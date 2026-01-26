@@ -21,19 +21,19 @@ namespace StockApi.Services
         {
             var data = await _repo.GetStockBalancesAsync();
 
-            // Map ข้อมูลลง DTO
             return data.Select(x => new StockBalanceDto
             {
                 ItemCode = x.ItemCode,
-                // ดึงชื่อ/หมวดหมู่ จากตาราง Item ที่ Join มา
                 Name = x.Item?.Name ?? "Unknown",
                 Category = x.Item?.Category ?? "-",
                 Unit = x.Item?.Unit ?? "-",
 
                 TotalQuantity = x.TotalQuantity,
+                Balance = x.Balance,
+
+                // Map ค่าจาก Database ใส่ DTO ตรงนี้ครับ
                 TempReceived = x.TempReceived,
-                TempWithdrawn = x.TempWithdrawn,
-                Balance = x.Balance
+                TempWithdrawn = x.TempWithdrawn
             }).ToList();
         }
     }

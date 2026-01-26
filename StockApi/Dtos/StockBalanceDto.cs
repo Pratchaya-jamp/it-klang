@@ -1,4 +1,4 @@
-namespace StockApi.Dtos
+﻿namespace StockApi.Dtos
 {
     public class StockBalanceDto
     {

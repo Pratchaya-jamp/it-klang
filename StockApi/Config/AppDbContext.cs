@@ -9,16 +9,18 @@ namespace StockApi.Config
 
         public DbSet<Item> Items { get; set; }
         public DbSet<StockBalance> StockBalances { get; set; }
+        // public DbSet<StockTransaction> StockTransactions { get; set; } // ถ้ายังไม่ใช้ คอมเมนต์ไว้ก่อนได้
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // บอก EF Core ว่า: การเชื่อมตารางนี้ ให้ใช้ ItemCode เป็นตัวเชื่อมนะ (ไม่ใช่ Id)
+            // Config ความสัมพันธ์: เชื่อมกันด้วย ItemCode (String)
             modelBuilder.Entity<StockBalance>()
-                .HasOne(s => s.Item)                // StockBalance มี 1 Item
-                .WithMany()                         // Item มีหลาย StockBalance ได้ (หรือจะ WithOne ก็ได้)
-                .HasForeignKey(s => s.ItemCode)     // FK คือ StockBalance.ItemCode
-                .HasPrincipalKey(i => i.ItemCode);  // **สำคัญ:** เป้าหมายคือ Item.ItemCode (ที่เป็น String เหมือนกัน)
+                .HasOne(s => s.Item)
+                .WithMany()
+                .HasForeignKey(s => s.ItemCode)
+                .HasPrincipalKey(i => i.ItemCode);
         }
     }
 }

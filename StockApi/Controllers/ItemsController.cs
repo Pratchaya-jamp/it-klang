@@ -1,4 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using StockApi.Dtos;
 using StockApi.Services;
 
 namespace StockApi.Controllers
@@ -14,11 +15,21 @@ namespace StockApi.Controllers
             _service = service;
         }
 
+        // GET: api/items/dashboard
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetDashboard([FromQuery] string? searchId, [FromQuery] string? category)
         {
             var result = await _service.GetDashboardAsync(searchId, category);
             return Ok(new { data = result });
+        }
+
+        // POST: api/items
+        // ใช้ลงทะเบียนสินค้าใหม่
+        [HttpPost]
+        public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest request)
+        {
+            var createdItem = await _service.CreateItemAsync(request);
+            return StatusCode(201, new { message = "สร้างสินค้าสำเร็จ พร้อมเปิดบัญชีสต็อก", data = createdItem });
         }
     }
 }

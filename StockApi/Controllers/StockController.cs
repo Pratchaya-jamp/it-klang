@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using StockApi.Services;
 
 namespace StockApi.Controllers
@@ -14,7 +14,8 @@ namespace StockApi.Controllers
             _service = service;
         }
 
-        // Endpoint: GET /api/stock/overview
+        // GET: api/stocks/overview
+        // เอาไว้ดูยอดคงเหลือ
         [HttpGet("overview")]
         public async Task<IActionResult> GetOverview()
         {
