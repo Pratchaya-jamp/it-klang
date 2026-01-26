@@ -23,6 +23,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 3. Register Layers (Dependency Injection)
 builder.Services.AddScoped<IItemRepository, ItemRepository>();
 builder.Services.AddScoped<IItemService, ItemService>();
+builder.Services.AddScoped<IStockRepository, StockRepository>();
+builder.Services.AddScoped<IStockService, StockService>();
 
 // 4. Setup Swagger & Controllers
 builder.Services.AddControllers();
