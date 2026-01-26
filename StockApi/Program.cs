@@ -4,6 +4,7 @@ using Microsoft.OpenApi.Models;
 using StockApi.Config;
 using StockApi.Repositories;
 using StockApi.Services;
+using StockApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +43,7 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // 5. Run Middleware
+app.UseMiddleware<GlobalExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
