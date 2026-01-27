@@ -32,7 +32,7 @@ namespace StockApi.Services
                 Balance = x.Balance,
 
                 // Map ค่าจาก Database ใส่ DTO ตรงนี้ครับ
-                TempReceived = x.TempReceived,
+                Received = x.Received,
                 TempWithdrawn = x.TempWithdrawn
             }).ToList();
         }

@@ -14,7 +14,7 @@ namespace StockApi.Entities
         public string ItemCode { get; set; } = string.Empty;
 
         public int TotalQuantity { get; set; }
-        public int TempReceived { get; set; }
+        public int Received { get; set; }
         public int TempWithdrawn { get; set; }
         public int Balance { get; set; }
 

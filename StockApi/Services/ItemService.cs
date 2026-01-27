@@ -16,7 +16,7 @@ namespace StockApi.Services
     public class ItemService : IItemService
     {
         private readonly IItemRepository _repo;
-        private readonly AppDbContext _context; // ใช้ Context เพื่อทำ Transaction
+        private readonly AppDbContext _context;
 
         public ItemService(IItemRepository repo, AppDbContext context)
         {
@@ -24,7 +24,6 @@ namespace StockApi.Services
             _context = context;
         }
 
-        // R: อ่านข้อมูล Dashboard
         public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category)
         {
             var items = await _repo.GetDashboardItemsAsync(searchId, category);
@@ -37,17 +36,16 @@ namespace StockApi.Services
             }).ToList();
         }
 
-        // C: สร้าง Item ใหม่ (และสร้าง Stock 0 แถมให้ทันที)
+        // C: Create Item
         public async Task<ItemDto> CreateItemAsync(CreateItemRequest request)
         {
-            // 1. เช็คซ้ำ (เหมือนเดิม)
             var exists = await _context.Items.AnyAsync(x => x.ItemCode == request.ItemCode);
             if (exists) throw new BadRequestException($"รหัสสินค้า '{request.ItemCode}' มีอยู่ในระบบแล้ว");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // Step A: สร้าง Item (เหมือนเดิม)
+                // 1. สร้าง Item
                 var newItem = new Item
                 {
                     ItemCode = request.ItemCode,
@@ -58,17 +56,20 @@ namespace StockApi.Services
                 _context.Items.Add(newItem);
                 await _context.SaveChangesAsync();
 
-                // Step B: สร้าง StockBalance (แก้ยอดตรงนี้!)
+                // 2. สร้าง StockBalance
                 var newStock = new StockBalance
                 {
                     ItemCode = request.ItemCode,
 
-                    // ใช้ค่าจาก Request เลยครับ
+                    // ยอดรับเข้าสะสม (Received): บันทึกว่ารับมาเท่าไหร่
+                    Received = request.Quantity,
+
+                    // ยอดรวมในคลัง (Total): มีของเท่าไหร่
                     TotalQuantity = request.Quantity,
+
+                    // ยอดคงเหลือ (Balance): พร้อมใช้เท่าไหร่
                     Balance = request.Quantity,
 
-                    // ส่วน Temp ยังเป็น 0 เพราะยังไม่มีการจอง
-                    TempReceived = 0,
                     TempWithdrawn = 0
                 };
                 _context.StockBalances.Add(newStock);
