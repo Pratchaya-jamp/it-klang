@@ -17,9 +17,12 @@ namespace StockApi.Controllers
 
         // GET: api/items/dashboard
         [HttpGet("dashboard")]
-        public async Task<IActionResult> GetDashboard([FromQuery] string? searchId, [FromQuery] string? category)
+        public async Task<IActionResult> GetDashboard(
+            [FromQuery] string? searchId,
+            [FromQuery] string? category,
+            [FromQuery] string? keyword) // <-- เพิ่มตัวนี้
         {
-            var result = await _service.GetDashboardAsync(searchId, category);
+            var result = await _service.GetDashboardAsync(searchId, category, keyword);
             return Ok(new { data = result });
         }
 
