@@ -32,7 +32,11 @@ namespace StockApi.Services
                 ItemCode = x.ItemCode,
                 Name = x.Name,
                 Category = x.Category,
-                Unit = x.Unit
+                Unit = x.Unit,
+
+                // จัด Format ตรงนี้
+                CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToList();
         }
 
@@ -45,32 +49,31 @@ namespace StockApi.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. สร้าง Item
+                // ใช้เวลาไทย (ถ้าอยากให้ใน DB เป็นเวลาไทยเลย)
+                // หรือใช้ DateTime.Now ตามปกติถ้าเครื่องเป็นเวลาไทยอยู่แล้ว
+                var now = DateTime.Now;
+
                 var newItem = new Item
                 {
                     ItemCode = request.ItemCode,
                     Name = request.Name,
                     Category = request.Category,
-                    Unit = request.Unit
+                    Unit = request.Unit,
+                    CreatedAt = now,
+                    UpdatedAt = now
                 };
                 _context.Items.Add(newItem);
                 await _context.SaveChangesAsync();
 
-                // 2. สร้าง StockBalance
                 var newStock = new StockBalance
                 {
                     ItemCode = request.ItemCode,
-
-                    // ยอดรับเข้าสะสม (Received): บันทึกว่ารับมาเท่าไหร่
                     Received = request.Quantity,
-
-                    // ยอดรวมในคลัง (Total): มีของเท่าไหร่
                     TotalQuantity = request.Quantity,
-
-                    // ยอดคงเหลือ (Balance): พร้อมใช้เท่าไหร่
                     Balance = request.Quantity,
-
-                    TempWithdrawn = 0
+                    TempWithdrawn = 0,
+                    CreatedAt = now,
+                    UpdatedAt = now
                 };
                 _context.StockBalances.Add(newStock);
                 await _context.SaveChangesAsync();
@@ -82,7 +85,11 @@ namespace StockApi.Services
                     ItemCode = newItem.ItemCode,
                     Name = newItem.Name,
                     Category = newItem.Category,
-                    Unit = newItem.Unit
+                    Unit = newItem.Unit,
+
+                    // จัด Format ส่งกลับ
+                    CreatedAt = newItem.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                    UpdatedAt = newItem.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
             }
             catch

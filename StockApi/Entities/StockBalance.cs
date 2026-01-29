@@ -20,5 +20,8 @@ namespace StockApi.Entities
 
         [ForeignKey("ItemCode")]
         public Item? Item { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
     }
 }

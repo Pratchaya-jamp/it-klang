@@ -27,13 +27,14 @@ namespace StockApi.Services
                 Name = x.Item?.Name ?? "Unknown",
                 Category = x.Item?.Category ?? "-",
                 Unit = x.Item?.Unit ?? "-",
-
                 TotalQuantity = x.TotalQuantity,
-                Balance = x.Balance,
-
-                // Map ค่าจาก Database ใส่ DTO ตรงนี้ครับ
                 Received = x.Received,
-                TempWithdrawn = x.TempWithdrawn
+                Balance = x.Balance,
+                TempWithdrawn = x.TempWithdrawn,
+
+                // จัด Format ตรงนี้
+                CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToList();
         }
     }

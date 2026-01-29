@@ -11,5 +11,7 @@
         public int Received { get; set; }
         public int TempWithdrawn { get; set; }
         public int Balance { get; set; }
+        public string CreatedAt { get; set; } = string.Empty;
+        public string UpdatedAt { get; set; } = string.Empty;
     }
 }
