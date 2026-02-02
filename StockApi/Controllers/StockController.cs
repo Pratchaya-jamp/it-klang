@@ -17,9 +17,12 @@ namespace StockApi.Controllers
         // GET: api/stocks/overview
         // เอาไว้ดูยอดคงเหลือ
         [HttpGet("overview")]
-        public async Task<IActionResult> GetOverview()
+        public async Task<IActionResult> GetOverview(
+            [FromQuery] string? searchId,
+            [FromQuery] string? category,
+            [FromQuery] string? keyword) // <-- เพิ่มตัวนี้
         {
-            var result = await _service.GetStockOverviewAsync();
+            var result = await _service.GetStockOverviewAsync(searchId, category, keyword);
             return Ok(new { data = result });
         }
     }
