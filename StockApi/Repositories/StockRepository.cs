@@ -6,8 +6,7 @@ namespace StockApi.Repositories
 {
     public interface IStockRepository
     {
-        // เพิ่ม Parameter 3 ตัว
-        Task<List<StockBalance>> GetStockBalancesAsync(string? searchId, string? category, string? keyword);
+        Task<List<StockBalance>> GetStockBalancesAsync(string? searchId, string? category, string? keyword, string? variant);
     }
 
     public class StockRepository : IStockRepository
@@ -19,32 +18,24 @@ namespace StockApi.Repositories
             _context = context;
         }
 
-        public async Task<List<StockBalance>> GetStockBalancesAsync(string? searchId, string? category, string? keyword)
+        public async Task<List<StockBalance>> GetStockBalancesAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            // ต้อง Include Item เข้ามาด้วย ไม่งั้นจะกรอง Category/Name ไม่ได้
             var query = _context.StockBalances.Include(x => x.Item).AsQueryable();
 
-            // 1. Filter Category (ดูจากตาราง Item ที่ Join มา)
             if (!string.IsNullOrEmpty(category))
-            {
                 query = query.Where(x => x.Item != null && x.Item.Category == category);
-            }
 
-            // 2. Filter Keyword (สเปคย่อย: SATA, DDR4 จากชื่อ Item)
+            // Filter Variant (Spec)
+            if (!string.IsNullOrEmpty(variant))
+                query = query.Where(x => x.Item != null && x.Item.Name.ToLower().Contains(variant.ToLower()));
+
+            // Filter Keyword (Name)
             if (!string.IsNullOrEmpty(keyword))
-            {
-                string k = keyword.ToLower();
-                query = query.Where(x => x.Item != null && x.Item.Name.ToLower().Contains(k));
-            }
+                query = query.Where(x => x.Item != null && x.Item.Name.ToLower().Contains(keyword.ToLower()));
 
-            // 3. Filter SearchId (รหัสสินค้า จากตาราง Stock เองได้เลย)
             if (!string.IsNullOrEmpty(searchId))
-            {
-                string s = searchId.ToLower();
-                query = query.Where(x => x.ItemCode.ToLower().Contains(s));
-            }
+                query = query.Where(x => x.ItemCode.ToLower().Contains(searchId.ToLower()));
 
-            // เรียงลำดับจากของใหม่ไปเก่า
             return await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
         }
     }

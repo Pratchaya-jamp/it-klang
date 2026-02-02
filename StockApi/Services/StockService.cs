@@ -5,8 +5,7 @@ namespace StockApi.Services
 {
     public interface IStockService
     {
-        // เพิ่ม Parameter ใน Interface
-        Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword);
+        Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword, string? variant);
     }
 
     public class StockService : IStockService
@@ -19,10 +18,9 @@ namespace StockApi.Services
         }
 
         // แก้ Method Implementation
-        public async Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword)
+        public async Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            // ส่งค่าต่อไปให้ Repository
-            var data = await _repo.GetStockBalancesAsync(searchId, category, keyword);
+            var data = await _repo.GetStockBalancesAsync(searchId, category, keyword, variant);
 
             return data.Select(x => new StockBalanceDto
             {
@@ -30,13 +28,10 @@ namespace StockApi.Services
                 Name = x.Item?.Name ?? "Unknown",
                 Category = x.Item?.Category ?? "-",
                 Unit = x.Item?.Unit ?? "-",
-
                 TotalQuantity = x.TotalQuantity,
                 Received = x.Received,
                 Balance = x.Balance,
                 TempWithdrawn = x.TempWithdrawn,
-
-                // แปลงเวลาเป็น String Format
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToList();

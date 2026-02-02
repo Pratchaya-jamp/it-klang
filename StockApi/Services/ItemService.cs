@@ -9,7 +9,8 @@ namespace StockApi.Services
 {
     public interface IItemService
     {
-        Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword);
+        Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant);
+
         Task<ItemDto> CreateItemAsync(CreateItemRequest request);
     }
 
@@ -24,10 +25,9 @@ namespace StockApi.Services
             _context = context;
         }
 
-        public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword)
+        public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            // ส่ง keyword ต่อไปให้ Repo
-            var items = await _repo.GetDashboardItemsAsync(searchId, category, keyword);
+            var items = await _repo.GetDashboardItemsAsync(searchId, category, keyword, variant);
 
             return items.Select(x => new ItemDto
             {
@@ -35,7 +35,7 @@ namespace StockApi.Services
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
-                CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"), // ใช้ DateUtils ก็ได้ถ้ามี
+                CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToList();
         }

@@ -20,9 +20,10 @@ namespace StockApi.Controllers
         public async Task<IActionResult> GetOverview(
             [FromQuery] string? searchId,
             [FromQuery] string? category,
-            [FromQuery] string? keyword) // <-- เพิ่มตัวนี้
+            [FromQuery] string? keyword,
+            [FromQuery] string? variant) // <-- เพิ่มตัวนี้
         {
-            var result = await _service.GetStockOverviewAsync(searchId, category, keyword);
+            var result = await _service.GetStockOverviewAsync(searchId, category, keyword, variant);
             return Ok(new { data = result });
         }
     }
