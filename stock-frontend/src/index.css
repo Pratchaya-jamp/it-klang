@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Custom Fonts หรือ Reset เพิ่มเติม (ถ้ามี) */
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc; /* Slate-50 background for enterprise look */
+}
