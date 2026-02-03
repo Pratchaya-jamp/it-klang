@@ -7,6 +7,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useToast } from '../context/ToastContext';
+import { createPortal } from 'react-dom';
 
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -52,12 +53,10 @@ const deleteItem = async (code) => {
 
 // --- SUB-COMPONENTS ---
 
-// 1. Creatable Select (Custom Dropdown + Type to Add)
+// 1. Creatable Select
 const CreatableSelect = ({ label, value, onChange, options, placeholder = "Select or type..." }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
-
-  // Close when clicking outside
   useEffect(() => {
     const handleClick = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false);
@@ -66,7 +65,6 @@ const CreatableSelect = ({ label, value, onChange, options, placeholder = "Selec
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Filter options based on input
   const filteredOptions = options.filter(opt => opt.toLowerCase().includes((value || "").toLowerCase()));
   const isCustomValue = value && !options.some(opt => opt.toLowerCase() === value.toLowerCase());
 
@@ -74,54 +72,15 @@ const CreatableSelect = ({ label, value, onChange, options, placeholder = "Selec
     <div className="space-y-1" ref={wrapperRef}>
       <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">{label}</label>
       <div className="relative">
-        <input
-          type="text" required
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => { onChange(e.target.value); setIsOpen(true); }}
-          onFocus={() => setIsOpen(true)}
-          className="w-full h-11 px-3 pr-10 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-600 outline-none"
-          tabIndex={-1} // Skip tab focus
-        >
-          <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
-        </button>
-
+        <input type="text" required placeholder={placeholder} value={value} onChange={(e) => { onChange(e.target.value); setIsOpen(true); }} onFocus={() => setIsOpen(true)} className="w-full h-11 px-3 pr-10 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
+        <button type="button" onClick={() => setIsOpen(!isOpen)} className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-600 outline-none" tabIndex={-1}><ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} /></button>
         {isOpen && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-100 rounded-lg shadow-xl max-h-48 overflow-auto animate-in fade-in zoom-in-95 duration-100">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt) => (
-                <div
-                  key={opt}
-                  onClick={() => { onChange(opt); setIsOpen(false); }}
-                  className={cn(
-                    "px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors",
-                    value === opt ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600"
-                  )}
-                >
-                  {opt}
-                  {value === opt && <Check size={14} />}
-                </div>
-              ))
-            ) : null}
-
-            {/* Show "Create New" hint if typing something not in list */}
-            {isCustomValue && (
-               <div 
-                 onClick={() => setIsOpen(false)} // Confirm value by closing
-                 className="px-3 py-2.5 text-xs text-zinc-400 border-t border-zinc-50 italic cursor-pointer hover:bg-zinc-50"
-               >
-                 Use new category: "<span className="text-zinc-700 font-medium">{value}</span>"
-               </div>
-            )}
-            
-            {!value && filteredOptions.length === 0 && (
-                <div className="px-3 py-2.5 text-xs text-zinc-400 italic">Type to add new...</div>
-            )}
+            {filteredOptions.length > 0 ? filteredOptions.map((opt) => (
+              <div key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors", value === opt ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600")}>{opt}{value === opt && <Check size={14} />}</div>
+            )) : null}
+            {isCustomValue && <div onClick={() => setIsOpen(false)} className="px-3 py-2.5 text-xs text-zinc-400 border-t border-zinc-50 italic cursor-pointer hover:bg-zinc-50">Use new category: "<span className="text-zinc-700 font-medium">{value}</span>"</div>}
+            {!value && filteredOptions.length === 0 && <div className="px-3 py-2.5 text-xs text-zinc-400 italic">Type to add new...</div>}
           </div>
         )}
       </div>
@@ -129,18 +88,15 @@ const CreatableSelect = ({ label, value, onChange, options, placeholder = "Selec
   );
 };
 
-// 2. Item Modal (Create & Edit Mode)
+// 2. Item Modal
 const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
   const isEditMode = !!initialData;
   const [formData, setFormData] = useState({ itemCode: '', name: '', category: '', unit: '', quantity: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-
-  // Preset Categories
   const categoryPresets = ['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor'];
 
-  // Animation Logic
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
@@ -153,7 +109,6 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
     }
   }, [isOpen]);
 
-  // Init Data
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
@@ -164,27 +119,20 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
     }
   }, [isOpen, initialData]);
 
-  // Logic Check
   const isFormValid = () => {
-    if (!isEditMode) {
-      return Object.values(formData).every(val => val !== '' && val !== null);
-    }
+    if (!isEditMode) return Object.values(formData).every(val => val !== '' && val !== null);
     const { quantity, ...rest } = formData; 
     return Object.values(rest).every(val => val !== '' && val !== null);
   };
   
-  const isChanged = isEditMode 
-    ? JSON.stringify(formData) !== JSON.stringify(initialData)
-    : true;
+  const isChanged = isEditMode ? JSON.stringify(formData) !== JSON.stringify(initialData) : true;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isFormValid() || (!isChanged && isEditMode)) return;
-
     setIsSubmitting(true);
     try {
       const payload = { ...formData, quantity: Number(formData.quantity) };
-      
       if (isEditMode) {
         await updateItem(formData.itemCode, payload);
         onSuccess("Item updated successfully!", "success");
@@ -202,18 +150,10 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
 
   if (!isMounted) return null;
 
-  return (
+  return createPortal (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")}
-        onClick={onClose}
-      />
-      <div 
-        className={cn(
-          "relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col gap-6 transform transition-all duration-300 ease-out",
-          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4"
-        )}
-      >
+      <div className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
+      <div className={cn("relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col gap-6 transform transition-all duration-300 ease-out", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{isEditMode ? 'Edit Item' : 'New Inventory Item'}</h2>
@@ -221,71 +161,39 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
           </div>
           <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors"><X size={20} strokeWidth={1.5} /></button>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Item Code {isEditMode && <span className="text-zinc-300 font-normal">(Read-only)</span>}</label>
-            <input 
-              type="text" required placeholder="Ex. 00000025"
-              value={formData.itemCode}
-              onChange={e => setFormData({...formData, itemCode: e.target.value})}
-              disabled={isEditMode}
-              className={cn(
-                "w-full h-11 px-3 border rounded-xl text-sm transition-all outline-none",
-                isEditMode 
-                  ? "bg-zinc-100 border-zinc-200 text-zinc-500 cursor-not-allowed" 
-                  : "bg-zinc-50 border-transparent focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200"
-              )}
-            />
+            <input type="text" required placeholder="Ex. 00000025" value={formData.itemCode} onChange={e => setFormData({...formData, itemCode: e.target.value})} disabled={isEditMode} className={cn("w-full h-11 px-3 border rounded-xl text-sm transition-all outline-none", isEditMode ? "bg-zinc-100 border-zinc-200 text-zinc-500 cursor-not-allowed" : "bg-zinc-50 border-transparent focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200")} />
           </div>
-
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Product Name</label>
             <input type="text" required placeholder="Product Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
-            {/* Custom Creatable Select for Category */}
-            <CreatableSelect 
-              label="Category"
-              value={formData.category}
-              onChange={(val) => setFormData({...formData, category: val})}
-              options={categoryPresets}
-              placeholder="Select or type..."
-            />
-            
+            <CreatableSelect label="Category" value={formData.category} onChange={(val) => setFormData({...formData, category: val})} options={categoryPresets} placeholder="Select or type..." />
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Unit</label>
               <input type="text" required placeholder="PC, Box..." value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
             </div>
           </div>
-
           {!isEditMode && (
             <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Quantity</label>
-              <input 
-                type="number" required placeholder="0" min="0"
-                value={formData.quantity}
-                onChange={e => setFormData({...formData, quantity: e.target.value})}
-                className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none"
-              />
+              <input type="number" required placeholder="0" min="0" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
             </div>
           )}
-
           <div className="pt-4 flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all active:scale-95">Cancel</button>
-            <button 
-              type="submit" 
-              disabled={!isFormValid() || isSubmitting || (!isChanged && isEditMode)} 
-              className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95"
-            >
+            <button type="submit" disabled={!isFormValid() || isSubmitting || (!isChanged && isEditMode)} className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95">
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {isEditMode ? 'Update Changes' : 'Save Item'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -318,31 +226,13 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, itemCode }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")}
-        onClick={onClose}
-      />
-      <div 
-        className={cn(
-          "relative bg-white w-full max-w-sm p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col items-center text-center gap-4 transform transition-all duration-300 ease-out",
-          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4"
-        )}
-      >
-        <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-2">
-          <AlertTriangle size={24} />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-zinc-900">Delete Item?</h3>
-          <p className="text-sm text-zinc-500 mt-1">
-            Are you sure you want to delete <span className="font-mono font-medium text-zinc-700">{itemCode}</span>?<br/>This action cannot be undone.
-          </p>
-        </div>
+      <div className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
+      <div className={cn("relative bg-white w-full max-w-sm p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col items-center text-center gap-4 transform transition-all duration-300 ease-out", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+        <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-2"><AlertTriangle size={24} /></div>
+        <div><h3 className="text-lg font-semibold text-zinc-900">Delete Item?</h3><p className="text-sm text-zinc-500 mt-1">Are you sure you want to delete <span className="font-mono font-medium text-zinc-700">{itemCode}</span>?<br/>This action cannot be undone.</p></div>
         <div className="flex gap-3 w-full mt-2">
           <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all">Cancel</button>
-          <button onClick={handleConfirm} disabled={isDeleting} className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-all shadow-md shadow-red-100 flex items-center justify-center gap-2">
-            {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            Delete
-          </button>
+          <button onClick={handleConfirm} disabled={isDeleting} className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-all shadow-md shadow-red-100 flex items-center justify-center gap-2">{isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}Delete</button>
         </div>
       </div>
     </div>
@@ -391,7 +281,6 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
 export default function Dashboard() {
   const { showToast } = useToast();
   
-  // States
   const [searchId, setSearchId] = useState("");
   const [category, setCategory] = useState(""); 
   const [keyword, setKeyword] = useState("");   
@@ -401,7 +290,6 @@ export default function Dashboard() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
-  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null); 
   const [deletingItem, setDeletingItem] = useState(null); 
@@ -425,7 +313,6 @@ export default function Dashboard() {
     if (category) params.append('category', category);
     if (keyword) params.append('keyword', keyword);
     if (variant) params.append('variant', variant);
-
     const res = await fetchItems(params.toString());
     setData(res.data || []);
     setLoading(false);
@@ -437,20 +324,9 @@ export default function Dashboard() {
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);
 
-  // Actions
-  const handleCreate = () => {
-    setEditingItem(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteClick = (item) => {
-    setDeletingItem(item);
-  };
+  const handleCreate = () => { setEditingItem(null); setIsModalOpen(true); };
+  const handleEdit = (item) => { setEditingItem(item); setIsModalOpen(true); };
+  const handleDeleteClick = (item) => { setDeletingItem(item); };
 
   const handleConfirmDelete = async () => {
     if (deletingItem) {
@@ -469,7 +345,6 @@ export default function Dashboard() {
     if (type === 'success') fetchData();
   };
 
-  // Process Data
   const processedData = useMemo(() => {
     if (!data) return { all: [], paginated: [], totalPages: 0 };
     const sorted = [...data].sort((a, b) => sortOrder === 'asc' ? a.itemCode.localeCompare(b.itemCode) : b.itemCode.localeCompare(a.itemCode));
@@ -482,7 +357,6 @@ export default function Dashboard() {
 
   const toggleSort = () => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
 
-  // Stats
   const stats = useMemo(() => {
     if (!data.length) return { total: 0, categories: 0, units: 0, topCategory: '-' };
     const total = data.length;
@@ -494,7 +368,6 @@ export default function Dashboard() {
     return { total, categories: uniqueCategories, units: uniqueUnits, topCategory, topCategoryPercent };
   }, [data]);
 
-  // UI Handlers
   const handleCategoryChange = (val) => { setCategory(val); setKeyword(""); setVariant(""); };
   const clearAllFilters = () => { setCategory(""); setKeyword(""); setVariant(""); setIsFilterOpen(false); };
   const hasActiveFilters = category || keyword || variant;
@@ -508,95 +381,46 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8 relative">
-      
-      {/* MODALS */}
-      <ItemModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={handleModalSuccess} 
-        initialData={editingItem} 
-      />
-      
-      <DeleteModal 
-        isOpen={!!deletingItem} 
-        onClose={() => setDeletingItem(null)} 
-        onConfirm={handleConfirmDelete} 
-        itemCode={deletingItem?.itemCode} 
-      />
+      <ItemModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleModalSuccess} initialData={editingItem} />
+      <DeleteModal isOpen={!!deletingItem} onClose={() => setDeletingItem(null)} onConfirm={handleConfirmDelete} itemCode={deletingItem?.itemCode} />
 
-      {/* Header */}
       <div className="flex items-end justify-between py-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1>
-          <p className="text-zinc-500 text-sm font-light mt-1">Real-time inventory overview.</p>
-        </div>
-        <div className="hidden sm:flex text-sm text-zinc-400 font-light items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-zinc-100 shadow-sm">
-           <Clock size={14}/> <span>Today</span>
-        </div>
+        <div><h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1><p className="text-zinc-500 text-sm font-light mt-1">Real-time inventory overview.</p></div>
+        <div className="hidden sm:flex text-sm text-zinc-400 font-light items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-zinc-100 shadow-sm"><Clock size={14}/> <span>Today</span></div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Items" value={stats.total} subtext="Filtered items count" icon={Package} />
         <StatCard title="Active Categories" value={stats.categories} subtext="Product lines found" icon={Layers} />
         <StatCard title="Unit Types" value={stats.units} subtext="Distinct counting units" icon={Scale} />
         <StatCard title="Dominant Category" value={stats.topCategory} subtext={stats.total > 0 ? `${stats.topCategoryPercent}% of total inventory` : "No data available"} icon={BarChart3} highlight={true} />
       </div>
-
       <div className="h-px w-full bg-zinc-100"></div>
 
-      {/* Controls */}
       <div>
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center gap-3 w-full">
-            <div className="relative flex-1 group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-              <input type="text" placeholder="Search by Item Code..." value={searchId} onChange={(e) => setSearchId(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" />
-            </div>
-            
+            <div className="relative flex-1 group"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} /><input type="text" placeholder="Search by Item Code..." value={searchId} onChange={(e) => setSearchId(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" /></div>
             <div className="relative" ref={filterRef}>
-              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("h-11 w-11 flex items-center justify-center rounded-xl border transition-all shadow-sm", isFilterOpen || hasActiveFilters ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50")}>
-                <SlidersHorizontal size={18} strokeWidth={2} />
-                {hasActiveFilters && !isFilterOpen && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>}
-              </button>
+              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("h-11 w-11 flex items-center justify-center rounded-xl border transition-all shadow-sm", isFilterOpen || hasActiveFilters ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50")}><SlidersHorizontal size={18} strokeWidth={2} />{hasActiveFilters && !isFilterOpen && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>}</button>
               {isFilterOpen && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-zinc-100 p-4 z-30 animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">Filters</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> Reset</button>}</div>
-                  <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} />
-                  <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
+                  <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} /><div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
                 </div>
               )}
             </div>
-
-            <button onClick={handleCreate} className="h-11 px-5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm shadow-zinc-200 active:scale-95">
-              <Plus size={16} /> <span className="hidden sm:inline">New Item</span>
-            </button>
+            <button onClick={handleCreate} className="h-11 px-5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm shadow-zinc-200 active:scale-95"><Plus size={16} /> <span className="hidden sm:inline">New Item</span></button>
           </div>
-          
-          {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in">
-              <span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>
-              {[category, keyword, variant].filter(Boolean).map((t) => (
-                <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
-                  {t} <button onClick={() => {if(t===category)setCategory("");if(t===keyword)setKeyword("");if(t===variant)setVariant("")}} className="hover:text-red-500 transition-colors"><X size={12}/></button>
-                </span>
-              ))}
-            </div>
-          )}
+          {hasActiveFilters && <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in"><span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>{[category, keyword, variant].filter(Boolean).map((t) => (<span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">{t} <button onClick={() => {if(t===category)setCategory("");if(t===keyword)setKeyword("");if(t===variant)setVariant("")}} className="hover:text-red-500 transition-colors"><X size={12}/></button></span>))}</div>}
         </div>
 
-        {/* Table Container */}
         <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50/30">
-                  <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={toggleSort}>
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
-                      Code
-                      <div className="flex flex-col">{sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}</div>
-                    </div>
-                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={toggleSort}><div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">Code<div className="flex flex-col">{sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}</div></div></th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Name</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Category</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center">Unit</th>
@@ -615,24 +439,11 @@ export default function Dashboard() {
                       <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
                       <td className="px-6 py-4 text-center text-zinc-500">{item.unit}</td>
                       <td className="px-6 py-4 text-right text-zinc-400 text-xs font-light">{item.createdAt}</td>
-                      
-                      {/* ACTION BUTTONS */}
+                      {/* ACTION BUTTONS (VISIBLE) */}
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => handleEdit(item)}
-                            className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={14} strokeWidth={2} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteClick(item)}
-                            className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} strokeWidth={2} />
-                          </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => handleEdit(item)} className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><Pencil size={15} strokeWidth={2} /></button>
+                          <button onClick={() => handleDeleteClick(item)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 size={15} strokeWidth={2} /></button>
                         </div>
                       </td>
                     </tr>
@@ -643,23 +454,9 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
-
           <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <span>Rows:</span>
-              <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer">
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
-                <button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
-              </div>
-            </div>
+            <div className="flex items-center gap-2 text-sm text-zinc-500"><span>Rows:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select></div>
+            <div className="flex items-center gap-4"><span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span><div className="flex items-center gap-1"><button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button><button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button></div></div>
           </div>
         </div>
       </div>
