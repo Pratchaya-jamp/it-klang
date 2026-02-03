@@ -15,12 +15,16 @@ namespace StockApi.Config
         {
             base.OnModelCreating(modelBuilder);
 
-            // Config ความสัมพันธ์: เชื่อมกันด้วย ItemCode (String)
-            modelBuilder.Entity<StockBalance>()
-                .HasOne(s => s.Item)
-                .WithMany()
-                .HasForeignKey(s => s.ItemCode)
-                .HasPrincipalKey(i => i.ItemCode);
+            // 1. ระบุชัดๆ ไปเลยว่า ItemCode คือ Primary Key (Key หลัก) ของตาราง Item
+            // เพื่อไม่ให้ EF Core เผลอไปใช้ Id (int)
+            modelBuilder.Entity<Item>()
+                .HasKey(i => i.ItemCode);
+
+            // 2. ระบุความสัมพันธ์ 1-ต่อ-1
+            modelBuilder.Entity<Item>()
+                .HasOne(i => i.StockBalance)
+                .WithOne(s => s.Item)
+                .HasForeignKey<StockBalance>(s => s.ItemCode); // เชื่อมด้วย ItemCode (String) ทั้งคู่
         }
     }
 }

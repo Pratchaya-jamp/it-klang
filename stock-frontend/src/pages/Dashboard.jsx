@@ -2,14 +2,16 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, SlidersHorizontal, ChevronDown, Check, Plus, X, Trash2,
   Package, Layers, Scale, BarChart3, Clock, ArrowUp, ArrowDown, 
-  ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, Save, Loader2, Pencil, AlertTriangle
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useToast } from '../context/ToastContext';
 
+// Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// --- API SERVICE ---
+// --- API SERVICES ---
 const fetchItems = async (queryString) => {
   try {
     const response = await fetch(`/api/items/dashboard?${queryString}`);
@@ -20,7 +22,334 @@ const fetchItems = async (queryString) => {
   }
 };
 
+const createItem = async (payload) => {
+  const response = await fetch('/api/items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create item');
+  return await response.json();
+};
+
+const updateItem = async (code, payload) => {
+  const response = await fetch(`/api/items/${code}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update item');
+  return await response.json();
+};
+
+const deleteItem = async (code) => {
+  const response = await fetch(`/api/items/${code}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete item');
+  return true;
+};
+
 // --- SUB-COMPONENTS ---
+
+// 1. Creatable Select (Custom Dropdown + Type to Add)
+const CreatableSelect = ({ label, value, onChange, options, placeholder = "Select or type..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Filter options based on input
+  const filteredOptions = options.filter(opt => opt.toLowerCase().includes((value || "").toLowerCase()));
+  const isCustomValue = value && !options.some(opt => opt.toLowerCase() === value.toLowerCase());
+
+  return (
+    <div className="space-y-1" ref={wrapperRef}>
+      <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">{label}</label>
+      <div className="relative">
+        <input
+          type="text" required
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+          className="w-full h-11 px-3 pr-10 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-600 outline-none"
+          tabIndex={-1} // Skip tab focus
+        >
+          <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-100 rounded-lg shadow-xl max-h-48 overflow-auto animate-in fade-in zoom-in-95 duration-100">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt}
+                  onClick={() => { onChange(opt); setIsOpen(false); }}
+                  className={cn(
+                    "px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors",
+                    value === opt ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600"
+                  )}
+                >
+                  {opt}
+                  {value === opt && <Check size={14} />}
+                </div>
+              ))
+            ) : null}
+
+            {/* Show "Create New" hint if typing something not in list */}
+            {isCustomValue && (
+               <div 
+                 onClick={() => setIsOpen(false)} // Confirm value by closing
+                 className="px-3 py-2.5 text-xs text-zinc-400 border-t border-zinc-50 italic cursor-pointer hover:bg-zinc-50"
+               >
+                 Use new category: "<span className="text-zinc-700 font-medium">{value}</span>"
+               </div>
+            )}
+            
+            {!value && filteredOptions.length === 0 && (
+                <div className="px-3 py-2.5 text-xs text-zinc-400 italic">Type to add new...</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 2. Item Modal (Create & Edit Mode)
+const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
+  const isEditMode = !!initialData;
+  const [formData, setFormData] = useState({ itemCode: '', name: '', category: '', unit: '', quantity: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Preset Categories
+  const categoryPresets = ['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor'];
+
+  // Animation Logic
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true);
+      const timer = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => setIsMounted(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Init Data
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setFormData({ ...initialData });
+      } else {
+        setFormData({ itemCode: '', name: '', category: '', unit: '', quantity: '' });
+      }
+    }
+  }, [isOpen, initialData]);
+
+  // Logic Check
+  const isFormValid = () => {
+    if (!isEditMode) {
+      return Object.values(formData).every(val => val !== '' && val !== null);
+    }
+    const { quantity, ...rest } = formData; 
+    return Object.values(rest).every(val => val !== '' && val !== null);
+  };
+  
+  const isChanged = isEditMode 
+    ? JSON.stringify(formData) !== JSON.stringify(initialData)
+    : true;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isFormValid() || (!isChanged && isEditMode)) return;
+
+    setIsSubmitting(true);
+    try {
+      const payload = { ...formData, quantity: Number(formData.quantity) };
+      
+      if (isEditMode) {
+        await updateItem(formData.itemCode, payload);
+        onSuccess("Item updated successfully!", "success");
+      } else {
+        await createItem(payload);
+        onSuccess("Item created successfully!", "success");
+      }
+      onClose();
+    } catch (error) {
+      onSuccess(`Failed to ${isEditMode ? 'update' : 'create'} item.`, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isMounted) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div 
+        className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")}
+        onClick={onClose}
+      />
+      <div 
+        className={cn(
+          "relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col gap-6 transform transition-all duration-300 ease-out",
+          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4"
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{isEditMode ? 'Edit Item' : 'New Inventory Item'}</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">{isEditMode ? `Updating details for ${initialData.itemCode}` : 'Fill in the details to add to stock.'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors"><X size={20} strokeWidth={1.5} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Item Code {isEditMode && <span className="text-zinc-300 font-normal">(Read-only)</span>}</label>
+            <input 
+              type="text" required placeholder="Ex. 00000025"
+              value={formData.itemCode}
+              onChange={e => setFormData({...formData, itemCode: e.target.value})}
+              disabled={isEditMode}
+              className={cn(
+                "w-full h-11 px-3 border rounded-xl text-sm transition-all outline-none",
+                isEditMode 
+                  ? "bg-zinc-100 border-zinc-200 text-zinc-500 cursor-not-allowed" 
+                  : "bg-zinc-50 border-transparent focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200"
+              )}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Product Name</label>
+            <input type="text" required placeholder="Product Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Custom Creatable Select for Category */}
+            <CreatableSelect 
+              label="Category"
+              value={formData.category}
+              onChange={(val) => setFormData({...formData, category: val})}
+              options={categoryPresets}
+              placeholder="Select or type..."
+            />
+            
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Unit</label>
+              <input type="text" required placeholder="PC, Box..." value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
+            </div>
+          </div>
+
+          {!isEditMode && (
+            <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Quantity</label>
+              <input 
+                type="number" required placeholder="0" min="0"
+                value={formData.quantity}
+                onChange={e => setFormData({...formData, quantity: e.target.value})}
+                className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none"
+              />
+            </div>
+          )}
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all active:scale-95">Cancel</button>
+            <button 
+              type="submit" 
+              disabled={!isFormValid() || isSubmitting || (!isChanged && isEditMode)} 
+              className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95"
+            >
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {isEditMode ? 'Update Changes' : 'Save Item'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 3. Delete Confirm Modal
+const DeleteModal = ({ isOpen, onClose, onConfirm, itemCode }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true);
+      const timer = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => setIsMounted(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    await onConfirm();
+    setIsDeleting(false);
+    onClose();
+  };
+
+  if (!isMounted) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div 
+        className={cn("absolute inset-0 bg-zinc-900/20 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")}
+        onClick={onClose}
+      />
+      <div 
+        className={cn(
+          "relative bg-white w-full max-w-sm p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col items-center text-center gap-4 transform transition-all duration-300 ease-out",
+          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4"
+        )}
+      >
+        <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-2">
+          <AlertTriangle size={24} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-zinc-900">Delete Item?</h3>
+          <p className="text-sm text-zinc-500 mt-1">
+            Are you sure you want to delete <span className="font-mono font-medium text-zinc-700">{itemCode}</span>?<br/>This action cannot be undone.
+          </p>
+        </div>
+        <div className="flex gap-3 w-full mt-2">
+          <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all">Cancel</button>
+          <button onClick={handleConfirm} disabled={isDeleting} className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-all shadow-md shadow-red-100 flex items-center justify-center gap-2">
+            {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- HELPER COMPONENTS ---
 const StatCard = ({ title, value, subtext, icon: Icon, highlight }) => (
   <div className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all duration-200 group">
     <div className="flex justify-between items-start mb-2">
@@ -41,15 +370,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
   return (
     <div className="relative w-full mb-3 last:mb-0">
       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 block">{label}</label>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "w-full flex items-center justify-between px-3 py-2 bg-zinc-50 border border-transparent rounded-lg text-sm transition-all",
-          "hover:bg-zinc-100", isOpen ? "bg-white border-zinc-300 ring-2 ring-zinc-50" : "",
-          !value ? "text-zinc-400" : "text-zinc-900 font-medium"
-        )}
-      >
+      <button type="button" onClick={() => setIsOpen(!isOpen)} className={cn("w-full flex items-center justify-between px-3 py-2 bg-zinc-50 border border-transparent rounded-lg text-sm transition-all", "hover:bg-zinc-100", isOpen ? "bg-white border-zinc-300 ring-2 ring-zinc-50" : "", !value ? "text-zinc-400" : "text-zinc-900 font-medium")}>
         <span className="truncate">{value || placeholder}</span>
         <ChevronDown size={14} className={cn("transition-transform text-zinc-400", isOpen && "rotate-180")} />
       </button>
@@ -66,19 +387,25 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
   );
 };
 
+// --- MAIN DASHBOARD ---
 export default function Dashboard() {
-  // Filter State
+  const { showToast } = useToast();
+  
+  // States
   const [searchId, setSearchId] = useState("");
   const [category, setCategory] = useState(""); 
   const [keyword, setKeyword] = useState("");   
   const [variant, setVariant] = useState("");   
   const [sortOrder, setSortOrder] = useState('asc');
-  
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); // Default 10
-
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Modal States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null); 
+  const [deletingItem, setDeletingItem] = useState(null); 
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const filterRef = useRef(null);
@@ -91,67 +418,86 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch Data
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (searchId) params.append('searchId', searchId);
-      if (category) params.append('category', category);
-      if (keyword) params.append('keyword', keyword);
-      if (variant) params.append('variant', variant);
+  const fetchData = async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (searchId) params.append('searchId', searchId);
+    if (category) params.append('category', category);
+    if (keyword) params.append('keyword', keyword);
+    if (variant) params.append('variant', variant);
 
-      const res = await fetchItems(params.toString());
-      setData(res.data || []);
-      setLoading(false);
-      setCurrentPage(1); // Reset page when filter changes
-    };
+    const res = await fetchItems(params.toString());
+    setData(res.data || []);
+    setLoading(false);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
     const timeoutId = setTimeout(() => fetchData(), 500);
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);
 
-  // --- SORTING & PAGINATION LOGIC ---
+  // Actions
+  const handleCreate = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (item) => {
+    setDeletingItem(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingItem) {
+      try {
+        await deleteItem(deletingItem.itemCode);
+        showToast("Item deleted successfully", "success");
+        fetchData();
+      } catch (error) {
+        showToast("Failed to delete item", "error");
+      }
+    }
+  };
+
+  const handleModalSuccess = (message, type = 'success') => {
+    showToast(message, type);
+    if (type === 'success') fetchData();
+  };
+
+  // Process Data
   const processedData = useMemo(() => {
     if (!data) return { all: [], paginated: [], totalPages: 0 };
-    
-    // 1. Sort
-    const sorted = [...data].sort((a, b) => {
-      return sortOrder === 'asc' 
-        ? a.itemCode.localeCompare(b.itemCode) 
-        : b.itemCode.localeCompare(a.itemCode);
-    });
-
-    // 2. Paginate
+    const sorted = [...data].sort((a, b) => sortOrder === 'asc' ? a.itemCode.localeCompare(b.itemCode) : b.itemCode.localeCompare(a.itemCode));
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = sorted.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(sorted.length / itemsPerPage);
-
-    return { all: sorted, paginated: currentItems, totalPages, totalCount: sorted.length };
+    return { all: sorted, paginated: currentItems, totalPages };
   }, [data, sortOrder, currentPage, itemsPerPage]);
 
   const toggleSort = () => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
 
-  // Stats Logic
+  // Stats
   const stats = useMemo(() => {
     if (!data.length) return { total: 0, categories: 0, units: 0, topCategory: '-' };
     const total = data.length;
     const uniqueCategories = new Set(data.map(item => item.category)).size;
     const uniqueUnits = new Set(data.map(item => item.unit)).size;
-    const categoryCounts = data.reduce((acc, item) => {
-      acc[item.category] = (acc[item.category] || 0) + 1;
-      return acc;
-    }, {});
+    const categoryCounts = data.reduce((acc, item) => { acc[item.category] = (acc[item.category] || 0) + 1; return acc; }, {});
     const topCategory = Object.keys(categoryCounts).reduce((a, b) => categoryCounts[a] > categoryCounts[b] ? a : b, '-');
     const topCategoryPercent = Math.round((categoryCounts[topCategory] / total) * 100);
     return { total, categories: uniqueCategories, units: uniqueUnits, topCategory, topCategoryPercent };
   }, [data]);
 
-  // Filter Handlers
+  // UI Handlers
   const handleCategoryChange = (val) => { setCategory(val); setKeyword(""); setVariant(""); };
   const clearAllFilters = () => { setCategory(""); setKeyword(""); setVariant(""); setIsFilterOpen(false); };
   const hasActiveFilters = category || keyword || variant;
-
   const renderSubFilters = () => {
     if (!category) return <div className="p-4 text-center text-xs text-zinc-400 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">Select a category first</div>;
     if (['Mouse', 'Keyboard'].includes(category)) return <CustomSelect label="Connection" options={['USB', 'Wireless']} value={keyword} onChange={setKeyword} />;
@@ -161,7 +507,23 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8">
+    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8 relative">
+      
+      {/* MODALS */}
+      <ItemModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={handleModalSuccess} 
+        initialData={editingItem} 
+      />
+      
+      <DeleteModal 
+        isOpen={!!deletingItem} 
+        onClose={() => setDeletingItem(null)} 
+        onConfirm={handleConfirmDelete} 
+        itemCode={deletingItem?.itemCode} 
+      />
+
       {/* Header */}
       <div className="flex items-end justify-between py-6">
         <div>
@@ -183,16 +545,15 @@ export default function Dashboard() {
 
       <div className="h-px w-full bg-zinc-100"></div>
 
-      {/* Table & Controls */}
+      {/* Controls */}
       <div>
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center gap-3 w-full">
             <div className="relative flex-1 group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-              <input type="text" placeholder="Search by Item Code..." value={searchId} onChange={(e) => setSearchId(e.target.value)}
-                className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm"
-              />
+              <input type="text" placeholder="Search by Item Code..." value={searchId} onChange={(e) => setSearchId(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" />
             </div>
+            
             <div className="relative" ref={filterRef}>
               <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("h-11 w-11 flex items-center justify-center rounded-xl border transition-all shadow-sm", isFilterOpen || hasActiveFilters ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50")}>
                 <SlidersHorizontal size={18} strokeWidth={2} />
@@ -206,11 +567,12 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-            <button className="h-11 px-5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm shadow-zinc-200 active:scale-95">
+
+            <button onClick={handleCreate} className="h-11 px-5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm shadow-zinc-200 active:scale-95">
               <Plus size={16} /> <span className="hidden sm:inline">New Item</span>
             </button>
           </div>
-
+          
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in">
               <span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>
@@ -239,70 +601,66 @@ export default function Dashboard() {
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Category</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center">Unit</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Date</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {loading ? (
-                  [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="5" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
+                  [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="6" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
                 ) : processedData.paginated.length > 0 ? (
                   processedData.paginated.map((item) => (
-                    <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0 cursor-pointer">
+                    <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0">
                       <td className="px-6 py-4 font-mono text-zinc-500 text-xs group-hover:text-zinc-900 font-medium">{item.itemCode}</td>
                       <td className="px-6 py-4"><span className="font-medium text-zinc-900 block">{item.name}</span></td>
                       <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
                       <td className="px-6 py-4 text-center text-zinc-500">{item.unit}</td>
                       <td className="px-6 py-4 text-right text-zinc-400 text-xs font-light">{item.createdAt}</td>
+                      
+                      {/* ACTION BUTTONS */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleEdit(item)}
+                            className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={14} strokeWidth={2} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteClick(item)}
+                            className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} strokeWidth={2} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="5" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Search size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No items found</p></div></td></tr>
+                  <tr><td colSpan="6" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Search size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No items found</p></div></td></tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* --- PAGINATION FOOTER --- */}
           <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            
-            {/* Left: Rows per page selector */}
             <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <span>Rows per page:</span>
-              <select 
-                value={itemsPerPage} 
-                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer"
-              >
+              <span>Rows:</span>
+              <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer">
                 <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={20}>20</option>
               </select>
             </div>
-
-            {/* Right: Navigation & Page Info */}
             <div className="flex items-center gap-4">
-              <span className="text-sm text-zinc-500">
-                Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span>
-              </span>
-              
+              <span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
               <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))}
-                  disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0}
-                  className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight size={16} />
-                </button>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                <button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

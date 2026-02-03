@@ -8,6 +8,9 @@ namespace StockApi.Repositories
     {
         // เพิ่ม variant
         Task<List<Item>> GetDashboardItemsAsync(string? searchId, string? category, string? keyword, string? variant);
+        Task<Item?> GetItemByCodeAsync(string itemCode); // หา Item รายตัว
+        Task UpdateItemAsync(Item item);                 // สั่ง Save ค่าที่แก้
+        Task DeleteItemAsync(string itemCode);
     }
 
     public class ItemRepository : IItemRepository
@@ -41,6 +44,34 @@ namespace StockApi.Repositories
                 query = query.Where(x => x.ItemCode.ToLower().Contains(searchId.ToLower()));
 
             return await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
+
+        public async Task<Item?> GetItemByCodeAsync(string itemCode)
+        {
+            return await _context.Items
+                .Include(x => x.StockBalance) // จอยมาด้วยเพื่อเช็คยอด
+                .FirstOrDefaultAsync(x => x.ItemCode == itemCode);
+        }
+
+        // 2. บันทึกการแก้ไข
+        public async Task UpdateItemAsync(Item item)
+        {
+            _context.Items.Update(item);
+            await _context.SaveChangesAsync();
+        }
+
+        // 3. ลบสินค้า (ลบทั้ง Item และ StockBalance ของตัวนั้น)
+        public async Task DeleteItemAsync(string itemCode)
+        {
+            // ลบ StockBalance ก่อน (เนื่องจาก FK)
+            var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == itemCode);
+            if (stock != null) _context.StockBalances.Remove(stock);
+
+            // ลบ Item
+            var item = await _context.Items.FirstOrDefaultAsync(x => x.ItemCode == itemCode);
+            if (item != null) _context.Items.Remove(item);
+
+            await _context.SaveChangesAsync();
         }
     }
 }

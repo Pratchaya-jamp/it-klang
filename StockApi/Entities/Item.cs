@@ -6,11 +6,10 @@ namespace StockApi.Entities
     [Table("Items")]
     public class Item
     {
-        [Key]
-        public int Id { get; set; }
+        // [Key]
+        // public int Id { get; set; }
 
-        [Required]
-        [Column("ItemCode")]
+        [Key] // ต้องอยู่ที่นี่
         public string ItemCode { get; set; } = string.Empty;
 
         [Required]
@@ -27,5 +26,7 @@ namespace StockApi.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+        public StockBalance? StockBalance { get; set; }
     }
 }

@@ -35,5 +35,21 @@ namespace StockApi.Controllers
             var createdItem = await _service.CreateItemAsync(request);
             return StatusCode(201, new { message = "สร้างสินค้าสำเร็จ พร้อมเปิดบัญชีสต็อก", data = createdItem });
         }
+
+        // PUT: api/Items/IT-001 (แก้ไข)
+        [HttpPut("{itemCode}")]
+        public async Task<IActionResult> UpdateItem(string itemCode, [FromBody] UpdateItemRequest request)
+        {
+            await _service.UpdateItemAsync(itemCode, request);
+            return Ok(new { message = $"แก้ไขสินค้า {itemCode} สำเร็จ" });
+        }
+
+        // DELETE: api/Items/IT-001 (ลบ)
+        [HttpDelete("{itemCode}")]
+        public async Task<IActionResult> DeleteItem(string itemCode)
+        {
+            await _service.DeleteItemAsync(itemCode);
+            return Ok(new { message = $"ลบสินค้า {itemCode} สำเร็จ" });
+        }
     }
 }
