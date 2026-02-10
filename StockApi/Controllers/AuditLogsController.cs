@@ -4,7 +4,7 @@ using StockApi.Services;
 namespace StockApi.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/auditlogs")]
     public class AuditLogsController : ControllerBase
     {
         private readonly IAuditService _auditService;

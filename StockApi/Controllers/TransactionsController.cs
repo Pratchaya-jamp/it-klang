@@ -5,7 +5,7 @@ using StockApi.Services;
 namespace StockApi.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/transactions")]
     public class TransactionsController : ControllerBase
     {
         private readonly IStockService _stockService;
