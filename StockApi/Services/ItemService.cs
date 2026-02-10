@@ -29,17 +29,25 @@ namespace StockApi.Services
 
         public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            var items = await _repo.GetDashboardItemsAsync(searchId, category, keyword, variant);
+            // 1. รับ Query มา (สูตร SQL)
+            var query = _repo.GetDashboardQuery(searchId, category, keyword, variant);
 
-            return items.Select(x => new ItemDto
+            // 2. ทำ Projection (เลือกเฉพาะคอลัมน์ที่ใช้) -> แล้วค่อยยิง DB ด้วย ToListAsync()
+            // วิธีนี้คือหัวใจความเร็วของ GET ครับ
+            var result = await query.Select(x => new ItemDto
             {
                 ItemCode = x.ItemCode,
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
+
+                // แปลงเวลาตรงนี้
+                // (ถ้า Database Error เรื่องแปลงเวลา ให้ใช้ .ToString() เฉยๆ แล้วไป format ที่ Frontend)
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
-            }).ToList();
+            }).ToListAsync();
+
+            return result;
         }
 
         // C: Create Item

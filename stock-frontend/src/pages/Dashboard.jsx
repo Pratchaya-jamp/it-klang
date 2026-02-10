@@ -319,7 +319,22 @@ export default function Dashboard() {
     setCurrentPage(1);
   };
 
+  // useEffect(() => {
+  //   const timeoutId = setTimeout(() => fetchData(), 500);
+  //   return () => clearTimeout(timeoutId);
+  // }, [searchId, category, keyword, variant]);
+
+  const isFirstRun = useRef(true);
+
   useEffect(() => {
+    // ถ้าเป็นครั้งแรก ให้ยิงเลย ไม่ต้องรอ 500ms
+    if (isFirstRun.current) {
+      fetchData();
+      isFirstRun.current = false;
+      return;
+    }
+
+    // ครั้งถัดๆ ไป (ตอนพิมพ์ Search) ค่อยหน่วงเวลา
     const timeoutId = setTimeout(() => fetchData(), 500);
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);

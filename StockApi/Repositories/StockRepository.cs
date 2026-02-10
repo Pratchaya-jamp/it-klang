@@ -20,7 +20,10 @@ namespace StockApi.Repositories
 
         public async Task<List<StockBalance>> GetStockBalancesAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            var query = _context.StockBalances.Include(x => x.Item).AsQueryable();
+            var query = _context.StockBalances
+                .AsNoTracking()
+                .Include(x => x.Item)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(category))
                 query = query.Where(x => x.Item != null && x.Item.Category == category);

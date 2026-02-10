@@ -55,6 +55,26 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthorization();
+app.UseMiddleware<StockApi.Middlewares.RequestLoggingMiddleware>();
 app.MapControllers();
+
+// สร้าง Scope ชั่วคราวเพื่อเรียกใช้ Database ตอนเริ่มโปรแกรม
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+
+        // เรียกฟังก์ชันอุ่นเครื่องที่เราเขียนเมื่อกี้
+        StockApi.Utilities.DbInitializer.Initialize(context);
+
+        Console.WriteLine("🔥 Database Pre-warmed successfully!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Warmup Error: {ex.Message}");
+    }
+}
 
 app.Run();
