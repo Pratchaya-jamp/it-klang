@@ -26,6 +26,7 @@ builder.Services.AddScoped<IItemRepository, ItemRepository>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 
 // 4. Setup Swagger & Controllers
 builder.Services.AddControllers();

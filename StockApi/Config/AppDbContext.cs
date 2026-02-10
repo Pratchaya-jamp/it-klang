@@ -9,7 +9,7 @@ namespace StockApi.Config
 
         public DbSet<Item> Items { get; set; }
         public DbSet<StockBalance> StockBalances { get; set; }
-        // public DbSet<StockTransaction> StockTransactions { get; set; } // ถ้ายังไม่ใช้ คอมเมนต์ไว้ก่อนได้
+        public DbSet<StockTransaction> StockTransactions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
