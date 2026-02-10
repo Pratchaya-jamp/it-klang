@@ -10,8 +10,8 @@ namespace StockApi.Services
     {
         Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword, string? variant);
 
-        Task ReceiveStockAsync(TransactionRequest request);  // รับของ (เติมของ + ล้างยอดเบิก)
-        Task WithdrawStockAsync(TransactionRequest request); // เบิกของ (ตัดของ + ทดยอดเบิก)
+        Task ReceiveStockAsync(List<TransactionRequest> requests);
+        Task WithdrawStockAsync(List<TransactionRequest> requests);
     }
 
     public class StockService : IStockService
@@ -57,72 +57,76 @@ namespace StockApi.Services
             }).ToList();
         }
 
-        public async Task ReceiveStockAsync(TransactionRequest request)
+        public async Task ReceiveStockAsync(List<TransactionRequest> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                if (stock == null) throw new Exception("ไม่พบสินค้า");
-
-                // เก็บค่าเก่าไว้ทำ Log
-                int oldBalance = stock.Balance;
-
-                // --- 1. จัดการยอด Received รายวัน ---
-                var today = DateTime.Now.Date;
-                var lastReceive = stock.LastReceivedDate.Date;
-
-                if (lastReceive < today)
+                foreach (var request in requests)
                 {
-                    // ถ้าวันที่ล่าสุด เป็น "เมื่อวาน" (หรือเก่ากว่า)
-                    // ให้รีเซ็ตยอดรับเป็นยอดใหม่เลย (เริ่มนับ 1 ใหม่ของวันนี้)
-                    stock.Received = request.Quantity;
+                    var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                    if (stock == null) throw new Exception($"ไม่พบสินค้า Code: {request.ItemCode}");
+
+                    int oldBalance = stock.Balance;
+
+                    // --- 1. จัดการยอดรายวัน (Logic เดิม) ---
+                    var today = DateTime.Now.Date;
+                    if (stock.LastReceivedDate.Date < today) stock.Received = request.Quantity;
+                    else stock.Received += request.Quantity;
+                    stock.LastReceivedDate = DateTime.Now;
+
+                    // --- 2. Logic ใหม่ของ Total & Balance ---
+                    // Balance เพิ่มเสมอ (เพราะของเข้าคลัง)
+                    stock.Balance += request.Quantity;
+
+                    // คำนวณการเติมของ
+                    int amountToFillHole = 0; // จำนวนที่เอาไปโปะยอดที่ขาด
+                    int amountExpansion = 0;  // จำนวนที่เป็นของใหม่จริงๆ (ส่วนเกิน)
+
+                    if (stock.TempWithdrawn > 0)
+                    {
+                        // ถ้ามียอดขาด ให้เอาไปเติมยอดขาดก่อน
+                        amountToFillHole = Math.Min(stock.TempWithdrawn, request.Quantity);
+                        stock.TempWithdrawn -= amountToFillHole;
+
+                        // ส่วนที่เหลือคือนับเป็นของใหม่
+                        amountExpansion = request.Quantity - amountToFillHole;
+                    }
+                    else
+                    {
+                        // ถ้าไม่มียอดขาดเลย ถือเป็นของใหม่ทั้งหมด
+                        amountExpansion = request.Quantity;
+                    }
+
+                    // *** จุดสำคัญ: Total เพิ่มเฉพาะส่วนที่เป็นของใหม่ (Expansion) เท่านั้น ***
+                    // ถ้าแค่ซื้อมาเติมคืน (FillHole) Total จะเท่าเดิม
+                    stock.TotalQuantity += amountExpansion;
+
+                    stock.UpdatedAt = DateTime.Now;
+
+                    // --- 3. Logs ---
+                    await _txRepo.AddTransactionAsync(new StockTransaction
+                    {
+                        TransactionNo = $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}",
+                        ItemCode = request.ItemCode,
+                        Type = "IN",
+                        Quantity = request.Quantity,
+                        BalanceAfter = stock.Balance,
+                        Note = request.Note,
+                        CreatedBy = request.CreatedBy,
+                        CreatedAt = DateTime.Now
+                    });
+
+                    string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
+                    await _logRepo.AddLogAsync(
+                        $"STOCK_IN (+{request.Quantity})",
+                        "StockBalances",
+                        request.ItemCode,
+                        $"Balance: {oldBalance}",
+                        packData,
+                        request.CreatedBy
+                    );
                 }
-                else
-                {
-                    // ถ้ายังเป็น "วันนี้" อยู่
-                    // ให้บวกเพิ่มเข้าไป
-                    stock.Received += request.Quantity;
-                }
-
-                // อัปเดตวันที่รับล่าสุด เป็นปัจจุบัน
-                stock.LastReceivedDate = DateTime.Now;
-
-                // --- 2. จัดการ Balance และ Temp (เหมือนเดิม) ---
-                stock.Balance += request.Quantity;
-                stock.TotalQuantity += request.Quantity;
-
-                if (stock.TempWithdrawn > 0)
-                {
-                    stock.TempWithdrawn -= request.Quantity;
-                    if (stock.TempWithdrawn < 0) stock.TempWithdrawn = 0;
-                }
-
-                stock.UpdatedAt = DateTime.Now;
-
-                // --- 3. บันทึก Log (เหมือนเดิม ไม่เกี่ยวกับยอดรายวัน) ---
-                await _txRepo.AddTransactionAsync(new StockTransaction
-                {
-                    TransactionNo = GenerateTransactionNo(),
-                    ItemCode = request.ItemCode,
-                    Type = "IN",
-                    Quantity = request.Quantity,
-                    BalanceAfter = stock.Balance,
-                    Note = request.Note,
-                    CreatedBy = request.CreatedBy,
-                    CreatedAt = DateTime.Now
-                });
-
-                string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
-
-                await _logRepo.AddLogAsync(
-                    "STOCK_IN",
-                    "StockBalances",
-                    request.ItemCode,
-                    $"Balance: {oldBalance}", // OldValue
-                    packData,                 // NewValue (ส่งแบบ Pack ไปก่อน)
-                    request.CreatedBy
-                );
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -130,52 +134,55 @@ namespace StockApi.Services
             catch { await transaction.RollbackAsync(); throw; }
         }
 
-        // 2. เบิกของออก (OUT) -> ตัดของจริง และ ทดไว้ว่าเบิกไปเท่าไหร่ (รอเติม)
-        public async Task WithdrawStockAsync(TransactionRequest request)
+        // 2. เบิกของ (Withdraw): ลด Balance แต่ Total เท่าเดิม!
+        public async Task WithdrawStockAsync(List<TransactionRequest> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                if (stock == null) throw new Exception("ไม่พบสินค้า");
-
-                // เช็คของพอไหม
-                if (stock.Balance < request.Quantity)
-                    throw new Exception($"สินค้าไม่พอเบิก (คงเหลือ {stock.Balance})");
-
-                int oldBalance = stock.Balance;
-
-                // Logic:
-                stock.Balance -= request.Quantity;       // 1. ของหายจริง
-                stock.TotalQuantity -= request.Quantity; // 2. ยอดรวมลดจริง
-
-                stock.TempWithdrawn += request.Quantity; // 3. เพิ่มยอด Temp (เพื่อบอกว่า "พร่องไปเท่าไหร่")
-
-                stock.UpdatedAt = DateTime.Now;
-
-                // Log
-                await _txRepo.AddTransactionAsync(new StockTransaction
+                foreach (var request in requests)
                 {
-                    TransactionNo = GenerateTransactionNo(),
-                    ItemCode = request.ItemCode,
-                    Type = "OUT",
-                    Quantity = request.Quantity,
-                    BalanceAfter = stock.Balance,
-                    Note = request.Note,
-                    CreatedBy = request.CreatedBy,
-                    CreatedAt = DateTime.Now
-                });
+                    var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                    if (stock == null) throw new Exception($"ไม่พบสินค้า Code: {request.ItemCode}");
 
-                string packData = $"Balance: {stock.Balance}|Withdraw:-{request.Quantity}|Receive:+0";
+                    if (stock.Balance < request.Quantity)
+                        throw new Exception($"สินค้า {stock.ItemCode} ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance})");
 
-                await _logRepo.AddLogAsync(
-                    "STOCK_OUT",
-                    "StockBalances",
-                    request.ItemCode,
-                    $"Balance: {oldBalance}", // OldValue
-                    packData,                 // NewValue (ส่งแบบ Pack ไปก่อน)
-                    request.CreatedBy
-                );
+                    int oldBalance = stock.Balance;
+
+                    // --- Logic ใหม่ ---
+                    stock.Balance -= request.Quantity;       // ของบนชั้นหายไป
+                    stock.TempWithdrawn += request.Quantity; // ไปอยู่ที่ "ยอดรอเติม/ถูกเบิก"
+
+                    // *** จุดสำคัญ: TotalQuantity ไม่ลด! ***
+                    // เพราะเราถือว่าทรัพย์สินยังเป็นของบริษัท (แค่เปลี่ยนสถานะจาก Shelf -> In Use/Missing)
+                    // stock.TotalQuantity -= request.Quantity; // <--- บรรทัดนี้ลบทิ้งไปเลย
+
+                    stock.UpdatedAt = DateTime.Now;
+
+                    // --- Logs ---
+                    await _txRepo.AddTransactionAsync(new StockTransaction
+                    {
+                        TransactionNo = $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}",
+                        ItemCode = request.ItemCode,
+                        Type = "OUT",
+                        Quantity = request.Quantity,
+                        BalanceAfter = stock.Balance,
+                        Note = request.Note,
+                        CreatedBy = request.CreatedBy,
+                        CreatedAt = DateTime.Now
+                    });
+
+                    string packData = $"Balance: {stock.Balance}|Withdraw:-{request.Quantity}|Receive:+0";
+                    await _logRepo.AddLogAsync(
+                        $"STOCK_OUT (-{request.Quantity})",
+                        "StockBalances",
+                        request.ItemCode,
+                        $"Balance: {oldBalance}",
+                        packData,
+                        request.CreatedBy
+                    );
+                }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();

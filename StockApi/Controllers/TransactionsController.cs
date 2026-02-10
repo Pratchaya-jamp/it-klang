@@ -17,12 +17,15 @@ namespace StockApi.Controllers
 
         // POST: api/transactions/receive
         [HttpPost("receive")]
-        public async Task<IActionResult> Receive([FromBody] TransactionRequest request)
+        public async Task<IActionResult> Receive([FromBody] List<TransactionRequest> requests) // รับเป็น List
         {
             try
             {
-                await _stockService.ReceiveStockAsync(request);
-                return Ok(new { message = "รับสินค้าเข้าสต็อกเรียบร้อย" });
+                if (requests == null || !requests.Any())
+                    return BadRequest(new { message = "ไม่พบรายการสินค้า" });
+
+                await _stockService.ReceiveStockAsync(requests);
+                return Ok(new { message = $"รับสินค้า {requests.Count} รายการเรียบร้อย" });
             }
             catch (Exception ex)
             {
@@ -32,12 +35,15 @@ namespace StockApi.Controllers
 
         // POST: api/transactions/withdraw
         [HttpPost("withdraw")]
-        public async Task<IActionResult> Withdraw([FromBody] TransactionRequest request)
+        public async Task<IActionResult> Withdraw([FromBody] List<TransactionRequest> requests) // รับเป็น List
         {
             try
             {
-                await _stockService.WithdrawStockAsync(request);
-                return Ok(new { message = "เบิกสินค้าออกจากสต็อกเรียบร้อย" });
+                if (requests == null || !requests.Any())
+                    return BadRequest(new { message = "ไม่พบรายการสินค้า" });
+
+                await _stockService.WithdrawStockAsync(requests);
+                return Ok(new { message = $"เบิกสินค้า {requests.Count} รายการเรียบร้อย" });
             }
             catch (Exception ex)
             {

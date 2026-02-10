@@ -148,16 +148,31 @@ namespace StockApi.Services
         // D: Delete
         public async Task DeleteItemAsync(string itemCode)
         {
+            // 1. หาของก่อน
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบสินค้า Code: {itemCode}");
 
+            // 2. Validation 1: เช็คของคงเหลือ (Safety เบื้องต้น)
             if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
             {
                 throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีสินค้าคงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
             }
 
-            // 1. *** บันทึก Log: DELETE ***
-            // บันทึกก่อนลบ เพราะถ้าลบไปแล้วเดี๋ยวหาชื่อสินค้ามาใส่ Log ไม่ได้
+            // 3. *** Validation 2: เช็คประวัติการเคลื่อนไหว (Stock Movement) ***
+            // ยอมให้มี CREATE / UPDATE / DELETE ได้ (ถือว่าจัดการข้อมูลทั่วไป)
+            // แต่ห้ามมี STOCK_IN / STOCK_OUT (ถือว่าเป็น Transaction ทางบัญชีแล้ว)
+
+            bool hasMovement = await _context.SystemLogs.AnyAsync(x =>
+                x.RecordId == itemCode &&
+                (x.Action.Contains("STOCK_IN") || x.Action.Contains("STOCK_OUT"))
+            );
+
+            if (hasMovement)
+            {
+                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากสินค้านี้เคยมีการ รับเข้า/เบิกออก ไปแล้ว (มี Audit History)");
+            }
+
+            // 4. ถ้าผ่านเงื่อนไขข้างบน แสดงว่าเป็นสินค้าที่ "สร้างผิด" หรือ "ยังไม่เคยใช้งานจริง" -> ยอมให้ลบ
             await _logRepo.AddLogAsync(
                 "DELETE",
                 "Items",
