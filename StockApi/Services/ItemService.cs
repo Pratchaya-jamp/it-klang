@@ -19,30 +19,28 @@ namespace StockApi.Services
     public class ItemService : IItemService
     {
         private readonly IItemRepository _repo;
+        private readonly ISystemLogRepository _logRepo; // <--- 1. เพิ่มตัวนี้
         private readonly AppDbContext _context;
 
-        public ItemService(IItemRepository repo, AppDbContext context)
+        public ItemService(IItemRepository repo, ISystemLogRepository logRepo, AppDbContext context) // <--- Inject เข้ามา
         {
             _repo = repo;
+            _logRepo = logRepo;
             _context = context;
         }
 
         public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            // 1. รับ Query มา (สูตร SQL)
+            // 1. รับ Query มา
             var query = _repo.GetDashboardQuery(searchId, category, keyword, variant);
 
-            // 2. ทำ Projection (เลือกเฉพาะคอลัมน์ที่ใช้) -> แล้วค่อยยิง DB ด้วย ToListAsync()
-            // วิธีนี้คือหัวใจความเร็วของ GET ครับ
+            // 2. ทำ Projection
             var result = await query.Select(x => new ItemDto
             {
                 ItemCode = x.ItemCode,
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
-
-                // แปลงเวลาตรงนี้
-                // (ถ้า Database Error เรื่องแปลงเวลา ให้ใช้ .ToString() เฉยๆ แล้วไป format ที่ Frontend)
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToListAsync();
@@ -59,10 +57,9 @@ namespace StockApi.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // ใช้เวลาไทย (ถ้าอยากให้ใน DB เป็นเวลาไทยเลย)
-                // หรือใช้ DateTime.Now ตามปกติถ้าเครื่องเป็นเวลาไทยอยู่แล้ว
                 var now = DateTime.Now;
 
+                // 1. สร้าง Item
                 var newItem = new Item
                 {
                     ItemCode = request.ItemCode,
@@ -75,6 +72,7 @@ namespace StockApi.Services
                 _context.Items.Add(newItem);
                 await _context.SaveChangesAsync();
 
+                // 2. สร้าง Stock
                 var newStock = new StockBalance
                 {
                     ItemCode = request.ItemCode,
@@ -88,6 +86,17 @@ namespace StockApi.Services
                 _context.StockBalances.Add(newStock);
                 await _context.SaveChangesAsync();
 
+                // 3. *** บันทึก Log: CREATE ***
+                // (ใส่ตรงนี้เพื่อให้รวมอยู่ใน Transaction ถ้าพังก็ Rollback หมด)
+                await _logRepo.AddLogAsync(
+                    "CREATE",
+                    "Items",
+                    newItem.ItemCode,
+                    "-",
+                    $"Name: {newItem.Name}, Category: {newItem.Category}, InitialStock: {request.Quantity}",
+                    "Admin"
+                );
+
                 await transaction.CommitAsync();
 
                 return new ItemDto
@@ -96,8 +105,6 @@ namespace StockApi.Services
                     Name = newItem.Name,
                     Category = newItem.Category,
                     Unit = newItem.Unit,
-
-                    // จัด Format ส่งกลับ
                     CreatedAt = newItem.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                     UpdatedAt = newItem.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
@@ -112,45 +119,54 @@ namespace StockApi.Services
         // U: Update
         public async Task UpdateItemAsync(string itemCode, UpdateItemRequest request)
         {
-            // 1. หาของก่อน (Repository เรา Include StockBalance มาให้อยู่แล้ว)
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบสินค้า Code: {itemCode}");
 
-            // 2. เก็บเวลาปัจจุบัน
-            var now = DateTime.Now;
+            // 1. *** เก็บค่าเก่าก่อนแก้ (OldValue) ***
+            string oldValue = $"Name: {item.Name}, Cat: {item.Category}, Unit: {item.Unit}";
 
-            // 3. อัปเดตค่าใน Item (ข้อมูลหลัก)
+            var now = DateTime.Now;
             item.Name = request.Name;
             item.Category = request.Category;
             item.Unit = request.Unit;
-            item.UpdatedAt = now; // อัปเดตเวลาของ Item
+            item.UpdatedAt = now;
 
-            // 4. *** เพิ่มส่วนนี้: Sync เวลาไปที่ StockBalance ด้วย ***
-            // (เพื่อให้หน้า Stock Overview ขึ้นว่ามีการอัปเดตล่าสุดเมื่อกี้)
             if (item.StockBalance != null)
             {
                 item.StockBalance.UpdatedAt = now;
             }
 
-            // 5. บันทึก (Entity Framework จะฉลาดพอที่จะ Save ทั้ง Item และ StockBalance พร้อมกัน)
+            // 2. *** เตรียมค่าใหม่ (NewValue) ***
+            string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}";
+
+            // 3. *** บันทึก Log: UPDATE ***
+            await _logRepo.AddLogAsync("UPDATE", "Items", itemCode, oldValue, newValue, "Admin");
+
             await _repo.UpdateItemAsync(item);
         }
 
         // D: Delete
         public async Task DeleteItemAsync(string itemCode)
         {
-            // 1. หาของก่อน
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบสินค้า Code: {itemCode}");
 
-            // 2. Validation: เช็คว่ามีของเหลือในคลังไหม?
-            // (เข้าถึง StockBalance ผ่าน Navigation Property ที่ Include มาใน Repo)
             if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
             {
                 throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีสินค้าคงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
             }
 
-            // 3. ถ้าของเป็น 0 ถึงจะยอมให้ลบ
+            // 1. *** บันทึก Log: DELETE ***
+            // บันทึกก่อนลบ เพราะถ้าลบไปแล้วเดี๋ยวหาชื่อสินค้ามาใส่ Log ไม่ได้
+            await _logRepo.AddLogAsync(
+                "DELETE",
+                "Items",
+                itemCode,
+                $"Name: {item.Name}",
+                "DELETED",
+                "Admin"
+            );
+
             await _repo.DeleteItemAsync(itemCode);
         }
     }

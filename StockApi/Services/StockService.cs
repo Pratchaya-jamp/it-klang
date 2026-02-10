@@ -18,13 +18,15 @@ namespace StockApi.Services
     {
         private readonly IStockRepository _repo;
         private readonly ITransactionRepository _txRepo; // เพิ่มตัวนี้
+        private readonly ISystemLogRepository _logRepo;
         private readonly AppDbContext _context;          // เพิ่มตัวนี้
 
         // Constructor ต้องรับค่าเข้ามาให้ครบ 3 ตัว
-        public StockService(IStockRepository repo, ITransactionRepository txRepo, AppDbContext context)
+        public StockService(IStockRepository repo, ITransactionRepository txRepo, ISystemLogRepository logRepo, AppDbContext context)
         {
             _repo = repo;
             _txRepo = txRepo;
+            _logRepo = logRepo;
             _context = context;
         }
 
@@ -62,6 +64,9 @@ namespace StockApi.Services
             {
                 var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
                 if (stock == null) throw new Exception("ไม่พบสินค้า");
+
+                // เก็บค่าเก่าไว้ทำ Log
+                int oldBalance = stock.Balance;
 
                 // --- 1. จัดการยอด Received รายวัน ---
                 var today = DateTime.Now.Date;
@@ -108,6 +113,17 @@ namespace StockApi.Services
                     CreatedAt = DateTime.Now
                 });
 
+                string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
+
+                await _logRepo.AddLogAsync(
+                    "STOCK_IN",
+                    "StockBalances",
+                    request.ItemCode,
+                    $"Balance: {oldBalance}", // OldValue
+                    packData,                 // NewValue (ส่งแบบ Pack ไปก่อน)
+                    request.CreatedBy
+                );
+
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
@@ -126,6 +142,8 @@ namespace StockApi.Services
                 // เช็คของพอไหม
                 if (stock.Balance < request.Quantity)
                     throw new Exception($"สินค้าไม่พอเบิก (คงเหลือ {stock.Balance})");
+
+                int oldBalance = stock.Balance;
 
                 // Logic:
                 stock.Balance -= request.Quantity;       // 1. ของหายจริง
@@ -147,6 +165,17 @@ namespace StockApi.Services
                     CreatedBy = request.CreatedBy,
                     CreatedAt = DateTime.Now
                 });
+
+                string packData = $"Balance: {stock.Balance}|Withdraw:-{request.Quantity}|Receive:+0";
+
+                await _logRepo.AddLogAsync(
+                    "STOCK_OUT",
+                    "StockBalances",
+                    request.ItemCode,
+                    $"Balance: {oldBalance}", // OldValue
+                    packData,                 // NewValue (ส่งแบบ Pack ไปก่อน)
+                    request.CreatedBy
+                );
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
