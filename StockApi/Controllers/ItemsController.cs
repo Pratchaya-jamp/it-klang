@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using StockApi.Dtos;
+using StockApi.Dtos; // ตรวจสอบว่ามี Dtos นี้อยู่จริง
 using StockApi.Services;
 
 namespace StockApi.Controllers
@@ -21,35 +21,64 @@ namespace StockApi.Controllers
             [FromQuery] string? searchId,
             [FromQuery] string? category,
             [FromQuery] string? keyword,
-            [FromQuery] string? variant) // <-- เพิ่มตัวนี้
+            [FromQuery] string? variant)
         {
+            // GET มักจะไม่ค่อยพัง เลยไม่ต้อง try-catch ก็ได้ (ยกเว้น Database ล่ม)
             var result = await _service.GetDashboardAsync(searchId, category, keyword, variant);
-            return Ok(new { data = result });
+            return Ok(new { data = result }); // 200 OK
         }
 
         // POST: api/items
-        // ใช้ลงทะเบียนสินค้าใหม่
         [HttpPost]
         public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest request)
         {
-            var createdItem = await _service.CreateItemAsync(request);
-            return StatusCode(201, new { message = "สร้างสินค้าสำเร็จ พร้อมเปิดบัญชีสต็อก", data = createdItem });
+            try
+            {
+                var createdItem = await _service.CreateItemAsync(request);
+                // 201 Created
+                return StatusCode(201, new { message = "สร้างสินค้าสำเร็จ พร้อมเปิดบัญชีสต็อก", data = createdItem });
+            }
+            catch (Exception ex)
+            {
+                // 400 Bad Request (เช่น รหัสซ้ำ, ข้อมูลไม่ครบ)
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        // PUT: api/Items/IT-001 (แก้ไข)
+        // PUT: api/Items/IT-001
         [HttpPut("{itemCode}")]
         public async Task<IActionResult> UpdateItem(string itemCode, [FromBody] UpdateItemRequest request)
         {
-            await _service.UpdateItemAsync(itemCode, request);
-            return Ok(new { message = $"แก้ไขสินค้า {itemCode} สำเร็จ" });
+            try
+            {
+                await _service.UpdateItemAsync(itemCode, request);
+                // 200 OK
+                return Ok(new { message = $"แก้ไขสินค้า {itemCode} สำเร็จ" });
+            }
+            catch (Exception ex)
+            {
+                // แยกแยะ Error
+                if (ex.Message.Contains("ไม่พบ")) return NotFound(new { message = ex.Message }); // 404
+                return BadRequest(new { message = ex.Message }); // 400
+            }
         }
 
-        // DELETE: api/Items/IT-001 (ลบ)
+        // DELETE: api/Items/IT-001
         [HttpDelete("{itemCode}")]
         public async Task<IActionResult> DeleteItem(string itemCode)
         {
-            await _service.DeleteItemAsync(itemCode);
-            return Ok(new { message = $"ลบสินค้า {itemCode} สำเร็จ" });
+            try
+            {
+                await _service.DeleteItemAsync(itemCode);
+                // 204 No Content (มาตรฐานคือไม่ส่ง Body กลับ)
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                // แยกแยะ Error (สำคัญมากสำหรับ Case Audit Log ที่เราเพิ่งทำ)
+                if (ex.Message.Contains("ไม่พบ")) return NotFound(new { message = ex.Message }); // 404
+                return BadRequest(new { message = ex.Message }); // 400 (ติด Audit Log/ของยังเหลือ)
+            }
         }
     }
 }

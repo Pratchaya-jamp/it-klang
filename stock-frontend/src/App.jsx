@@ -8,6 +8,9 @@ import Loading from './components/Loading'; // Import Loading Component
 // const Dashboard = import('./pages/Dashboard'); // แบบเก่า (Synchronous)
 const Dashboard = lazy(() => import('./pages/Dashboard')); // แบบใหม่ (Asynchronous)
 const Inventory = lazy(() => import('./pages/Inventory'));
+const Register = lazy(() => import('./pages/Register'));
+const Login = lazy(() => import('./pages/Login'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 
 // หน้าอื่นๆ ก็ทำเผื่อไว้ได้เลย
 const InventoryPlaceholder = () => <div className="p-10 text-center text-zinc-400">Inventory Module</div>;
@@ -31,6 +34,9 @@ function App() {
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/transactions" element={<TransactionsPlaceholder />} />
                 <Route path="/settings" element={<SettingsPlaceholder />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/changepwd" element={<ChangePassword />} />
               </Routes>
             </Suspense>
           </main>

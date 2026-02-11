@@ -5,26 +5,36 @@ namespace StockApi.Controllers
 {
     [ApiController]
     [Route("api/stocks")]
-    public class StockController : ControllerBase
+    public class StocksController : ControllerBase
     {
         private readonly IStockService _service;
 
-        public StockController(IStockService service)
+        public StocksController(IStockService service)
         {
             _service = service;
         }
 
         // GET: api/stocks/overview
-        // เอาไว้ดูยอดคงเหลือ
+        // เอาไว้ดูยอดคงเหลือ (Stock Balance)
         [HttpGet("overview")]
         public async Task<IActionResult> GetOverview(
             [FromQuery] string? searchId,
             [FromQuery] string? category,
             [FromQuery] string? keyword,
-            [FromQuery] string? variant) // <-- เพิ่มตัวนี้
+            [FromQuery] string? variant)
         {
-            var result = await _service.GetStockOverviewAsync(searchId, category, keyword, variant);
-            return Ok(new { data = result });
+            try
+            {
+                var result = await _service.GetStockOverviewAsync(searchId, category, keyword, variant);
+
+                // 200 OK
+                return Ok(new { data = result });
+            }
+            catch (Exception ex)
+            {
+                // 400 Bad Request (กรณีส่ง Query ผิด หรือ DB มีปัญหา)
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

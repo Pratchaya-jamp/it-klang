@@ -5,6 +5,9 @@ using StockApi.Config;
 using StockApi.Repositories;
 using StockApi.Services;
 using StockApi.Middlewares;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +32,22 @@ builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<ISystemLogRepository, SystemLogRepository>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+// builder.Services.AddScoped<IEmailService, StockApi.Services.MockEmailService>();
+builder.Services.AddScoped<IEmailService, StockApi.Services.GmailService>();
+builder.Services.AddScoped<IAuthService, StockApi.Services.AuthService>();
+
+// Config JWT
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("Jwt:Key").Value!)),
+            ValidateIssuer = false, // ไม่เช็ค Issuer (เพื่อความง่ายตอนนี้)
+            ValidateAudience = false // ไม่เช็ค Audience
+        };
+    });
 
 // 4. Setup Swagger & Controllers
 builder.Services.AddControllers();
