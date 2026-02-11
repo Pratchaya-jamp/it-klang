@@ -7,6 +7,7 @@ import Loading from './components/Loading'; // Import Loading Component
 // 2. เปลี่ยนการ Import Page ปกติ เป็น lazy
 // const Dashboard = import('./pages/Dashboard'); // แบบเก่า (Synchronous)
 const Dashboard = lazy(() => import('./pages/Dashboard')); // แบบใหม่ (Asynchronous)
+const Inventory = lazy(() => import('./pages/Inventory'));
 
 // หน้าอื่นๆ ก็ทำเผื่อไว้ได้เลย
 const InventoryPlaceholder = () => <div className="p-10 text-center text-zinc-400">Inventory Module</div>;
@@ -27,7 +28,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 
-                <Route path="/inventory" element={<InventoryPlaceholder />} />
+                <Route path="/inventory" element={<Inventory />} />
                 <Route path="/transactions" element={<TransactionsPlaceholder />} />
                 <Route path="/settings" element={<SettingsPlaceholder />} />
               </Routes>

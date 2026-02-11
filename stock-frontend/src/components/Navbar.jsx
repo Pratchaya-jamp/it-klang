@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User } from 'lucide-react';
+import { LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User, } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -13,7 +13,7 @@ export default function Navbar() {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
     { name: 'Inventory', path: '/inventory', icon: Package },
-    { name: 'Transactions', path: '/transactions', icon: ArrowRightLeft }, // ยืม-คืน-เบิก
+    { name: 'Borrowing', path: '/borrowing', icon: ArrowRightLeft }, // ยืม-คืน-เบิก
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
