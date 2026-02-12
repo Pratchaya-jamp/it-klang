@@ -7,6 +7,7 @@ using StockApi.Services;
 using StockApi.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,15 +38,26 @@ builder.Services.AddScoped<IEmailService, StockApi.Services.GmailService>();
 builder.Services.AddScoped<IAuthService, StockApi.Services.AuthService>();
 
 // Config JWT
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("Jwt:Key").Value!)),
-            ValidateIssuer = false, // ไม่เช็ค Issuer (เพื่อความง่ายตอนนี้)
-            ValidateAudience = false // ไม่เช็ค Audience
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+                builder.Configuration.GetSection("Jwt:Key").Value!
+            )),
+
+            // --- เพิ่มการตรวจสอบ Issuer ---
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+
+            ValidateAudience = false,
+
+            // *** สำคัญ: บอกระบบว่า Claim ไหนคือ Role ***
+            RoleClaimType = "role", // บอกว่าถ้าจะเช็ค Role ให้ดูที่ key ชื่อ "role" นะ
+            NameClaimType = "name"  // บอกว่าถ้าจะเช็ค User.Identity.Name ให้ดูที่ "name"
         };
     });
 
@@ -54,11 +66,31 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
+    // 1. กำหนดรูปแบบความปลอดภัย (บอก Swagger ว่าเราใช้ JWT)
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Title = "Stock Enterprise API",
-        Version = "v1",
-        Description = "API ระบบจัดการ Stock"
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "ใส่ Token ที่ได้จากการ Login ลงในช่องนี้ได้เลย (ไม่ต้องพิมพ์คำว่า Bearer นำหน้า)"
+    });
+
+    // 2. บังคับใช้ความปลอดภัยนี้กับทุก Endpoint
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
     });
 });
 

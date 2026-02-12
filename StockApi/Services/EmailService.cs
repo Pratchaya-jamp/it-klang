@@ -2,12 +2,12 @@
 {
     public interface IEmailService
     {
-        Task SendPasswordEmailAsync(string toEmail, string staffId, string password);
+        Task SendPasswordEmailAsync(string toEmail, string name, string staffId, string password);
     }
 
     public class MockEmailService : IEmailService
     {
-        public Task SendPasswordEmailAsync(string toEmail, string staffId, string password)
+        public Task SendPasswordEmailAsync(string toEmail, string name, string staffId, string password)
         {
             // ของจริง: ใช้ SmtpClient ส่งเมล
             // ของเล่น: ปริ้นท์ออกมาดูเลย

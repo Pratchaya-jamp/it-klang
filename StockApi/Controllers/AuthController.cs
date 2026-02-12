@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StockApi.Dtos;
 using StockApi.Services;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace StockApi.Controllers
 {
@@ -75,6 +77,35 @@ namespace StockApi.Controllers
             catch (Exception ex)
             {
                 // 400 Bad Request (เช่น รหัสเดิมผิด)
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // GET: api/auth/me
+        // ดึงข้อมูลตัวเอง (ต้องแนบ Token)
+        [Authorize] // <--- บังคับ Login
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            try
+            {
+                // 1. แกะ StaffId ออกมาจาก Token (ที่เรายัดไว้ตอน Login)
+                // ClaimTypes.NameIdentifier คือมาตรฐานที่เก็บ ID
+                var staffId = User.FindFirst("id")?.Value;
+
+                if (string.IsNullOrEmpty(staffId))
+                {
+                    return Unauthorized(new { message = "Token ไม่สมบูรณ์ หรือหา User ID ไม่เจอ" });
+                }
+
+                // 2. เรียก Service ไปดึงข้อมูล
+                var userProfile = await _authService.GetUserProfileAsync(staffId);
+
+                // 200 OK
+                return Ok(new { data = userProfile });
+            }
+            catch (Exception ex)
+            {
                 return BadRequest(new { message = ex.Message });
             }
         }

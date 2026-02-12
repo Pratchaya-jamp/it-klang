@@ -12,7 +12,7 @@ namespace StockApi.Services
             _configuration = configuration;
         }
 
-        public async Task SendPasswordEmailAsync(string toEmail, string staffId, string password)
+        public async Task SendPasswordEmailAsync(string toEmail, string name, string staffId, string password)
         {
             // 1. ดึงค่า Config
             var emailSettings = _configuration.GetSection("EmailSettings");
@@ -36,8 +36,9 @@ namespace StockApi.Services
                 Body = $@"
                     <html>
                     <body>
-                        <h2>ยินดีต้อนรับคุณ {staffId}</h2>
+                        <h2>ยินดีต้อนรับคุณ {name}</h2>
                         <p>บัญชีของคุณถูกสร้างเรียบร้อยแล้ว</p>
+                        <p>ชื่อผู้ใช้ของคุณคือ: <b style='color:blue; font-size: 18px;'>{staffId}</b></p>
                         <p>รหัสผ่านเริ่มต้นของคุณคือ: <b style='color:blue; font-size: 18px;'>{password}</b></p>
                         <br>
                         <p style='color:red;'>*กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก</p>

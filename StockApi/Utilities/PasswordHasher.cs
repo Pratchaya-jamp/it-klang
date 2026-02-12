@@ -7,9 +7,9 @@ namespace StockApi.Utilities
     public static class PasswordHasher
     {
         // สูตรเน้นความเร็ว (Fastest)
-        private const int DegreeOfParallelism = 1; // ใช้ CPU แค่ 1 Core (ลด Overhead การสลับ Thread)
-        private const int Iterations = 1;          // วนรอบเดียวจบ (Minimum)
-        private const int MemorySize = 16 * 1024;  // ใช้ RAM แค่ 16 MB (น้อยมาก)
+        private const int DegreeOfParallelism = 2; // ใช้ CPU แค่ 1 Core (ลด Overhead การสลับ Thread)
+        private const int Iterations = 4;          // วนรอบเดียวจบ (Minimum)
+        private const int MemorySize = 64 * 1024;  // ใช้ RAM แค่ 16 MB (น้อยมาก)
 
         public static string HashPassword(string password)
         {

@@ -20,6 +20,7 @@ namespace StockApi.Repositories
         public async Task AddTransactionAsync(StockTransaction transaction)
         {
             _context.StockTransactions.Add(transaction);
+            await Task.CompletedTask;
             // ยังไม่ SaveChanges ตรงนี้นะครับ เดี๋ยวไป Save พร้อมตัดสต็อกใน Service (เพื่อความชัวร์แบบ Transaction)
         }
     }
