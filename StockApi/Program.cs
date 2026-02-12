@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,27 +44,67 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // 1. Config การตรวจ Token (เหมือนเดิม)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-                builder.Configuration.GetSection("Jwt:Key").Value!
-            )),
-
-            // --- เพิ่มการตรวจสอบ Issuer ---
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-
             ValidateAudience = false,
+            RoleClaimType = "role",
+            NameClaimType = "name"
+        };
 
-            // *** สำคัญ: บอกระบบว่า Claim ไหนคือ Role ***
-            RoleClaimType = "role", // บอกว่าถ้าจะเช็ค Role ให้ดูที่ key ชื่อ "role" นะ
-            NameClaimType = "name"  // บอกว่าถ้าจะเช็ค User.Identity.Name ให้ดูที่ "name"
+        // 2. *** แก้ตรงนี้: ใส่ async / await ให้ชัดเจน ***
+        options.Events = new JwtBearerEvents
+        {
+            // กรณี: ไม่ได้แนบ Token หรือ Token ผิด (401)
+            OnChallenge = async context => // <--- เติม async ตรงนี้
+            {
+                // สั่งหยุด Default Behavior (ที่ทำให้หน้าขาว)
+                context.HandleResponse();
+
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                var result = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    status = 401,
+                    message = "กรุณาเข้าสู่ระบบก่อนใช้งาน (Token Missing or Invalid)",
+                    detail = context.ErrorDescription
+                });
+
+                // สั่งเขียนแล้วรอจนเสร็จ
+                await context.Response.WriteAsync(result);
+            },
+
+            // กรณี: ไม่มีสิทธิ์ (403)
+            OnForbidden = async context => // <--- เติม async ตรงนี้
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var result = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    status = 403,
+                    message = "คุณไม่มีสิทธิ์ใช้งานส่วนนี้ (Access Denied)"
+                });
+
+                await context.Response.WriteAsync(result);
+            }
         };
     });
 
 // 4. Setup Swagger & Controllers
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    var policy = new AuthorizationPolicyBuilder()
+                     .RequireAuthenticatedUser()
+                     .Build();
+
+    options.Filters.Add(new AuthorizeFilter(policy));
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

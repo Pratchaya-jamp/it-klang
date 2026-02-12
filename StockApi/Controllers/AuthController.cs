@@ -18,6 +18,7 @@ namespace StockApi.Controllers
         }
 
         // POST: api/auth/register
+        [AllowAnonymous]
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -36,6 +37,7 @@ namespace StockApi.Controllers
         }
 
         // POST: api/auth/login
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -46,7 +48,7 @@ namespace StockApi.Controllers
                 if (response.IsForceChangePassword)
                 {
                     // 200 OK: ส่งผลลัพธ์ปกติ แต่แจ้ง Frontend ว่าต้องเปลี่ยนรหัส
-                    return Ok(new
+                    return StatusCode(201,new
                     {
                         message = "กรุณาเปลี่ยนรหัสผ่านก่อนเข้าใช้งาน",
                         requireChangePassword = true
@@ -54,7 +56,7 @@ namespace StockApi.Controllers
                 }
 
                 // 200 OK: Login สำเร็จ ได้ Token
-                return Ok(response);
+                return StatusCode(201, response);
             }
             catch (Exception ex)
             {
@@ -72,7 +74,7 @@ namespace StockApi.Controllers
                 await _authService.ChangePasswordAsync(request);
 
                 // 200 OK: การแก้ไขข้อมูลสำเร็จ
-                return Ok(new { message = "เปลี่ยนรหัสผ่านสำเร็จ กรุณา Login ใหม่อีกครั้ง" });
+                return StatusCode(201, new { message = "เปลี่ยนรหัสผ่านสำเร็จ กรุณา Login ใหม่อีกครั้ง" });
             }
             catch (Exception ex)
             {
