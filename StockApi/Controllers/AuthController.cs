@@ -55,8 +55,18 @@ namespace StockApi.Controllers
                     });
                 }
 
+                var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,        // JS เข้าถึงไม่ได้ (กัน XSS)
+                    Secure = true,          // ส่งผ่าน HTTPS เท่านั้น (Localhost ก็ได้ถ้า Dev cert ผ่าน)
+                    SameSite = SameSiteMode.Strict, // ป้องกัน CSRF
+                    Expires = DateTime.Now.AddHours(1) // อายุเท่ากับ Token
+                };
+
+                Response.Cookies.Append("jwt", response.Token, cookieOptions);
+
                 // 200 OK: Login สำเร็จ ได้ Token
-                return StatusCode(201, response);
+                return StatusCode(201, new { message = "เข้าสู่ระบบสำเร็จ" });
             }
             catch (Exception ex)
             {
@@ -82,6 +92,13 @@ namespace StockApi.Controllers
                 // 400 Bad Request (เช่น รหัสเดิมผิด)
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("jwt");
+            return Ok(new { message = "ออกจากระบบสำเร็จ" });
         }
 
         // GET: api/auth/me

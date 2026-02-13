@@ -60,6 +60,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // 2. *** แก้ตรงนี้: ใส่ async / await ให้ชัดเจน ***
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // ลองหา Cookie ชื่อ "jwt"
+                var token = context.Request.Cookies["jwt"];
+
+                // ถ้ามี ให้เอาไปใช้เป็น Token เลย
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
+
+                return Task.CompletedTask;
+            },
+
             // กรณี: ไม่ได้แนบ Token หรือ Token ผิด (401)
             OnChallenge = async context => // <--- เติม async ตรงนี้
             {
