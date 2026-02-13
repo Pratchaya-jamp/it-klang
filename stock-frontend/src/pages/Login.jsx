@@ -4,6 +4,7 @@ import { IdCard, Lock, Loader2, ArrowRight, LayoutDashboard } from 'lucide-react
 import { useToast } from '../context/ToastContext';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../context/AuthContext';
 
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -11,6 +12,7 @@ function cn(...inputs) { return twMerge(clsx(inputs)); }
 export default function Login() {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { login } = useAuth();
   
   const [formData, setFormData] = useState({
     staffId: '',
@@ -24,60 +26,33 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true); // 1. เริ่มหมุน
+    setLoading(true);
 
     try {
-      // 2. หน่วงเวลา 3 วินาที (ให้ User รู้สึกว่ากำลังประมวลผล)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Artificial Delay
 
-      // 3. ยิง API Login
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      // เรียกใช้ login จาก AuthContext (ซึ่งข้างในใช้ request จาก fetchUtils)
+      const result = await login(formData);
 
-      if (!response.ok) {
-        throw new Error('Login failed. Please check your credentials.');
-      }
-
-      const data = await response.json();
-      
-      // ---------------------------------------------------------
-      // 🔒 CHECK REQUIRE CHANGE PASSWORD FIRST
-      // ---------------------------------------------------------
-      if (data.requireChangePassword === true) {
-        showToast("Security Alert: You must change your password.", "info");
-        
-        // ถ้าจำเป็นต้องใช้ token เพื่อเปลี่ยนรหัส ให้เก็บไว้ก่อน
-        if (data.token) localStorage.setItem('token', data.token);
-
-        // Force Redirect ไปหน้า Change Password
+      // เช็คกรณีต้องเปลี่ยนรหัส
+      if (result.requireChangePassword) {
+        showToast("Security Alert: Please change your password.", "info");
         navigate('/changepwd', { 
-          state: { 
-            staffId: formData.staffId, 
-            oldPassword: formData.password 
-          },
+          state: { staffId: formData.staffId, oldPassword: formData.password },
           replace: true 
         });
-        
         return;
       }
 
-      // --- NORMAL LOGIN SUCCESS ---
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        showToast("Welcome back!", "success");
-        navigate('/dashboard');
-      } else {
-        throw new Error('Authentication Error: No token received.');
-      }
+      // Login สำเร็จ
+      showToast("Welcome back!", "success");
+      navigate('/dashboard');
 
     } catch (error) {
       console.error("Login Error:", error);
-      showToast(error.message || "Something went wrong", "error");
+      showToast(error.message || "Invalid credentials", "error");
     } finally {
-      setLoading(false); // 4. หยุดหมุน (หลังจากผ่านไป 3 วิ + API Response)
+      setLoading(false);
     }
   };
 
