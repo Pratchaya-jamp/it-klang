@@ -38,6 +38,7 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 // builder.Services.AddScoped<IEmailService, StockApi.Services.MockEmailService>();
 builder.Services.AddScoped<IEmailService, StockApi.Services.GmailService>();
 builder.Services.AddScoped<IAuthService, StockApi.Services.AuthService>();
+builder.Services.AddHttpContextAccessor();
 
 // Config JWT
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();

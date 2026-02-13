@@ -3,6 +3,7 @@ using StockApi.Config;
 using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Repositories;
+using Microsoft.AspNetCore.Http;
 
 namespace StockApi.Services
 {
@@ -20,14 +21,16 @@ namespace StockApi.Services
         private readonly ITransactionRepository _txRepo; // เพิ่มตัวนี้
         private readonly ISystemLogRepository _logRepo;
         private readonly AppDbContext _context;          // เพิ่มตัวนี้
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         // Constructor ต้องรับค่าเข้ามาให้ครบ 3 ตัว
-        public StockService(IStockRepository repo, ITransactionRepository txRepo, ISystemLogRepository logRepo, AppDbContext context)
+        public StockService(IStockRepository repo, ITransactionRepository txRepo, ISystemLogRepository logRepo, AppDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _repo = repo;
             _txRepo = txRepo;
             _logRepo = logRepo;
             _context = context;
+            _httpContextAccessor = httpContextAccessor; // ตรงนี้ถึงจะผ่าน
         }
 
         // --- ส่วนดึงข้อมูล (Get Overview) ---
@@ -57,11 +60,21 @@ namespace StockApi.Services
             }).ToList();
         }
 
+        private string GetCurrentUserName()
+        {
+            // ดึง claim "name" ที่เรายัดไว้ตอน Login
+            var name = _httpContextAccessor.HttpContext?.User?.FindFirst("name")?.Value;
+
+            // ถ้าหาไม่เจอ (เช่น กรณีระบบทำงานเอง) ให้ใช้ชื่อ "System"
+            return name ?? "System";
+        }
+
         public async Task ReceiveStockAsync(List<TransactionRequest> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                string currentUser = GetCurrentUserName();
                 foreach (var request in requests)
                 {
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
@@ -113,7 +126,7 @@ namespace StockApi.Services
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
                         Note = request.Note,
-                        CreatedBy = request.CreatedBy,
+                        CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });
 
@@ -124,7 +137,7 @@ namespace StockApi.Services
                         request.ItemCode,
                         $"Balance: {oldBalance}",
                         packData,
-                        request.CreatedBy
+                        currentUser
                     );
                 }
 
@@ -140,6 +153,7 @@ namespace StockApi.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                string currentUser = GetCurrentUserName();
                 foreach (var request in requests)
                 {
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
@@ -169,7 +183,7 @@ namespace StockApi.Services
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
                         Note = request.Note,
-                        CreatedBy = request.CreatedBy,
+                        CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });
 
@@ -180,7 +194,7 @@ namespace StockApi.Services
                         request.ItemCode,
                         $"Balance: {oldBalance}",
                         packData,
-                        request.CreatedBy
+                        currentUser
                     );
                 }
 

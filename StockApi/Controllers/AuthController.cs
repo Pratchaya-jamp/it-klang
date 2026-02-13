@@ -66,6 +66,7 @@ namespace StockApi.Controllers
         }
 
         // POST: api/auth/change-password
+        [AllowAnonymous]
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
