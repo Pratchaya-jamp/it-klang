@@ -63,7 +63,7 @@ namespace StockApi.Controllers
                     Expires = DateTime.Now.AddHours(1) // อายุเท่ากับ Token
                 };
 
-                Response.Cookies.Append("jwt", response.Token, cookieOptions);
+                Response.Cookies.Append("accessToken", response.Token, cookieOptions);
 
                 // 200 OK: Login สำเร็จ ได้ Token
                 return StatusCode(201, new { message = "เข้าสู่ระบบสำเร็จ" });
@@ -97,7 +97,7 @@ namespace StockApi.Controllers
         [HttpPost("logout")]
         public IActionResult Logout()
         {
-            Response.Cookies.Delete("jwt");
+            Response.Cookies.Delete("accessToken");
             return Ok(new { message = "ออกจากระบบสำเร็จ" });
         }
 

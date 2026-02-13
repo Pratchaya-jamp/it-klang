@@ -27,6 +27,17 @@ var connectionString = $"server={Env.GetString("DB_HOST")};" +
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // <-- ใส่ URL Frontend ของคุณ (Vue/React)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // <--- *** สำคัญที่สุด! ถ้าไม่มีบรรทัดนี้ Cookie จะไม่ส่งไป ***
+    });
+});
+
 // 3. Register Layers (Dependency Injection)
 builder.Services.AddScoped<IItemRepository, ItemRepository>();
 builder.Services.AddScoped<IItemService, ItemService>();
@@ -63,7 +74,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnMessageReceived = context =>
             {
                 // ลองหา Cookie ชื่อ "jwt"
-                var token = context.Request.Cookies["jwt"];
+                var token = context.Request.Cookies["accessToken"];
 
                 // ถ้ามี ให้เอาไปใช้เป็น Token เลย
                 if (!string.IsNullOrEmpty(token))
@@ -165,6 +176,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<StockApi.Middlewares.RequestLoggingMiddleware>();
 app.MapControllers();
