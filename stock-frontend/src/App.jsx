@@ -13,6 +13,7 @@ const Register = lazy(() => import('./pages/Register'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
 
 // --- LAYOUTS ---
 
@@ -65,6 +66,7 @@ function App() {
                 <Route element={<MainLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/audit" element={<AuditLog />} />
                   {/* เพิ่มหน้าอื่นๆ ที่นี่ */}
                 </Route>
               </Route>

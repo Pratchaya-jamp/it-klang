@@ -5,11 +5,13 @@ import {
   Search, SlidersHorizontal, ChevronDown, Check, X, Trash2,
   Package, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, 
   Download, RefreshCcw, AlertCircle, CheckCircle2, FileSpreadsheet,
-  ArrowDownLeft, ArrowUpRight, Plus, Calendar, Filter, StickyNote
+  ArrowDownLeft, ArrowUpRight, Plus, Calendar, Filter, StickyNote,
+  LayoutList, BarChart2 // 👈 เพิ่ม icon ใหม่
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useToast } from '../context/ToastContext';
+import InventoryStats from '../components/InventoryStats'; // 👈 Import Component กราฟ
 
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -44,9 +46,8 @@ const submitTransaction = async (type, items) => {
   return await response.json();
 };
 
-// --- SUB-COMPONENTS ---
-
-// 1. Item Selector Modal (Popup Level 2: Z-Index 200)
+// --- SUB-COMPONENTS (Keep your original modals as is) ---
+// 1. Item Selector Modal
 const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -123,7 +124,7 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   );
 };
 
-// 2. Transaction Modal (Popup Level 1: Z-Index 100)
+// 2. Transaction Modal
 const TransactionModal = ({ isOpen, type, onClose, onSuccess, inventoryData }) => {
   const [activeType, setActiveType] = useState(type);
   const [items, setItems] = useState([{ itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
@@ -201,9 +202,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess, inventoryData }) =
     <>
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className={cn("fixed inset-0 bg-zinc-900/40 backdrop-blur-sm transition-opacity duration-300", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-        
         <div className={cn("relative bg-white w-full max-w-3xl p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col transform transition-all duration-300 overflow-hidden", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-          
           <div className={cn("px-6 py-4 flex items-center justify-between border-b transition-colors duration-300", isReceive ? "bg-emerald-50/50 border-emerald-100" : "bg-amber-50/50 border-amber-100")}>
             <div className="flex items-center gap-3">
               <div className={cn("p-2.5 rounded-xl transition-colors duration-300", isReceive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{isReceive ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}</div>
@@ -211,73 +210,51 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess, inventoryData }) =
             </div>
             <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
           </div>
-
           <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
             <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>Date: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString()}</span></span></div>
-            
             <div className="space-y-3">
               {items.map((item, index) => (
-                // ใช้ items-start เพื่อแก้ปัญหากล่องเบี้ยวเวลา Stock info โผล่มา
                 <div key={index} className="flex flex-col sm:flex-row items-start gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
-                  
-                  {/* Row: Item Selector */}
                   <div className="flex-1 w-full sm:w-auto space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Item</label>
                     <div className="relative flex gap-2">
                       <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all bg-white hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium")}>
-                         {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "Click to search item..."}
+                          {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "Click to search item..."}
                       </div>
                       <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
                     </div>
                     {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1">Current Stock: <span className="font-medium text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
                   </div>
-                  
-                  {/* Row: Quantity */}
                   <div className="w-full sm:w-24 space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Qty</label>
                     <input type="number" min="1" value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', Number(e.target.value))} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 text-center" />
                   </div>
-
-                  {/* Row: Note */}
                   <div className="flex-1 w-full sm:w-auto space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Note</label>
-                    <input 
-                      type="text" 
-                      placeholder="Optional remark..."
-                      value={item.note} 
-                      onChange={(e) => handleFieldChange(index, 'note', e.target.value)} 
-                      className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 placeholder:text-zinc-300" 
-                    />
+                    <input type="text" placeholder="Optional remark..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 placeholder:text-zinc-300" />
                   </div>
-
-                  {/* Delete Button (Aligned with invisible label) */}
                   <div className="w-auto space-y-1">
-                     {/* Label ล่องหน เพื่อดันปุ่มลงมาในระดับเดียวกับ Input */}
-                     <label className="text-[10px] font-bold uppercase tracking-wider invisible block">Del</label> 
-                     <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
+                      <label className="text-[10px] font-bold uppercase tracking-wider invisible block">Del</label> 
+                      <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
                   </div>
                 </div>
               ))}
             </div>
-
             <button onClick={handleAddItem} className="w-full py-3 border border-dashed border-zinc-300 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 transition-all flex items-center justify-center gap-2 text-sm font-medium"><Plus size={16} /> Add Another Item</button>
           </div>
-
           <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3">
             <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white transition-all">Cancel</button>
             <button onClick={handleSubmit} disabled={!isValid || isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-medium transition-all shadow-md flex items-center justify-center gap-2", isReceive ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>{isSubmitting && <RefreshCcw size={16} className="animate-spin" />} Confirm {isReceive ? 'Receipt' : 'Withdrawal'}</button>
           </div>
         </div>
       </div>
-
       <ItemSelectorModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleSelectItem} data={inventoryData} />
     </>,
     document.body
   );
 };
 
-// ... (ExportPreviewModal, CustomSelect, StockStatusBadge) ...
-// Copy ExportPreviewModal from previous code here...
+// 3. Export Modal
 const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     const [isMounted, setIsMounted] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
@@ -356,7 +333,7 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
       </div>,
       document.body
     );
-  };
+};
 
 const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..." }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -383,18 +360,21 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
         )}
       </div>
     );
-  };
+};
   
 const StockStatusBadge = ({ balance }) => {
     if (balance === 0) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100"><AlertCircle size={12} /> Out of Stock</span>;
     if (balance < 5) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100"><AlertCircle size={12} /> Low Stock</span>;
     return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"><CheckCircle2 size={12} /> In Stock</span>;
-  };
+};
 
 // --- MAIN PAGE ---
 export default function Inventory() {
   const { showToast } = useToast();
   
+  // --- STATES ---
+  const [viewMode, setViewMode] = useState('list'); // 👈 เพิ่ม State สำหรับสลับหน้า ('list' | 'chart')
+
   const [searchId, setSearchId] = useState("");
   const [category, setCategory] = useState(""); 
   const [keyword, setKeyword] = useState("");   
@@ -413,6 +393,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(false);
   const filterRef = useRef(null);
 
+  // ... (Effect Hooks เดิมของคุณยังอยู่ครบ) ...
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterRef.current && !filterRef.current.contains(event.target)) setIsFilterOpen(false);
@@ -447,6 +428,7 @@ export default function Inventory() {
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);
 
+  // ... (Handle Functions เดิมของคุณ) ...
   const handleSync = async () => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -518,7 +500,6 @@ export default function Inventory() {
         data={processedData.all} 
       />
 
-      {/* Transaction Modal (Handles Both Receive & Withdraw) */}
       <TransactionModal 
         isOpen={!!transactionType} 
         type={transactionType} 
@@ -536,17 +517,41 @@ export default function Inventory() {
         
         {/* ACTION BUTTONS */}
         <div className="flex items-center gap-3">
+           
+           {/* 1. View Toggle Buttons (List / Analytics) */}
+           <div className="flex bg-zinc-100 p-1 rounded-xl mr-2">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                viewMode === 'list' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+              )}
+            >
+              <LayoutList size={16} /> <span className="hidden sm:inline">List</span>
+            </button>
+            <button 
+              onClick={() => setViewMode('chart')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                viewMode === 'chart' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+              )}
+            >
+              <BarChart2 size={16} /> <span className="hidden sm:inline">Analytics</span>
+            </button>
+          </div>
+
+           {/* 2. Transaction & Sync Buttons */}
            <button 
              onClick={() => setTransactionType('IN')}
              className="h-10 px-4 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-all flex items-center gap-2 shadow-sm active:scale-95"
            >
-             <ArrowDownLeft size={16}/> Receive
+             <ArrowDownLeft size={16}/> <span className="hidden sm:inline">Receive</span>
            </button>
            <button 
              onClick={() => setTransactionType('OUT')}
              className="h-10 px-4 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl text-sm font-medium hover:bg-amber-100 transition-all flex items-center gap-2 shadow-sm active:scale-95"
            >
-             <ArrowUpRight size={16}/> Withdraw
+             <ArrowUpRight size={16}/> <span className="hidden sm:inline">Withdraw</span>
            </button>
            
            <div className="h-6 w-px bg-zinc-200 mx-1 hidden md:block"></div>
@@ -561,121 +566,133 @@ export default function Inventory() {
              <span className="hidden md:inline">Sync</span>
            </button>
            
-           <button 
-             onClick={() => setIsExportModalOpen(true)}
-             disabled={loading}
-             className="h-10 w-10 md:w-auto md:px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-70"
-             title="Export Excel"
-           >
-             <Download size={16}/> 
-             <span className="hidden md:inline">Export</span>
-           </button>
+           {/* ซ่อนปุ่ม Export เมื่ออยู่ในโหมด Analytics (เพราะกราฟไม่ได้ Export ข้อมูลตาราง) */}
+           {viewMode === 'list' && (
+             <button 
+               onClick={() => setIsExportModalOpen(true)}
+               disabled={loading}
+               className="h-10 w-10 md:w-auto md:px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-70"
+               title="Export Excel"
+             >
+               <Download size={16}/> 
+               <span className="hidden md:inline">Export</span>
+             </button>
+           )}
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-3 w-full">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-            <input type="text" placeholder="Search by Item Code or Name..." value={searchId} onChange={(e) => setSearchId(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm"
-            />
-          </div>
-          
-          <div className="relative" ref={filterRef}>
-            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("h-11 w-11 flex items-center justify-center rounded-xl border transition-all shadow-sm cursor-pointer", isFilterOpen || hasActiveFilters ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50")}>
-              <SlidersHorizontal size={18} strokeWidth={2} />
-              {hasActiveFilters && !isFilterOpen && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>}
-            </button>
-            {isFilterOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-zinc-100 p-4 z-30 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">Filters</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> Reset</button>}</div>
-                <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} />
-                <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
+      {/* --- CONTENT SWITCHER --- */}
+      {viewMode === 'chart' ? (
+        // === VIEW: ANALYTICS (GRAPH) ===
+        <InventoryStats />
+      ) : (
+        // === VIEW: LIST (TABLE & SEARCH) ===
+        <>
+          {/* Toolbar */}
+          <div className="flex flex-col gap-4 mb-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-3 w-full">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
+                <input type="text" placeholder="Search by Item Code or Name..." value={searchId} onChange={(e) => setSearchId(e.target.value)}
+                  className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm"
+                />
+              </div>
+              
+              <div className="relative" ref={filterRef}>
+                <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("h-11 w-11 flex items-center justify-center rounded-xl border transition-all shadow-sm cursor-pointer", isFilterOpen || hasActiveFilters ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50")}>
+                  <SlidersHorizontal size={18} strokeWidth={2} />
+                  {hasActiveFilters && !isFilterOpen && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>}
+                </button>
+                {isFilterOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-zinc-100 p-4 z-30 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">Filters</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> Reset</button>}</div>
+                    <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} />
+                    <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in">
+                <span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>
+                {[category, keyword, variant].filter(Boolean).map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
+                    {t} <button onClick={() => {if(t===category)setCategory("");if(t===keyword)setKeyword("");if(t===variant)setVariant("")}} className="hover:text-red-500 transition-colors"><X size={12}/></button>
+                  </span>
+                ))}
               </div>
             )}
           </div>
-        </div>
 
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in">
-            <span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>
-            {[category, keyword, variant].filter(Boolean).map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
-                {t} <button onClick={() => {if(t===category)setCategory("");if(t===keyword)setKeyword("");if(t===variant)setVariant("")}} className="hover:text-red-500 transition-colors"><X size={12}/></button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Table Container */}
-      <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50/30">
-                <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={() => handleSort('itemCode')}>
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
-                    Item Code
-                    <div className="flex flex-col">{sortBy === 'itemCode' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Item Name</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Category</th>
-                <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none text-right" onClick={() => handleSort('balance')}>
-                   <div className="flex items-center justify-end gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
-                    Balance
-                    <div className="flex flex-col">{sortBy === 'balance' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Received</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Withdrawn</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {loading ? (
-                [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
-              ) : processedData.paginated.length > 0 ? (
-                processedData.paginated.map((item) => (
-                  <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0">
-                    <td className="px-6 py-4 font-mono text-zinc-500 text-xs font-medium">{item.itemCode}</td>
-                    <td className="px-6 py-4"><div className="flex items-center gap-2"><span className="font-medium text-zinc-900">{item.name}</span></div></td>
-                    <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
-                    <td className="px-6 py-4 text-right"><span className="font-bold text-zinc-900">{item.balance}</span> <span className="text-xs text-zinc-400 font-normal ml-0.5">{item.unit}</span></td>
-                    <td className="px-6 py-4 text-right text-zinc-500">{item.received}</td>
-                    <td className="px-6 py-4 text-right text-zinc-500">{item.tempWithdrawn}</td>
-                    <td className="px-6 py-4 text-right"><StockStatusBadge balance={item.balance} /></td>
+          {/* Table Container */}
+          <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50/30">
+                    <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={() => handleSort('itemCode')}>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
+                        Item Code
+                        <div className="flex flex-col">{sortBy === 'itemCode' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
+                      </div>
+                    </th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Item Name</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Category</th>
+                    <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none text-right" onClick={() => handleSort('balance')}>
+                        <div className="flex items-center justify-end gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
+                        Balance
+                        <div className="flex flex-col">{sortBy === 'balance' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
+                      </div>
+                    </th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Received</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Withdrawn</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Status</th>
                   </tr>
-                ))
-              ) : (
-                <tr><td colSpan="7" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No stock data found</p></div></td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="text-sm">
+                  {loading ? (
+                    [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
+                  ) : processedData.paginated.length > 0 ? (
+                    processedData.paginated.map((item) => (
+                      <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0">
+                        <td className="px-6 py-4 font-mono text-zinc-500 text-xs font-medium">{item.itemCode}</td>
+                        <td className="px-6 py-4"><div className="flex items-center gap-2"><span className="font-medium text-zinc-900">{item.name}</span></div></td>
+                        <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
+                        <td className="px-6 py-4 text-right"><span className="font-bold text-zinc-900">{item.balance}</span> <span className="text-xs text-zinc-400 font-normal ml-0.5">{item.unit}</span></td>
+                        <td className="px-6 py-4 text-right text-zinc-500">{item.received}</td>
+                        <td className="px-6 py-4 text-right text-zinc-500">{item.tempWithdrawn}</td>
+                        <td className="px-6 py-4 text-right"><StockStatusBadge balance={item.balance} /></td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="7" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No stock data found</p></div></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Pagination */}
-        <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <span>Rows:</span>
-            <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer">
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
-              <button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm text-zinc-500">
+                <span>Rows:</span>
+                <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer">
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

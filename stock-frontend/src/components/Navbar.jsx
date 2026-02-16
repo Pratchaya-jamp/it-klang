@@ -28,7 +28,7 @@ export default function Navbar() {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
     { name: 'Inventory', path: '/inventory', icon: Package },
     { name: 'Borrowing', path: '/borrowing', icon: ArrowRightLeft },
-    // { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Audit Log', path: '/audit', icon: Settings },
   ];
 
   // --- EFFECT: Fetch User Data ---

@@ -34,49 +34,33 @@ export default function ChangePassword() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (formData.newPassword !== formData.confirmPassword) {
-      showToast("New passwords do not match.", "error");
-      return;
-    }
+  e.preventDefault();
 
-    if (formData.newPassword.length < 6) {
-      showToast("Password must be at least 6 characters.", "error");
-      return;
-    }
+  if (formData.newPassword !== formData.confirmPassword) {
+    showToast("New passwords do not match.", "error");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const payload = {
-        staffId: staffId,
-        oldPassword: oldPassword, // ส่งค่าเดิมกลับไปยืนยัน
-        newPassword: formData.newPassword
-      };
+  try {
+    await request("/auth/change-password", {
+      method: "POST",
+      body: {
+        newPassword: formData.newPassword,
+      },
+    });
 
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    showToast("Password changed successfully! Please login again.", "success");
 
-      if (!response.ok) {
-        throw new Error('Failed to change password.');
-      }
+    navigate("/login");
 
-      showToast("Password changed successfully! Please login again.", "success");
-      
-      // Clear session and redirect
-      localStorage.removeItem('token');
-      setTimeout(() => navigate('/login'), 1500);
-
-    } catch (error) {
-      showToast(error.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!staffId) return null;
 

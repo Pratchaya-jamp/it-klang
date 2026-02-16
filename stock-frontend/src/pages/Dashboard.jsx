@@ -53,6 +53,31 @@ const deleteItem = async (code) => {
 
 // --- SUB-COMPONENTS ---
 
+const RealTimeClock = () => {
+  const [date, setDate] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDate(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // จัดรูปแบบวันที่และเวลา (Bangkok Time)
+  const formattedTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
+
+  return <span className="font-mono font-medium">{formattedTime}</span>;
+};
+
 // 1. Creatable Select
 const CreatableSelect = ({ label, value, onChange, options, placeholder = "Select or type..." }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -401,7 +426,7 @@ export default function Dashboard() {
 
       <div className="flex items-end justify-between py-6">
         <div><h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Dashboard</h1><p className="text-zinc-500 text-sm font-light mt-1">Real-time inventory overview.</p></div>
-        <div className="hidden sm:flex text-sm text-zinc-400 font-light items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-zinc-100 shadow-sm"><Clock size={14}/> <span>Today</span></div>
+        <div className="hidden sm:flex text-sm text-zinc-400 font-light items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-zinc-100 shadow-sm"><Clock size={14}/> <RealTimeClock /></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
