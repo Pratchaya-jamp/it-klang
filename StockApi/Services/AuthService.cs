@@ -25,6 +25,9 @@ namespace StockApi.Services
 
         Task UpdateUserProfileAsync(string staffId, UserUpdateProfileRequest request);
         Task AdminUpdateUserAsync(string targetStaffId, AdminUpdateUserRequest request);
+
+        Task ForgotPasswordAsync(string email);
+        Task ResetPasswordWithTokenAsync(ResetPasswordRequest request);
     }
 
     public class AuthService : IAuthService
@@ -234,22 +237,99 @@ namespace StockApi.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
             if (user == null) throw new Exception($"ไม่พบผู้ใช้งาน ID: {targetStaffId}");
 
-            // Admin แก้ได้ทุกอย่าง
+            // 1. อัปเดตข้อมูลทั่วไป
             user.Name = request.Name;
             user.Email = request.Email;
 
-            // เช็ค Role ว่าถูกต้องไหมก่อนบันทึก
-            var validRoles = new[] { "User", "Admin", "SuperAdmin" };
-            if (!validRoles.Contains(request.Role))
+            // 2. อัปเดต Role (แบบ Custom / กรอกมือ)
+            if (!string.IsNullOrWhiteSpace(request.Role))
             {
-                throw new Exception("Role ไม่ถูกต้อง (ต้องเป็น User, Admin หรือ SuperAdmin)");
-            }
-            user.Role = request.Role;
+                // ตัดช่องว่างหน้า-หลังทิ้ง เพื่อความสะอาดของข้อมูล
+                string cleanRole = request.Role.Trim();
 
-            // (Optional) ถ้ามี field IsActive
-            // user.IsActive = request.IsActive;
+                // บันทึกลง DB เลย ไม่ต้องเช็ค List อะไรทั้งนั้น
+                user.Role = cleanRole;
+            }
 
             await _context.SaveChangesAsync();
+        }
+
+        public async Task ForgotPasswordAsync(string email)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null) throw new Exception("ไม่พบอีเมลนี้ในระบบ");
+
+            // 1. สร้าง Reset Token (อายุ 15 นาที) 
+            // เราจะใส่ Claim พิเศษเข้าไปเพื่อบอกว่าเป็น token สำหรับ reset เท่านั้น
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY")!);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[] {
+            new Claim("email", user.Email),
+            new Claim("purpose", "password_reset") // กันคนเอา Login Token มาสวมรอย
+            }),
+                Expires = DateTime.UtcNow.AddMinutes(15),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
+                Issuer = Env.GetString("JWT_ISSUER")
+            };
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var resetToken = tokenHandler.WriteToken(token);
+
+            var frontendUrl = Env.GetString("FRONTEND_URL");
+            frontendUrl = frontendUrl.TrimEnd('/');
+
+            // 2. สร้าง Link
+            var resetLink = $"{frontendUrl}/reset-password?token={resetToken}";
+
+            // 3. ส่งอีเมล
+            await _emailService.SendEmailAsync(
+                user.Email,
+                "รีเซ็ตรหัสผ่านระบบ Stock API",
+                $"<p>กรุณาคลิกลิงก์เพื่อตั้งรหัสผ่านใหม่ (ลิงก์มีอายุ 15 นาที):</p><a href='{resetLink}'>{resetLink}</a>"
+            );
+        }
+
+        public async Task ResetPasswordWithTokenAsync(ResetPasswordRequest request)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY")!);
+
+            try
+            {
+                // 1. Validate และแกะ Token
+                tokenHandler.ValidateToken(request.Token, new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = true,
+                    ValidIssuer = Env.GetString("JWT_ISSUER"),
+                    ValidateAudience = false,
+                    ClockSkew = TimeSpan.Zero // หมดเวลาปุ๊บ ตัดปั๊บ
+                }, out SecurityToken validatedToken);
+
+                var jwtToken = (JwtSecurityToken)validatedToken;
+                var email = jwtToken.Claims.First(x => x.Type == "email").Value;
+                var purpose = jwtToken.Claims.First(x => x.Type == "purpose").Value;
+
+                if (purpose != "password_reset") throw new Exception("Invalid token purpose");
+
+                // 2. หา User จาก Email ใน Token
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null) throw new Exception("ไม่พบผู้ใช้งาน");
+
+                // 3. เปลี่ยนรหัสผ่าน
+                user.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+                user.IsForceChangePassword = false;
+
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+                throw new Exception("ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว");
+            }
         }
     }
 }

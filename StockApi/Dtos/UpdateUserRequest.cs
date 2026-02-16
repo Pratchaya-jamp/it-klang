@@ -28,6 +28,6 @@ namespace StockApi.Dtos
         public string Role { get; set; } = string.Empty;
 
         // (Optional) เผื่ออนาคตอยากทำระบบแบน User
-        public bool IsActive { get; set; } = true;
+        //public bool IsActive { get; set; } = true;
     }
 }

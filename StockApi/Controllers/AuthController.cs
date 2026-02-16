@@ -165,20 +165,20 @@ namespace StockApi.Controllers
             }
         }
 
-        [Authorize] // แค่ Login ก็เข้าได้
-        [HttpGet("debug")]
-        public IActionResult DebugClaims()
-        {
-            return Ok(new
-            {
-                IsAuthenticated = User.Identity?.IsAuthenticated,
-                Name = User.Identity?.Name,
-                // ดูว่า Server เห็น Claim อะไรบ้าง
-                Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList(),
-                // เช็คดูซิว่า Server ยอมรับว่าเป็น SuperAdmin ไหม
-                IsInRole = User.IsInRole("SuperAdmin")
-            });
-        }
+        //[Authorize] // แค่ Login ก็เข้าได้
+        //[HttpGet("debug")]
+        //public IActionResult DebugClaims()
+        //{
+        //    return Ok(new
+        //    {
+        //        IsAuthenticated = User.Identity?.IsAuthenticated,
+        //        Name = User.Identity?.Name,
+        //        // ดูว่า Server เห็น Claim อะไรบ้าง
+        //        Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList(),
+        //        // เช็คดูซิว่า Server ยอมรับว่าเป็น SuperAdmin ไหม
+        //        IsInRole = User.IsInRole("SuperAdmin")
+        //    });
+        //}
 
         [Authorize] // <--- ใครก็ได้ที่ Login แล้ว
         [HttpPut("profile")]
@@ -205,15 +205,45 @@ namespace StockApi.Controllers
         // PUT: api/auth/admin/users/{id}
         // SuperAdmin แก้ไขข้อมูลคนอื่น
         [Authorize(Policy = "SuperAdminOnly")] // <--- ใช้ Policy ที่เราเพิ่งแก้ผ่าน
-        [HttpPut("admin/users/{id}")]
-        public async Task<IActionResult> AdminUpdateUser([FromRoute] string id, [FromBody] AdminUpdateUserRequest request)
+        [HttpPut("admin/users/{staffId}")]
+        public async Task<IActionResult> AdminUpdateUser(string staffId, [FromBody] AdminUpdateUserRequest request)
         {
             try
             {
                 // ส่ง ID จาก URL และข้อมูลจาก Body ไปให้ Service
-                await _authService.AdminUpdateUserAsync(id, request);
+                await _authService.AdminUpdateUserAsync(staffId, request);
+                return Ok(new { message = $"อัปเดตข้อมูลผู้ใช้งาน {staffId} เรียบร้อยแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
 
-                return Ok(new { message = $"แก้ไขข้อมูลผู้ใช้ {id} สำเร็จ" });
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                await _authService.ForgotPasswordAsync(request.Email);
+                return Ok(new { message = "ระบบได้ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลของคุณแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // POST: api/auth/reset-password-token
+        [AllowAnonymous]
+        [HttpPost("reset-password-token")]
+        public async Task<IActionResult> ResetPasswordToken([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                await _authService.ResetPasswordWithTokenAsync(request);
+                return Ok(new { message = "เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่" });
             }
             catch (Exception ex)
             {
