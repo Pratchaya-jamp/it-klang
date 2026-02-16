@@ -7,6 +7,7 @@ using StockApi.Config;
 using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Utilities;
+using DotNetEnv;
 
 namespace StockApi.Services
 {
@@ -103,26 +104,29 @@ namespace StockApi.Services
 
         private string CreateToken(User user)
         {
-            // 1. กำหนด Claims แบบชื่อสั้น (Manual String)
+            // 1. ดึง Key จาก .env เป็น string ก่อน
+            string jwtKeyString = Env.GetString("JWT_KEY")!;
+
+            // 2. แปลง string เป็น SymmetricSecurityKey
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKeyString));
+
+            // 3. สร้าง Credentials (ตรงนี้แหละที่มักจะใส่ผิด)
+            // ตัวแปร key ต้องใส่ในตำแหน่งแรกของ SigningCredentials
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
             var claims = new List<Claim>
             {
                 new Claim("id", user.StaffId),
                 new Claim("name", user.Name),
-                new Claim("role", user.Role),
+                new Claim("role", user.Role)
             };
 
-            var keyString = _configuration.GetSection("Jwt:Key").Value!;
-            var issuer = _configuration.GetSection("Jwt:Issuer").Value!; // <--- ดึง Issuer จาก Config
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-
             var token = new JwtSecurityToken(
-                issuer: issuer,      // <--- ใส่ iss ตรงนี้
-                audience: null,      // ไม่ได้ใช้ audience ก็ใส่ null
+                issuer: Env.GetString("JWT_ISSUER"), // ดึงจาก .env ตรงๆ
+                audience: null,
                 claims: claims,
                 expires: DateTime.Now.AddHours(1),
-                signingCredentials: creds
+                signingCredentials: creds // ใส่ตัวแปร creds ที่สร้างไว้ข้างบน
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -144,21 +148,37 @@ namespace StockApi.Services
                 CreatedAt = user.CreatedAt
             };
         }
-
         public async Task AdminResetPasswordAsync(string targetStaffId, string newPassword)
         {
-            // 1. ค้นหา User คนนั้น (คนที่ account มีปัญหา)
+            // 1. ค้นหา User คนนั้น
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
             if (user == null) throw new Exception("ไม่พบผู้ใช้งานรายนี้ในระบบ");
 
-            // 2. ไม่ต้องเช็ค OldPassword! (เพราะเราเป็น SuperAdmin)
-            // ยัดรหัสใหม่ใส่เข้าไปเลย
+            // 2. เปลี่ยนรหัสผ่านทันที (ไม่ต้องเช็คของเก่า)
             user.PasswordHash = PasswordHasher.HashPassword(newPassword);
 
-            // 3. บังคับให้เขาเปลี่ยนรหัสใหม่เองอีกรอบตอน Login ครั้งหน้า (เพื่อความปลอดภัย)
+            // 3. บังคับให้เขาเปลี่ยนรหัสเองอีกรอบตอน Login ครั้งหน้า (เพื่อความปลอดภัย)
             user.IsForceChangePassword = true;
 
             await _context.SaveChangesAsync();
+
+            // 4. *** เพิ่มส่วนนี้: ส่งอีเมลแจ้งเจ้าตัว ***
+            // เช็คก่อนว่ามีอีเมลไหม (เผื่อ User คนนี้ไม่ได้ลงอีเมลไว้)
+            if (!string.IsNullOrEmpty(user.Email))
+            {
+                string subject = "แจ้งเตือน: รหัสผ่านของคุณถูกรีเซ็ตโดยผู้ดูแลระบบ";
+                string body = $@"
+                    <h3>เรียนคุณ {user.Name} ({user.StaffId})</h3>
+                    <p>ผู้ดูแลระบบได้ทำการรีเซ็ตรหัสผ่านของคุณเรียบร้อยแล้ว</p>
+                    <p>รหัสผ่านใหม่ของคุณคือ: <strong>{newPassword}</strong></p>
+                    <hr />
+                    <p style='color: red;'>*กรุณาเข้าสู่ระบบด้วยรหัสผ่านนี้ และทำการเปลี่ยนรหัสผ่านใหม่ทันทีเพื่อความปลอดภัย</p>
+                    <p>ขอบคุณครับ<br/>Stock API System</p>
+                ";
+
+                // ส่งแบบ Fire-and-Forget (ไม่ต้องรอผลส่งเสร็จ) หรือจะ await ก็ได้ถ้าอยากชัวร์
+                await _emailService.SendEmailAsync(user.Email, subject, body);
+            }
         }
 
         // --- 1. User แก้ไขตัวเอง ---

@@ -20,12 +20,23 @@ Env.Load();
 Console.WriteLine($"Current Directory: {Directory.GetCurrentDirectory()}");
 Console.WriteLine($"Check .env file: {File.Exists(".env")}");
 
+var jwtKey = Env.GetString("JWT_KEY");
+var jwtIssuer = Env.GetString("JWT_ISSUER");
+
+if (string.IsNullOrEmpty(jwtKey))
+{
+    Console.WriteLine("❌ Error: JWT_KEY not found in .env");
+}
+
 // 2. Setup Database (MySQL)
 var connectionString = $"server={Env.GetString("DB_HOST")};" +
                        $"port={Env.GetString("DB_PORT")};" +
                        $"database={Env.GetString("DB_NAME")};" +
                        $"user={Env.GetString("DB_USER")};" +
-                       $"password={Env.GetString("DB_PASS")};";
+                       $"password={Env.GetString("DB_PASS")};" +
+                       $"pooling={Env.GetString("DB_POOLING")};" +
+                       $"minPoolSize={Env.GetString("DB_MIN_POOL")};" +
+                       $"maximumPoolSize={Env.GetString("DB_MAX_POOL")};";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
@@ -64,9 +75,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = jwtIssuer,
             ValidateAudience = false,
             RoleClaimType = "role",
             NameClaimType = "name"

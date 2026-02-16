@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Mail;
+using DotNetEnv;
 
 namespace StockApi.Services
 {
@@ -12,46 +13,64 @@ namespace StockApi.Services
             _configuration = configuration;
         }
 
-        public async Task SendPasswordEmailAsync(string toEmail, string name, string staffId, string password)
+        public async Task SendEmailAsync(string to, string subject, string body)
         {
-            // 1. ดึงค่า Config
-            var emailSettings = _configuration.GetSection("EmailSettings");
-            var fromEmail = emailSettings["Email"];
-            var appPassword = emailSettings["Password"];
-            var host = emailSettings["Host"];
-            var port = int.Parse(emailSettings["Port"]!);
+            // ดึงค่า Config (ตรวจสอบว่าใน appsettings.json หรือ .env มีค่าเหล่านี้ไหม)
+            // ถ้าใช้ .env ผ่าน IConfiguration: keys มักจะเป็น "EmailSettings:Email"
+            var fromEmail = Environment.GetEnvironmentVariable("EMAIL_USER");
 
-            // 2. ตั้งค่า SMTP Client
+            var appPassword = Environment.GetEnvironmentVariable("EMAIL_PASS");
+
+            var host = Environment.GetEnvironmentVariable("EMAIL_HOST");
+
+            var portStr = Environment.GetEnvironmentVariable("EMAIL_PORT");
+
+            if (string.IsNullOrEmpty(fromEmail))
+            {
+                throw new Exception("Config Error: EMAIL_USER is missing in .env");
+            }
+
+            if (!int.TryParse(portStr, out int port)) port = 587;
+
             var client = new SmtpClient(host, port)
             {
-                EnableSsl = true, // Gmail ต้องเปิด SSL
+                EnableSsl = true,
                 Credentials = new NetworkCredential(fromEmail, appPassword)
             };
 
-            // 3. สร้างเนื้อหาอีเมล (HTML)
             var mailMessage = new MailMessage
             {
-                From = new MailAddress(fromEmail!),
-                Subject = "ยินดีต้อนรับสู่ระบบ Stock API - รหัสผ่านของคุณ",
-                Body = $@"
-                    <html>
-                    <body>
-                        <h2>ยินดีต้อนรับคุณ {name}</h2>
-                        <p>บัญชีของคุณถูกสร้างเรียบร้อยแล้ว</p>
-                        <p>ชื่อผู้ใช้ของคุณคือ: <b style='color:blue; font-size: 18px;'>{staffId}</b></p>
-                        <p>รหัสผ่านเริ่มต้นของคุณคือ: <b style='color:blue; font-size: 18px;'>{password}</b></p>
-                        <br>
-                        <p style='color:red;'>*กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก</p>
-                    </body>
-                    </html>
-                ",
-                IsBodyHtml = true // บอกว่าเป็น HTML
+                From = new MailAddress(fromEmail),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = true
             };
 
-            mailMessage.To.Add(toEmail);
+            mailMessage.To.Add(to);
 
-            // 4. ส่งจริง
             await client.SendMailAsync(mailMessage);
+        }
+
+        // --- 2. ฟังก์ชันเดิม (ส่งรหัสผ่านตอน Register) ---
+        // ปรับให้เรียกใช้ SendEmailAsync ด้านบน (ลด code ซ้ำซ้อน)
+        public async Task SendPasswordEmailAsync(string toEmail, string name, string staffId, string password)
+        {
+            string subject = "ยินดีต้อนรับสู่ระบบ Stock API - รหัสผ่านของคุณ";
+
+            string body = $@"
+                <html>
+                <body>
+                    <h2>ยินดีต้อนรับคุณ {name}</h2>
+                    <p>บัญชีของคุณถูกสร้างเรียบร้อยแล้ว</p>
+                    <p>ชื่อผู้ใช้ของคุณคือ: <b style='color:blue; font-size: 18px;'>{staffId}</b></p>
+                    <p>รหัสผ่านเริ่มต้นของคุณคือ: <b style='color:blue; font-size: 18px;'>{password}</b></p>
+                    <br>
+                    <p style='color:red;'>*กรุณาเปลี่ยนรหัสผ่านทันทีหลังจากเข้าสู่ระบบครั้งแรก</p>
+                </body>
+                </html>";
+
+            // เรียกใช้ฟังก์ชันหลักด้านบน
+            await SendEmailAsync(toEmail, subject, body);
         }
     }
 }
