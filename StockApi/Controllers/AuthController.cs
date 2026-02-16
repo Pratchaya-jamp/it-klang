@@ -160,5 +160,46 @@ namespace StockApi.Controllers
                 IsInRole = User.IsInRole("SuperAdmin")
             });
         }
+
+        [Authorize] // <--- ใครก็ได้ที่ Login แล้ว
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UserUpdateProfileRequest request)
+        {
+            try
+            {
+                // 1. ดึง ID จาก Token ของตัวเอง (ปลอดภัยที่สุด ห้ามรับ ID จาก Body)
+                // ต้องใช้ claim "id" ตามที่เราคุยกันล่าสุด
+                var staffId = User.FindFirst("id")?.Value;
+
+                if (string.IsNullOrEmpty(staffId)) return Unauthorized();
+
+                await _authService.UpdateUserProfileAsync(staffId, request);
+
+                return Ok(new { message = "อัปเดตข้อมูลส่วนตัวสำเร็จ" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // PUT: api/auth/admin/users/{id}
+        // SuperAdmin แก้ไขข้อมูลคนอื่น
+        [Authorize(Policy = "SuperAdminOnly")] // <--- ใช้ Policy ที่เราเพิ่งแก้ผ่าน
+        [HttpPut("admin/users/{id}")]
+        public async Task<IActionResult> AdminUpdateUser([FromRoute] string id, [FromBody] AdminUpdateUserRequest request)
+        {
+            try
+            {
+                // ส่ง ID จาก URL และข้อมูลจาก Body ไปให้ Service
+                await _authService.AdminUpdateUserAsync(id, request);
+
+                return Ok(new { message = $"แก้ไขข้อมูลผู้ใช้ {id} สำเร็จ" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

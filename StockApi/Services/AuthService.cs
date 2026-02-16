@@ -17,6 +17,8 @@ namespace StockApi.Services
         Task ChangePasswordAsync(ChangePasswordRequest request);
         Task<UserProfileDto> GetUserProfileAsync(string staffId);
         Task AdminResetPasswordAsync(string targetStaffId, string newPassword);
+        Task UpdateUserProfileAsync(string staffId, UserUpdateProfileRequest request);
+        Task AdminUpdateUserAsync(string targetStaffId, AdminUpdateUserRequest request);
     }
 
     public class AuthService : IAuthService
@@ -155,6 +157,45 @@ namespace StockApi.Services
 
             // 3. บังคับให้เขาเปลี่ยนรหัสใหม่เองอีกรอบตอน Login ครั้งหน้า (เพื่อความปลอดภัย)
             user.IsForceChangePassword = true;
+
+            await _context.SaveChangesAsync();
+        }
+
+        // --- 1. User แก้ไขตัวเอง ---
+        public async Task UpdateUserProfileAsync(string staffId, UserUpdateProfileRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == staffId);
+            if (user == null) throw new Exception("ไม่พบข้อมูลผู้ใช้งาน");
+
+            // อัปเดตเฉพาะข้อมูลทั่วไป
+            user.Name = request.Name;
+            user.Email = request.Email;
+
+            // Log หรือทำอย่างอื่นเพิ่มเติมได้ที่นี่
+
+            await _context.SaveChangesAsync();
+        }
+
+        // --- 2. Admin แก้ไขคนอื่น ---
+        public async Task AdminUpdateUserAsync(string targetStaffId, AdminUpdateUserRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
+            if (user == null) throw new Exception($"ไม่พบผู้ใช้งาน ID: {targetStaffId}");
+
+            // Admin แก้ได้ทุกอย่าง
+            user.Name = request.Name;
+            user.Email = request.Email;
+
+            // เช็ค Role ว่าถูกต้องไหมก่อนบันทึก
+            var validRoles = new[] { "User", "Admin", "SuperAdmin" };
+            if (!validRoles.Contains(request.Role))
+            {
+                throw new Exception("Role ไม่ถูกต้อง (ต้องเป็น User, Admin หรือ SuperAdmin)");
+            }
+            user.Role = request.Role;
+
+            // (Optional) ถ้ามี field IsActive
+            // user.IsActive = request.IsActive;
 
             await _context.SaveChangesAsync();
         }
