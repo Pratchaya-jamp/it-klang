@@ -10,5 +10,9 @@ namespace StockApi.Dtos
         [Required(ErrorMessage = "กรุณาระบุรหัสผ่านใหม่")]
         [MinLength(6, ErrorMessage = "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร")]
         public string NewPassword { get; set; } = string.Empty;   // รหัสใหม่ที่ Admin ตั้งให้
+
+        [Required(ErrorMessage = "กรุณาระบุOTPที่ได้รับ")]
+        public string? OtpCode { get; set; } // เพิ่มช่องรับ OTP
+
     }
 }

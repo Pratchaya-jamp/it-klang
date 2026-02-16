@@ -8,6 +8,7 @@ using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Utilities;
 using DotNetEnv;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace StockApi.Services
 {
@@ -17,7 +18,11 @@ namespace StockApi.Services
         Task<LoginResponse> LoginAsync(LoginRequest request);
         Task ChangePasswordAsync(ChangePasswordRequest request);
         Task<UserProfileDto> GetUserProfileAsync(string staffId);
-        Task AdminResetPasswordAsync(string targetStaffId, string newPassword);
+
+        // --- แก้ไข 2 บรรทัดนี้ ---
+        Task RequestAdminOtpAsync(string adminStaffId); // เพิ่มสำหรับขอ OTP
+        Task AdminResetPasswordWithOtpAsync(string adminStaffId, string targetStaffId, string newPassword, string otpCode);
+
         Task UpdateUserProfileAsync(string staffId, UserUpdateProfileRequest request);
         Task AdminUpdateUserAsync(string targetStaffId, AdminUpdateUserRequest request);
     }
@@ -27,12 +32,14 @@ namespace StockApi.Services
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
+        private readonly IMemoryCache _cache;
 
-        public AuthService(AppDbContext context, IEmailService emailService, IConfiguration configuration)
+        public AuthService(AppDbContext context, IEmailService emailService, IConfiguration configuration, IMemoryCache cache)
         {
             _context = context;
             _emailService = emailService;
             _configuration = configuration;
+            _cache = cache;
         }
 
         public async Task RegisterAsync(RegisterRequest request)
@@ -148,18 +155,43 @@ namespace StockApi.Services
                 CreatedAt = user.CreatedAt
             };
         }
-        public async Task AdminResetPasswordAsync(string targetStaffId, string newPassword)
+
+        public async Task RequestAdminOtpAsync(string adminStaffId)
         {
-            // 1. ค้นหา User คนนั้น
+            var admin = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == adminStaffId);
+            if (admin == null) throw new Exception("ไม่พบข้อมูลผู้ดูแลระบบ");
+
+            // สร้างเลข 6 หลัก
+            var otpCode = new Random().Next(100000, 999999).ToString();
+
+            // เก็บใน Cache 5 นาที โดยผูกกับ StaffId ของ Admin
+            _cache.Set($"OTP_{adminStaffId}", otpCode, TimeSpan.FromMinutes(5));
+
+            // ส่งอีเมลหา Admin
+            await _emailService.SendEmailAsync(
+                admin.Email,
+                "รหัส OTP สำหรับยืนยันการรีเซ็ตรหัสผ่าน",
+                $"<h3>รหัสยืนยันของคุณคือ: <b style='color:blue;'>{otpCode}</b></h3><p>รหัสนี้มีอายุ 5 นาที</p>"
+            );
+        }
+
+        public async Task AdminResetPasswordWithOtpAsync(string adminStaffId, string targetStaffId, string newPassword, string otpCode)
+        {
+            // เช็ค OTP ใน Cache
+            if (!_cache.TryGetValue($"OTP_{adminStaffId}", out string? savedOtp) || savedOtp != otpCode)
+            {
+                throw new Exception("รหัส OTP ไม่ถูกต้องหรือหมดอายุ");
+            }
+
+            // ถ้าผ่าน ให้ลบ OTP ทิ้งทันที (ใช้ได้ครั้งเดียว)
+            _cache.Remove($"OTP_{adminStaffId}");
+
+            // ทำการเปลี่ยนรหัสให้ User ตามปกติ
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
-            if (user == null) throw new Exception("ไม่พบผู้ใช้งานรายนี้ในระบบ");
+            if (user == null) throw new Exception("ไม่พบผู้ใช้งานที่ต้องการรีเซ็ต");
 
-            // 2. เปลี่ยนรหัสผ่านทันที (ไม่ต้องเช็คของเก่า)
             user.PasswordHash = PasswordHasher.HashPassword(newPassword);
-
-            // 3. บังคับให้เขาเปลี่ยนรหัสเองอีกรอบตอน Login ครั้งหน้า (เพื่อความปลอดภัย)
             user.IsForceChangePassword = true;
-
             await _context.SaveChangesAsync();
 
             // 4. *** เพิ่มส่วนนี้: ส่งอีเมลแจ้งเจ้าตัว ***

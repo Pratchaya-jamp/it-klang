@@ -130,14 +130,33 @@ namespace StockApi.Controllers
             }
         }
 
-        [Authorize(Policy = "SuperAdminOnly")] // <--- ต้องเป็น SuperAdmin เท่านั้น
+        [Authorize(Policy = "SuperAdminOnly")]
+        [HttpPost("admin/request-otp")]
+        public async Task<IActionResult> RequestOtp()
+        {
+            try
+            {
+                var adminId = User.FindFirst("id")?.Value;
+                await _authService.RequestAdminOtpAsync(adminId!);
+                return Ok(new { message = "ส่งรหัส OTP ไปยังอีเมลของคุณแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [Authorize(Policy = "SuperAdminOnly")]
         [HttpPost("admin/reset-password")]
         public async Task<IActionResult> AdminResetPassword([FromBody] AdminResetPasswordRequest request)
         {
             try
             {
-                // ส่ง TargetStaffId และ NewPassword ไปให้ Service
-                await _authService.AdminResetPasswordAsync(request.TargetStaffId, request.NewPassword);
+                if (string.IsNullOrEmpty(request.OtpCode))
+                    return BadRequest(new { message = "กรุณากรอกรหัส OTP" });
+
+                var adminId = User.FindFirst("id")?.Value;
+                await _authService.AdminResetPasswordWithOtpAsync(adminId!, request.TargetStaffId, request.NewPassword, request.OtpCode);
                 return StatusCode(201, new { message = $"รีเซ็ตรหัสผ่านของ {request.TargetStaffId} สำเร็จ" });
             }
             catch (Exception ex)
