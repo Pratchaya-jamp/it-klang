@@ -271,5 +271,20 @@ namespace StockApi.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [Authorize(Policy = "SuperAdminOnly")]
+        [HttpGet("admin/users")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            try
+            {
+                var users = await _authService.GetAllUsersAsync();
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

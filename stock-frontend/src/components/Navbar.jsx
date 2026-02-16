@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User, 
-  LogOut, ChevronDown, Loader2 
+  Users, LogOut, ChevronDown, Loader2 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -15,7 +15,7 @@ function cn(...inputs) {
 
 export default function Navbar() {
   const location = useLocation();
-  const { logout } = useAuth(); // ดึงฟังก์ชัน logout มาใช้
+  const { user, logout } = useAuth(); // ดึงฟังก์ชัน logout มาใช้
 
   // --- STATE ---
   const [userData, setUserData] = useState(null); // เก็บข้อมูล User
@@ -152,10 +152,16 @@ export default function Navbar() {
                   <User size={16} />
                   My Profile
                 </Link>
-                  <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors" onClick={() => setIsDropdownOpen(false)}>
-                    <Settings size={14} />
-                    Settings
+                  {(user?.role === 'SuperAdmin' || user?.data?.role === 'SuperAdmin') && (
+                  <Link 
+                    to="/user-manage"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
+                  >
+                    <Users size={16} /> {/* อย่าลืม import Users (มี s) */}
+                    User Management
                   </Link>
+                )}
                 </div>
 
                 <div className="h-px bg-zinc-50 mx-2 my-1"></div>

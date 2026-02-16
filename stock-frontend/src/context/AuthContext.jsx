@@ -7,7 +7,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // สถานะโหลดตอนเปิดเว็บครั้งแรก
+  const [loading, setLoading] = useState(true);
 
   // 1. Check Session on Mount
   useEffect(() => {
@@ -16,12 +16,15 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      // ยิงไปถาม Backend ว่า Session นี้ Valid ไหม?
-      // Backend ต้องมี Endpoint นี้ที่ return ข้อมูล user ถ้า cookie ถูกต้อง
-      const userData = await request('/api/auth/me'); 
+      const response = await request('/api/auth/me'); 
+      
+      // ✅ แก้ไข: เช็คว่ามี key "data" หุ้มอยู่ไหม ถ้ามีให้แกะออกมา
+      const userData = response.data || response;
+      
+      console.log("CheckAuth User:", userData); // Debug ดูว่าได้ Role มาถูกต้องไหม
       setUser(userData);
+
     } catch (error) {
-      // ถ้า 401 หรือ Error แปลว่ายังไม่ Login
       setUser(null);
     } finally {
       setLoading(false);
@@ -30,32 +33,36 @@ export const AuthProvider = ({ children }) => {
 
   // 2. Login Action
   const login = async (credentials) => {
-    // ยิง Login ปกติ (Backend จะ Set-Cookie กลับมาใน Header)
-    const data = await request('/api/auth/login', {
+    const response = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
     
-    // ถ้า Login ผ่านและต้องเปลี่ยนรหัส (Backend ควรส่ง Flag นี้มา)
-    if (data.requireChangePassword) {
-        return { requireChangePassword: true, ...data };
+    // ถ้าต้องเปลี่ยนรหัสผ่าน ส่งกลับไปให้ Login.jsx จัดการ
+    if (response.requireChangePassword) {
+        return { requireChangePassword: true, ...response };
     }
 
-    // Login สำเร็จ -> Set User State
-    // (เราอาจใช้ data ที่ได้จากการ login หรือยิง /me อีกรอบก็ได้)
-    setUser(data.user || data); 
+    // ✅ แก้ไข: แกะ data ออกมาเหมือนกัน เพื่อให้ Format ตรงกันทั้งแอป
+    // กรณี Login API อาจส่งมาเป็น { token: "...", user: { ... } } หรือ { data: { ... } }
+    // ปรับบรรทัดนี้ให้ตรงกับ Response จริงของ Login API
+    const userData = response.data || response.user || response;
+    
+    console.log("Login User:", userData); // Debug
+    setUser(userData); 
+    
     return { success: true };
   };
 
   // 3. Logout Action
   const logout = async () => {
     try {
-      // บอก Backend ให้ Clear Cookie
       await request('/api/auth/logout', { method: 'POST' });
     } catch (error) {
       console.error("Logout error", error);
     } finally {
       setUser(null);
+      // ใช้ window.location เพื่อ clear state ทั้งหมดให้สะอาดจริงๆ
       window.location.href = '/login';
     }
   };

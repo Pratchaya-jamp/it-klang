@@ -17,6 +17,7 @@ const Inventory = lazy(() => import('./pages/Inventory'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 const Profile = lazy(() => import('./pages/Profile'));
 const EditProfile = lazy(() => import('./pages/EditProfile'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
 
 // --- LAYOUTS ---
 
@@ -78,6 +79,7 @@ function App() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/changepwd" element={<ChangePassword />} />
                   <Route path="/profile/edit" element={<EditProfile />} />
+                  <Route path="/user-manage" element={<UserManagement />} />
                   {/* เพิ่มหน้าอื่นๆ ที่นี่ */}
                 </Route>
               </Route>

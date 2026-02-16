@@ -29,6 +29,7 @@ namespace StockApi.Services
         Task ForgotPasswordAsync(string email);
         Task ResetPasswordWithTokenAsync(ResetPasswordRequest request);
         Task<bool> ValidateResetTokenAsync(string token);
+        Task<List<UserListDto>> GetAllUsersAsync();
     }
 
     public class AuthService : IAuthService
@@ -424,6 +425,23 @@ namespace StockApi.Services
             {
                 return false; // ผิดพลาดแม้แต่จุดเดียว (Signature ผิด, หมดอายุ, Format ผิด) คืนค่า false ทันที
             }
+        }
+
+        public async Task<List<UserListDto>> GetAllUsersAsync()
+        {
+            // ดึง User ทั้งหมดและเรียงตามวันที่สมัครล่าสุด
+            return await _context.Users
+                .OrderByDescending(u => u.CreatedAt)
+                .Select(u => new UserListDto
+                {
+                    StaffId = u.StaffId,
+                    Name = u.Name,
+                    Email = u.Email,
+                    Role = u.Role,
+                    IsForceChangePassword = u.IsForceChangePassword,
+                    CreatedAt = u.CreatedAt
+                })
+                .ToListAsync();
         }
     }
 }
