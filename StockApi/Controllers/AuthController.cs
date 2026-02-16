@@ -129,5 +129,36 @@ namespace StockApi.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [Authorize(Policy = "SuperAdminOnly")] // <--- ต้องเป็น SuperAdmin เท่านั้น
+        [HttpPost("admin/reset-password")]
+        public async Task<IActionResult> AdminResetPassword([FromBody] AdminResetPasswordRequest request)
+        {
+            try
+            {
+                // ส่ง TargetStaffId และ NewPassword ไปให้ Service
+                await _authService.AdminResetPasswordAsync(request.TargetStaffId, request.NewPassword);
+                return StatusCode(201, new { message = $"รีเซ็ตรหัสผ่านของ {request.TargetStaffId} สำเร็จ" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [Authorize] // แค่ Login ก็เข้าได้
+        [HttpGet("debug")]
+        public IActionResult DebugClaims()
+        {
+            return Ok(new
+            {
+                IsAuthenticated = User.Identity?.IsAuthenticated,
+                Name = User.Identity?.Name,
+                // ดูว่า Server เห็น Claim อะไรบ้าง
+                Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList(),
+                // เช็คดูซิว่า Server ยอมรับว่าเป็น SuperAdmin ไหม
+                IsInRole = User.IsInRole("SuperAdmin")
+            });
+        }
     }
 }

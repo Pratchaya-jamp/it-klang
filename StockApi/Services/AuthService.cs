@@ -16,6 +16,7 @@ namespace StockApi.Services
         Task<LoginResponse> LoginAsync(LoginRequest request);
         Task ChangePasswordAsync(ChangePasswordRequest request);
         Task<UserProfileDto> GetUserProfileAsync(string staffId);
+        Task AdminResetPasswordAsync(string targetStaffId, string newPassword);
     }
 
     public class AuthService : IAuthService
@@ -140,6 +141,22 @@ namespace StockApi.Services
                 IsForceChangePassword = user.IsForceChangePassword,
                 CreatedAt = user.CreatedAt
             };
+        }
+
+        public async Task AdminResetPasswordAsync(string targetStaffId, string newPassword)
+        {
+            // 1. ค้นหา User คนนั้น (คนที่ account มีปัญหา)
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
+            if (user == null) throw new Exception("ไม่พบผู้ใช้งานรายนี้ในระบบ");
+
+            // 2. ไม่ต้องเช็ค OldPassword! (เพราะเราเป็น SuperAdmin)
+            // ยัดรหัสใหม่ใส่เข้าไปเลย
+            user.PasswordHash = PasswordHasher.HashPassword(newPassword);
+
+            // 3. บังคับให้เขาเปลี่ยนรหัสใหม่เองอีกรอบตอน Login ครั้งหน้า (เพื่อความปลอดภัย)
+            user.IsForceChangePassword = true;
+
+            await _context.SaveChangesAsync();
         }
     }
 }

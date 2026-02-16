@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using StockApi.Config;
 using StockApi.Repositories;
+using StockApi.Data;
 using StockApi.Services;
 using StockApi.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,6 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Load .env
 Env.Load();
+Console.WriteLine($"Current Directory: {Directory.GetCurrentDirectory()}");
+Console.WriteLine($"Check .env file: {File.Exists(".env")}");
 
 // 2. Setup Database (MySQL)
 var connectionString = $"server={Env.GetString("DB_HOST")};" +
@@ -56,6 +59,7 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         // 1. Config การตรวจ Token (เหมือนเดิม)
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -122,6 +126,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("SuperAdminOnly", policy =>
+        policy.RequireClaim("role", "SuperAdmin")); // เช็ค key "role" ต้องมีค่า "SuperAdmin"
+});
+
 // 4. Setup Swagger & Controllers
 builder.Services.AddControllers(options =>
 {
@@ -180,6 +190,21 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        // เรียกฟังก์ชันที่เราเพิ่งสร้าง
+        await DataSeeder.SeedUsersAsync(services);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error Seeding Data: {ex.Message}");
+    }
+}
+
 app.UseMiddleware<StockApi.Middlewares.RequestLoggingMiddleware>();
 app.MapControllers();
 
