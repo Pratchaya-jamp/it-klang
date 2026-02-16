@@ -80,7 +80,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtIssuer,
             ValidateAudience = false,
             RoleClaimType = "role",
-            NameClaimType = "name"
+            NameClaimType = "name",
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
         };
 
         // 2. *** แก้ตรงนี้: ใส่ async / await ให้ชัดเจน ***

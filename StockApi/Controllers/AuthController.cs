@@ -235,6 +235,27 @@ namespace StockApi.Controllers
             }
         }
 
+        [AllowAnonymous] // เปิดให้ยิงเข้ามาได้เลยไม่ต้อง Login
+        [HttpGet("validate-reset-token")]
+        public async Task<IActionResult> ValidateResetToken([FromQuery] string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return BadRequest(new { message = "Token is required" });
+            }
+
+            var isValid = await _authService.ValidateResetTokenAsync(token);
+
+            if (!isValid)
+            {
+                // ถ้า Token ไม่ผ่าน (หมดอายุ, ปลอมแปลง, ผิดวัตถุประสงค์)
+                return BadRequest(new { message = "Invalid or expired token" });
+            }
+
+            // ถ้าผ่าน ส่ง 200 OK กลับไป Frontend จะได้โชว์ฟอร์มกรอกรหัสผ่าน
+            return Ok(new { message = "Token is valid" });
+        }
+
         // POST: api/auth/reset-password-token
         [AllowAnonymous]
         [HttpPost("reset-password-token")]

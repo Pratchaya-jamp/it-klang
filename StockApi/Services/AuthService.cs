@@ -28,6 +28,7 @@ namespace StockApi.Services
 
         Task ForgotPasswordAsync(string email);
         Task ResetPasswordWithTokenAsync(ResetPasswordRequest request);
+        Task<bool> ValidateResetTokenAsync(string token);
     }
 
     public class AuthService : IAuthService
@@ -135,7 +136,7 @@ namespace StockApi.Services
                 issuer: Env.GetString("JWT_ISSUER"), // ดึงจาก .env ตรงๆ
                 audience: null,
                 claims: claims,
-                expires: DateTime.Now.AddHours(1),
+                expires: DateTime.UtcNow.AddHours(1),
                 signingCredentials: creds // ใส่ตัวแปร creds ที่สร้างไว้ข้างบน
             );
 
@@ -294,41 +295,134 @@ namespace StockApi.Services
 
         public async Task ResetPasswordWithTokenAsync(ResetPasswordRequest request)
         {
+            // 1. ตรวจสอบเบื้องต้น: ถ้าส่งมาเป็นค่าว่าง ให้ดีดออกทันที
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                throw new Exception("Invalid Token: Token cannot be empty");
+            }
+
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY")!);
 
             try
             {
-                // 1. Validate และแกะ Token
-                tokenHandler.ValidateToken(request.Token, new TokenValidationParameters
+                // 2. ตั้งค่าการตรวจแบบเข้มข้น (Strict Mode)
+                var validationParameters = new TokenValidationParameters
+                {
+                    // ตรวจสอบลายเซ็น (Signature) ว่ามาจาก Key ของเราจริงๆ
+                    // *ถ้า Token ผิดแม้แต่ตัวเดียว Signature จะพังทันที*
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+
+                    // ตรวจสอบคนออก (Issuer) ว่าต้องเป็นระบบของเรา
+                    ValidateIssuer = true,
+                    ValidIssuer = Env.GetString("JWT_ISSUER"),
+
+                    // ไม่ต้องตรวจคนรับ (Audience) เพราะเราไม่ได้ระบุตอนสร้าง
+                    ValidateAudience = false,
+
+                    // ตรวจสอบวันหมดอายุแบบเคร่งครัด
+                    ValidateLifetime = true,
+
+                    // *** สำคัญมาก: ปรับ ClockSkew เป็น 0 ***
+                    // (ปกติ .NET จะแถมเวลาให้ 5 นาทีกันนาฬิกาไม่ตรง แต่เราไม่เอา! หมดคือหมด!)
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                // 3. เริ่มการตรวจสอบ (Validate)
+                // บรรทัดนี้คือ "ด่านตรวจคนเข้าเมือง" 
+                // ถ้า Token ขาด/เกิน/ผิด/หมดอายุ จะเกิด Exception ทันที
+                tokenHandler.ValidateToken(request.Token, validationParameters, out SecurityToken validatedToken);
+
+                // 4. แกะข้อมูลข้างใน (Claims)
+                var jwtToken = (JwtSecurityToken)validatedToken;
+
+                // ดึง Email
+                var emailClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "email");
+                if (emailClaim == null) throw new SecurityTokenException("Token does not contain email");
+
+                // ดึง Purpose (กันคนเอา Login Token มาเนียน Reset Pass)
+                var purposeClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "purpose");
+                if (purposeClaim == null || purposeClaim.Value != "password_reset")
+                {
+                    throw new SecurityTokenException("Invalid token purpose");
+                }
+
+                var email = emailClaim.Value;
+
+                // 5. หา User และเปลี่ยนรหัส
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null) throw new Exception("User not found");
+
+                // *เช็คเพิ่มเติม: ห้ามตั้งรหัสซ้ำกับรหัสปัจจุบัน (Optional)*
+                if (PasswordHasher.VerifyPassword(request.NewPassword, user.PasswordHash))
+                {
+                    throw new Exception("New password cannot be the same as the old password");
+                }
+
+                user.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+                user.IsForceChangePassword = false;
+
+                await _context.SaveChangesAsync();
+            }
+            catch (SecurityTokenException)
+            {
+                // จับ Error เฉพาะทางของ Token (เช่น Signature ผิด, หมดอายุ, รูปแบบผิด)
+                throw new Exception("Link หมดอายุหรือ Token ไม่ถูกต้อง (กรุณาขอรหัสผ่านใหม่)");
+            }
+            catch (ArgumentException)
+            {
+                // จับ Error กรณี Format ของ Token มั่วมาเลย (ไม่ใช่ JWT)
+                throw new Exception("รูปแบบ Token ไม่ถูกต้อง");
+            }
+            catch (Exception ex)
+            {
+                // Error อื่นๆ (เช่น หา User ไม่เจอ)
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<bool> ValidateResetTokenAsync(string token)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY")!);
+
+            try
+            {
+                // ตั้งค่าการตรวจสอบแบบเข้มข้นที่สุด (Zero Tolerance)
+                tokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = true,
                     ValidIssuer = Env.GetString("JWT_ISSUER"),
                     ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero // หมดเวลาปุ๊บ ตัดปั๊บ
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero // หมดเวลาปุ๊บ ตัดปั๊บ (ไม่มีแถม 5 นาที)
                 }, out SecurityToken validatedToken);
 
                 var jwtToken = (JwtSecurityToken)validatedToken;
+
+                // เช็ค Purpose: ต้องเป็น "password_reset" เท่านั้น (กันคนมั่วเอา Login Token มาใช้)
+                var purposeClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "purpose");
+                if (purposeClaim == null || purposeClaim.Value != "password_reset")
+                {
+                    return false; // Token ถูกแต่ผิดวัตถุประสงค์
+                }
+
+                // เช็คว่า User เจ้าของ Token ยังมีตัวตนอยู่ไหม
                 var email = jwtToken.Claims.First(x => x.Type == "email").Value;
-                var purpose = jwtToken.Claims.First(x => x.Type == "purpose").Value;
-
-                if (purpose != "password_reset") throw new Exception("Invalid token purpose");
-
-                // 2. หา User จาก Email ใน Token
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-                if (user == null) throw new Exception("ไม่พบผู้ใช้งาน");
+                if (user == null)
+                {
+                    return false; // Token ถูกแต่ User หายไปแล้ว
+                }
 
-                // 3. เปลี่ยนรหัสผ่าน
-                user.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
-                user.IsForceChangePassword = false;
-
-                await _context.SaveChangesAsync();
+                return true; // ผ่านทุกด่าน 100%
             }
-            catch (Exception)
+            catch
             {
-                throw new Exception("ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว");
+                return false; // ผิดพลาดแม้แต่จุดเดียว (Signature ผิด, หมดอายุ, Format ผิด) คืนค่า false ทันที
             }
         }
     }
