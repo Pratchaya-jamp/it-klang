@@ -11,9 +11,12 @@ import Loading from './components/Loading'; // ✅ ใช้อันเดิ�
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
+const Profile = lazy(() => import('./pages/Profile'));
+const EditProfile = lazy(() => import('./pages/EditProfile'));
 
 // --- LAYOUTS ---
 
@@ -47,18 +50,23 @@ function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               
-              {/* === PUBLIC ROUTES (Login/Register) === */}
-              {/* เข้าได้เฉพาะคนยังไม่ Login (ไม่มี Navbar) */}
+              {/* === PUBLIC ROUTES (เข้าได้โดยไม่ต้อง Login) === */}
+              {/* Reset Password ต้องอยู่ตรงนี้ครับ */}
               <Route element={<PublicRoute />}>
                 <Route element={<AuthLayout />}>
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
+                  
+                  {/* 2. ✅ เพิ่มบรรทัดนี้ครับ เพื่อให้ลิงก์จากอีเมลเข้าได้ */}
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/force-changepwd" element={<ChangePassword />} />
+                  
                 </Route>
               </Route>
 
               {/* === CHANGE PASSWORD === */}
               {/* ไม่มี Navbar */}
-              <Route path="/changepwd" element={<ChangePassword />} />
+              {/* <Route path="/changepwd" element={<ChangePassword />} /> */}
 
               {/* === PROTECTED ROUTES (Dashboard) === */}
               {/* เข้าได้เฉพาะคน Login แล้ว (มี Navbar) */}
@@ -67,6 +75,9 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/audit" element={<AuditLog />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/changepwd" element={<ChangePassword />} />
+                  <Route path="/profile/edit" element={<EditProfile />} />
                   {/* เพิ่มหน้าอื่นๆ ที่นี่ */}
                 </Route>
               </Route>

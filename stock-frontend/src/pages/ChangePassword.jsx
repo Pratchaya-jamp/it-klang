@@ -1,139 +1,154 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Loader2, Save, KeyRound, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Lock, ShieldCheck, Loader2, ArrowRight, KeyRound } from 'lucide-react';
+import { request } from '../utils/fetchUtils';
 import { useToast } from '../context/ToastContext';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-// Utility
-function cn(...inputs) { return twMerge(clsx(inputs)); }
+import { useAuth } from '../context/AuthContext';
 
 export default function ChangePassword() {
-  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // รับค่าที่ส่งมาจากหน้า Login (staffId และรหัสผ่านเก่าที่เพิ่งกรอกมา)
-  const { staffId, oldPassword } = location.state || {};
+  const { showToast } = useToast();
+  const { user, logout } = useAuth(); 
+
+  // ดึงข้อมูลจาก state ที่ส่งมาจาก Login (ถ้ามี)
+  const stateData = location.state || {};
+  const isFirstLogin = !!stateData.oldPassword; 
 
   const [formData, setFormData] = useState({
+    staffId: stateData.staffId || user?.staffId || '',
+    oldPassword: stateData.oldPassword || '', 
     newPassword: '',
     confirmPassword: ''
   });
+
   const [loading, setLoading] = useState(false);
 
-  // Security Check: ถ้าไม่มีข้อมูลส่งมา (เช่น เข้าผ่าน URL เอง) ให้ดีดกลับไป Login
+  // ตรวจสอบเงื่อนไขความปลอดภัย
   useEffect(() => {
-    if (!staffId || !oldPassword) {
-      navigate('/login');
+    // 1. ถ้าไม่ได้เปลี่ยนรหัสครั้งแรก และไม่ได้ Login อยู่ (ไม่มี user) ให้เด้งไปหน้า Login
+    if (!isFirstLogin && !user) {
+      navigate('/login', { replace: true });
+      return;
     }
-  }, [staffId, oldPassword, navigate]);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+    
+    // 2. ถ้าไม่มีข้อมูลพนักงานเลย (กรณีพิมพ์ URL เข้ามาเองดื้อๆ)
+    if (!formData.staffId) {
+      navigate('/login', { replace: true });
+    }
+  }, [isFirstLogin, user, navigate, formData.staffId]);
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    if (formData.newPassword !== formData.confirmPassword) {
+      showToast("Passwords do not match", "error");
+      return;
+    }
 
-  if (formData.newPassword !== formData.confirmPassword) {
-    showToast("New passwords do not match.", "error");
-    return;
-  }
+    setLoading(true);
+    try {
+      // ✅ Artificial Delay 2.5 วินาทีตามที่ขอ
+      await new Promise(resolve => setTimeout(resolve, 2500));
 
-  setLoading(true);
+      await request('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          staffId: formData.staffId, // ✅ แก้จาก staffId เป็น formData.staffId
+          oldPassword: formData.oldPassword,
+          newPassword: formData.newPassword
+        })
+      });
 
-  try {
-    await request("/auth/change-password", {
-      method: "POST",
-      body: {
-        newPassword: formData.newPassword,
-      },
-    });
+      showToast("Password updated successfully!", "success");
 
-    showToast("Password changed successfully! Please login again.", "success");
+      if (isFirstLogin) {
+        // กรณีบังคับเปลี่ยนครั้งแรก: ให้ Logout เพื่อไป Login ใหม่ด้วยรหัสใหม่
+        await logout(); 
+        navigate('/login', { replace: true });
+      } else {
+        // กรณีเปลี่ยนเองหลัง Login: ให้กลับไปหน้า Profile
+        navigate('/profile');
+      }
 
-    navigate("/login");
-
-  } catch (error) {
-    showToast(error.message, "error");
-  } finally {
-    setLoading(false);
-  }
-};
-
-  if (!staffId) return null;
+    } catch (error) {
+      showToast(error.message || "Failed to update password", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50/50 p-4">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-zinc-100 overflow-hidden relative">
-        
-        {/* Decorative Header */}
-        <div className="bg-amber-50/50 p-6 border-b border-amber-100/50 flex flex-col items-center text-center">
-            <div className="p-3 bg-amber-100 text-amber-600 rounded-full mb-3 shadow-sm">
-                <ShieldCheck size={28} strokeWidth={1.5} />
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-zinc-100 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <div className="p-8">
+          
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 text-white mb-4 shadow-lg shadow-zinc-200">
+              <ShieldCheck size={20} />
             </div>
-            <h2 className="text-lg font-bold text-zinc-900">Security Update Required</h2>
-            <p className="text-xs text-zinc-500 mt-1 max-w-[250px]">
-                For your security, please update your temporary password before continuing.
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
+              {isFirstLogin ? 'Secure Your Account' : 'Change Password'}
+            </h1>
+            <p className="text-sm text-zinc-500 mt-2 leading-relaxed">
+              {isFirstLogin 
+                ? 'Your account requires a password update.' 
+                : 'Please enter your current and new password.'}
             </p>
-        </div>
+          </div>
 
-        <div className="p-8 pt-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             
-            {/* Old Password (Locked) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Current Password (Locked)</label>
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
-                  <Lock size={18} />
-                </div>
-                <input 
-                  type="password" 
-                  value={oldPassword || ''} // ดึงค่าจาก State มาแสดง
-                  disabled // ล็อคห้ามแก้ไข
-                  className="w-full h-11 pl-10 pr-4 bg-zinc-100 border border-zinc-200 rounded-xl text-sm text-zinc-500 cursor-not-allowed focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="h-px bg-zinc-100 w-full my-2"></div>
-
-            {/* New Password */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">New Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Current Password</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <KeyRound size={18} />
                 </div>
                 <input 
-                  type="password" 
-                  name="newPassword"
+                  type="password"
                   required
-                  placeholder="Enter new password"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
+                  placeholder="••••••••"
+                  // 🔒 ถ้า Login ครั้งแรก จะ Disabled ไว้เพราะดึงรหัสเก่ามาให้แล้วจากหน้า Login
+                  disabled={isFirstLogin}
+                  value={formData.oldPassword}
+                  onChange={(e) => setFormData({...formData, oldPassword: e.target.value})}
+                  className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
-            {/* Confirm Password */}
+            <hr className="border-zinc-50 my-2" />
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">New Password</label>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
+                  <Lock size={18} />
+                </div>
+                <input 
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={formData.newPassword}
+                  onChange={(e) => setFormData({...formData, newPassword: e.target.value})}
+                  className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Confirm New Password</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
-                  <CheckCircle2 size={18} />
+                  <Lock size={18} />
                 </div>
                 <input 
-                  type="password" 
-                  name="confirmPassword"
+                  type="password"
                   required
-                  placeholder="Repeat new password"
+                  placeholder="••••••••"
                   value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
+                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                  className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all"
                 />
               </div>
             </div>
@@ -141,7 +156,7 @@ export default function ChangePassword() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full h-12 bg-zinc-900 text-white rounded-xl text-sm font-semibold hover:bg-zinc-800 active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+              className="w-full h-12 bg-zinc-900 text-white rounded-xl text-sm font-semibold hover:bg-zinc-800 active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 disabled:opacity-70 flex items-center justify-center gap-2 group"
             >
               {loading ? (
                 <>
@@ -150,11 +165,21 @@ export default function ChangePassword() {
                 </>
               ) : (
                 <>
-                  <Save size={18} />
-                  Confirm Change
+                  Update Password
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
+
+            {!isFirstLogin && (
+              <button 
+                type="button"
+                onClick={() => navigate(-1)}
+                className="w-full text-zinc-400 text-xs hover:text-zinc-600 transition-colors py-2"
+              >
+                Go Back
+              </button>
+            )}
 
           </form>
         </div>

@@ -144,6 +144,14 @@ export default function Navbar() {
                 </div>
                 
                 <div className="p-1">
+                  <Link 
+                  to="/profile" 
+                  onClick={() => setIsDropdownOpen(false)} // ปิด Dropdown เมื่อกด
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
+                >
+                  <User size={16} />
+                  My Profile
+                </Link>
                   <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors" onClick={() => setIsDropdownOpen(false)}>
                     <Settings size={14} />
                     Settings
