@@ -64,6 +64,8 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IEmailService, StockApi.Services.GmailService>();
 builder.Services.AddScoped<IAuthService, StockApi.Services.AuthService>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpContextAccessor(); // จำเป็นสำหรับดึง IP
+builder.Services.AddScoped<IUserAuditService, UserAuditService>();
 
 // Config JWT
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();

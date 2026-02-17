@@ -30,6 +30,7 @@ namespace StockApi.Services
         Task ResetPasswordWithTokenAsync(ResetPasswordRequest request);
         Task<bool> ValidateResetTokenAsync(string token);
         Task<List<UserListDto>> GetAllUsersAsync();
+        //Task LogLoginAsync(string staffId, bool isSuccess, string note = "");
     }
 
     public class AuthService : IAuthService
@@ -38,13 +39,16 @@ namespace StockApi.Services
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly IMemoryCache _cache;
+        private readonly IUserAuditService _auditService;
 
-        public AuthService(AppDbContext context, IEmailService emailService, IConfiguration configuration, IMemoryCache cache)
+        public AuthService(AppDbContext context, IEmailService emailService, IConfiguration configuration, IMemoryCache cache, IUserAuditService auditService)
         {
             _context = context;
             _emailService = emailService;
             _configuration = configuration;
             _cache = cache;
+            //_httpContextAccessor = httpContextAccessor;
+            _auditService = auditService;
         }
 
         public async Task RegisterAsync(RegisterRequest request)
@@ -81,7 +85,12 @@ namespace StockApi.Services
         public async Task<LoginResponse> LoginAsync(LoginRequest request)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == request.StaffId);
-            if (user == null) throw new Exception("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+            if (user == null || !PasswordHasher.VerifyPassword(request.Password, user.PasswordHash))
+            {
+                // ✅ เรียกใช้ _auditService แทน
+                await _auditService.LogLoginAsync(request.StaffId, false, "Invalid Credentials");
+                throw new Exception("ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง");
+            }
 
             // 1. ตรวจรหัสผ่าน (Argon2)
             if (!PasswordHasher.VerifyPassword(request.Password, user.PasswordHash))
@@ -95,6 +104,7 @@ namespace StockApi.Services
 
             // 3. ถ้าปกติ -> เจน Token
             string token = CreateToken(user);
+            await _auditService.LogLoginAsync(user.StaffId, true, "Login Successful");
             return new LoginResponse { Token = token, IsForceChangePassword = false };
         }
 

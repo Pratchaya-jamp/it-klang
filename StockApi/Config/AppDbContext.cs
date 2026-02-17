@@ -12,6 +12,7 @@ namespace StockApi.Config
         public DbSet<StockTransaction> StockTransactions { get; set; }
         public DbSet<SystemLog> SystemLogs { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<UserAuditLog> UserAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
