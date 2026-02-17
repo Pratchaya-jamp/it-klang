@@ -103,13 +103,23 @@ namespace StockApi.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == request.StaffId);
             if (user == null) throw new Exception("ไม่พบผู้ใช้งาน");
 
-            // 1. เช็ครหัสเก่าก่อนเปลี่ยน
+            // 1. เช็คว่ารหัสเก่าที่กรอกมา (OldPassword) ตรงกับใน DB ไหม
             if (!PasswordHasher.VerifyPassword(request.OldPassword, user.PasswordHash))
                 throw new Exception("รหัสผ่านเดิมไม่ถูกต้อง");
 
-            // 2. เปลี่ยนรหัสใหม่
+            // 🔥 2. เช็คว่ารหัสใหม่ (NewPassword) ดันไปซ้ำกับรหัสปัจจุบันใน DB หรือเปล่า
+            // เราต้องใช้ PasswordHasher.VerifyPassword เท่านั้นในการเช็ค
+            bool isSameAsOld = PasswordHasher.VerifyPassword(request.NewPassword, user.PasswordHash);
+
+            if (isSameAsOld)
+            {
+                // ถ้ารหัสใหม่กับรหัสใน DB ดันแกะออกมาแล้วตรงกัน ให้ดีดออกทันที
+                throw new Exception("คุณไม่สามารถใช้รหัสผ่านเดิมได้ กรุณาตั้งรหัสผ่านใหม่ที่ต่างจากเดิม");
+            }
+
+            // 3. ถ้าผ่านด่านมาได้ค่อยทำการ Hash รหัสใหม่แล้วบันทึก
             user.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
-            user.IsForceChangePassword = false; // ปลดล็อคแล้ว
+            user.IsForceChangePassword = false;
 
             await _context.SaveChangesAsync();
         }
@@ -194,6 +204,11 @@ namespace StockApi.Services
             // ทำการเปลี่ยนรหัสให้ User ตามปกติ
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
             if (user == null) throw new Exception("ไม่พบผู้ใช้งานที่ต้องการรีเซ็ต");
+
+            if (PasswordHasher.VerifyPassword(newPassword, user.PasswordHash))
+            {
+                throw new Exception("รหัสผ่านใหม่ที่ตั้งซ้ำกับรหัสผ่านปัจจุบันของผู้ใช้งาน");
+            }
 
             user.PasswordHash = PasswordHasher.HashPassword(newPassword);
             user.IsForceChangePassword = true;

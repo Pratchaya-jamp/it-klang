@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  Users, Search, Edit3, Shield, Mail, CheckCircle, 
+  Users, User, Search, Edit3, Shield, Mail, CheckCircle, 
   Loader2, Save, X, RotateCcw, AlertTriangle, KeyRound, ArrowRight, Lock 
 } from 'lucide-react';
 import { request } from '../utils/fetchUtils';
