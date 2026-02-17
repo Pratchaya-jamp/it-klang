@@ -11,25 +11,20 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
   const { showToast } = useToast();
   
   // Steps: 
-  // 0 = Confirm Start (ถามยืนยันเริ่ม)
+  // 0 = Confirm Start (ถามยืนยันขอ OTP)
   // 1 = OTP Input (กรอก OTP)
-  // 2 = Password Input (กรอกรหัสใหม่)
-  // 3 = Confirm Save (ถามยืนยันบันทึก)
+  // 2 = Final Confirm (ยืนยันการ Reset เพื่อให้ระบบ Gen รหัส)
   const [step, setStep] = useState(0); 
   const [loading, setLoading] = useState(false);
   
-  // Form Data
+  // Form Data (เหลือแค่ OTP)
   const [otpCode, setOtpCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Reset State เมื่อเปิด Modal ใหม่
   useEffect(() => {
     if (isOpen) {
       setStep(0);
       setOtpCode('');
-      setNewPassword('');
-      setConfirmPassword('');
       setLoading(false);
     }
   }, [isOpen]);
@@ -43,7 +38,6 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
       // Loading 2 วินาที
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // ยิง API ขอ OTP (ส่ง targetStaffId ไปด้วยเพื่อให้รู้ว่าขอของใคร)
       await request('/api/auth/admin/request-otp', {
         method: 'POST',
         body: JSON.stringify({ targetStaffId: user.staffId })
@@ -58,52 +52,37 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
     }
   };
 
-  // --- STEP 2: Submit OTP (ข้าม Validation ไปก่อน) ---
+  // --- STEP 2: Validate OTP Local & Go to Confirm ---
   const handleSubmitOtp = (e) => {
     e.preventDefault();
     if (otpCode.length !== 6) {
       showToast("Please enter a valid 6-digit OTP", "error");
       return;
     }
-    setStep(2); // ไปหน้ากรอกรหัสผ่าน
+    setStep(2); // ไปหน้ายืนยันครั้งสุดท้ายเลย (ไม่ต้องกรอกรหัสผ่านแล้ว)
   };
 
-  // --- STEP 3: Validate Password & Go to Confirm ---
-  const handlePreSubmitPassword = (e) => {
-    e.preventDefault();
-    if (newPassword.length < 6) {
-      showToast("Password must be at least 6 characters", "error");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast("Passwords do not match", "error");
-      return;
-    }
-    setStep(3); // ไปหน้ายืนยันครั้งสุดท้าย
-  };
-
-  // --- STEP 4: Final Submit (Reset Password) ---
+  // --- STEP 3: Final Submit (Reset & Auto-Gen) ---
   const handleFinalSubmit = async () => {
     setLoading(true);
     try {
-      // Loading 2 วินาที (Optional แต่ใส่เพื่อให้ UX เหมือนตอนขอ OTP)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      // 🚀 Payload เหลือแค่ targetStaffId กับ otpCode
       await request('/api/auth/admin/reset-password', {
         method: 'POST',
         body: JSON.stringify({
           targetStaffId: user.staffId,
-          newPassword: newPassword,
           otpCode: otpCode
         })
       });
 
-      showToast("Password reset successfully", "success");
-      onClose(); // ปิด Modal จบงาน
+      showToast("Password reset successfully. System has generated a new password.", "success");
+      onClose(); 
     } catch (error) {
       showToast(error.message || "Failed to reset password", "error");
-      // ถ้า Error อาจจะให้กลับไปแก้ OTP หรือ Password (ในที่นี้ให้ปิดไปก่อนหรือกลับไป Step 2)
-      setStep(2); 
+      // ถ้า Error ให้กลับไปแก้ OTP
+      setStep(1); 
     } finally {
       setLoading(false);
     }
@@ -120,7 +99,7 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
             <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
               <KeyRound size={20} className="text-zinc-900"/> Admin Password Reset
             </h3>
-            <p className="text-sm text-zinc-500">Target: <span className="font-mono font-bold text-zinc-700">{user.staffId}</span> ({user.name})</p>
+            <p className="text-sm text-zinc-500">Target: <span className="font-mono font-bold text-zinc-700">{user.staffId}</span></p>
           </div>
           <button onClick={onClose} disabled={loading} className="p-1 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-zinc-900 transition-colors">
             <X size={20} />
@@ -135,15 +114,15 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
             <div className="p-4 bg-yellow-50 text-yellow-800 rounded-xl border border-yellow-100 flex gap-3">
               <AlertTriangle className="shrink-0" size={20} />
               <p className="text-sm">
-                This action requires OTP verification. Are you sure you want to proceed with resetting the password for this user?
+                This process requires OTP verification. The system will <b>automatically generate</b> a new password for the user. Proceed?
               </p>
             </div>
             <div className="flex gap-3 mt-2">
               <button onClick={onClose} className="flex-1 h-11 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all">
-                No, Cancel
+                Cancel
               </button>
               <button onClick={handleRequestOtp} disabled={loading} className="flex-1 h-11 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 flex items-center justify-center gap-2 transition-all">
-                {loading ? <Loader2 size={18} className="animate-spin"/> : 'Yes, Proceed'}
+                {loading ? <Loader2 size={18} className="animate-spin"/> : 'Request OTP'}
               </button>
             </div>
           </div>
@@ -157,7 +136,7 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
                  <Mail size={24} />
                </div>
                <h4 className="text-zinc-900 font-bold">Enter OTP Code</h4>
-               <p className="text-xs text-zinc-500">Please enter the 6-digit code sent to the admin/user.</p>
+               <p className="text-xs text-zinc-500">Enter the 6-digit code sent to verify this action.</p>
              </div>
 
              <input 
@@ -166,75 +145,47 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
                required
                placeholder="000000"
                value={otpCode}
-               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} // รับเฉพาะตัวเลข
+               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} 
                className="w-full h-14 text-center text-2xl tracking-[0.5em] font-mono font-bold bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 focus:bg-white transition-all"
                autoFocus
              />
 
              <button type="submit" className="w-full h-11 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 flex items-center justify-center gap-2 mt-2">
-                Verify & Continue <ArrowRight size={18} />
+                Verify OTP <ArrowRight size={18} />
              </button>
           </form>
         )}
 
-        {/* STEP 2: New Password Input */}
+        {/* STEP 2: Final Confirmation (Auto-Gen) */}
         {step === 2 && (
-          <form onSubmit={handlePreSubmitPassword} className="flex flex-col gap-4">
-             <div className="text-center mb-2">
-               <h4 className="text-zinc-900 font-bold">Set New Password</h4>
-               <p className="text-xs text-zinc-500">Enter the new password for this account.</p>
-             </div>
-
-             <div className="space-y-3">
-               <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider ml-1">New Password</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-                    <input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900 outline-none" placeholder="••••••••" />
-                  </div>
-               </div>
-               <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Confirm Password</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-                    <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900 outline-none" placeholder="••••••••" />
-                  </div>
-               </div>
-             </div>
-
-             <button type="submit" className="w-full h-11 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 flex items-center justify-center gap-2 mt-4">
-                Next Step <ArrowRight size={18} />
-             </button>
-          </form>
-        )}
-
-        {/* STEP 3: Final Confirmation */}
-        {step === 3 && (
            <div className="flex flex-col gap-4">
-             <div className="p-4 bg-red-50 text-red-800 rounded-xl border border-red-100 flex flex-col items-center text-center gap-2">
-               <AlertTriangle size={32} />
+             <div className="p-4 bg-red-50 text-red-900 rounded-xl border border-red-100 flex flex-col items-center text-center gap-2">
+               <Shield size={32} className="text-red-600"/>
                <div>
-                 <p className="font-bold">Confirm Password Reset?</p>
-                 <p className="text-xs mt-1 opacity-80">
-                   This will overwrite the user's current password immediately. The OTP will be validated at this stage.
+                 <p className="font-bold text-lg">Confirm Reset?</p>
+                 <p className="text-sm mt-1 opacity-90">
+                   You are about to reset the password for <b>{user.name}</b>.
                  </p>
+                 <div className="mt-3 bg-white/60 p-2 rounded-lg text-xs font-mono text-red-800 border border-red-200/50">
+                    System will auto-generate a new password.
+                 </div>
                </div>
              </div>
              
              <div className="flex gap-3 mt-2">
-               <button onClick={() => setStep(2)} disabled={loading} className="flex-1 h-11 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all">
+               <button onClick={() => setStep(1)} disabled={loading} className="flex-1 h-11 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all">
                  Back
                </button>
                <button onClick={handleFinalSubmit} disabled={loading} className="flex-1 h-11 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-100">
-                 {loading ? <Loader2 size={18} className="animate-spin"/> : 'Confirm Reset'}
+                 {loading ? <Loader2 size={18} className="animate-spin"/> : 'Confirm & Reset'}
                </button>
              </div>
            </div>
         )}
 
-        {/* Stepper Dots (Visual Indicator) */}
+        {/* Stepper Dots */}
         <div className="flex justify-center gap-2 mt-6">
-          {[0, 1, 2, 3].map((s) => (
+          {[0, 1, 2].map((s) => (
             <div key={s} className={`w-2 h-2 rounded-full transition-all ${step === s ? 'bg-zinc-900 w-4' : step > s ? 'bg-zinc-300' : 'bg-zinc-100'}`} />
           ))}
         </div>

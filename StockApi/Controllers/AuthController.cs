@@ -152,12 +152,12 @@ namespace StockApi.Controllers
         {
             try
             {
-                if (string.IsNullOrEmpty(request.OtpCode))
-                    return BadRequest(new { message = "กรุณากรอกรหัส OTP" });
-
                 var adminId = User.FindFirst("id")?.Value;
-                await _authService.AdminResetPasswordWithOtpAsync(adminId!, request.TargetStaffId, request.NewPassword, request.OtpCode);
-                return StatusCode(201, new { message = $"รีเซ็ตรหัสผ่านของ {request.TargetStaffId} สำเร็จ" });
+
+                // ส่งแค่ adminId, targetStaffId และ otpCode
+                await _authService.AdminResetPasswordWithOtpAsync(adminId!, request.TargetStaffId, request.OtpCode!);
+
+                return Ok(new { message = "ระบบได้สร้างรหัสผ่านใหม่และส่งไปยังอีเมลของผู้ใช้งานเรียบร้อยแล้ว" });
             }
             catch (Exception ex)
             {
