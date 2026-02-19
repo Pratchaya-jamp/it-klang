@@ -12,6 +12,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Hangfire;
+using Hangfire.MySql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,7 +38,8 @@ var connectionString = $"server={Env.GetString("DB_HOST")};" +
                        $"password={Env.GetString("DB_PASS")};" +
                        $"pooling={Env.GetString("DB_POOLING")};" +
                        $"minPoolSize={Env.GetString("DB_MIN_POOL")};" +
-                       $"maximumPoolSize={Env.GetString("DB_MAX_POOL")};";
+                       $"maximumPoolSize={Env.GetString("DB_MAX_POOL")};" +
+                       "Allow User Variables=true;";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
@@ -66,6 +69,22 @@ builder.Services.AddScoped<IAuthService, StockApi.Services.AuthService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpContextAccessor(); // จำเป็นสำหรับดึง IP
 builder.Services.AddScoped<IUserAuditService, UserAuditService>();
+builder.Services.AddScoped<StockApi.Repositories.BorrowRepository>();
+builder.Services.AddScoped<StockApi.Services.IBorrowService, StockApi.Services.BorrowService>();
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseStorage(new MySqlStorage(
+        connectionString, // ✅ แก้ตรงนี้: ใช้ตัวแปร connectionString ที่สร้างไว้ข้างบน แทน Environment.Get...
+        new MySqlStorageOptions
+        {
+            TablesPrefix = "Hangfire_",
+            PrepareSchemaIfNecessary = true
+        }
+    )));
+
+builder.Services.AddHangfireServer();
 
 // Config JWT
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -191,6 +210,8 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddMemoryCache();
 
 var app = builder.Build();
+
+app.UseHangfireDashboard();
 
 // 5. Run Middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();

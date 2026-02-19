@@ -150,7 +150,8 @@ namespace StockApi.Services
             {
                 new Claim("id", user.StaffId),
                 new Claim("name", user.Name),
-                new Claim("role", user.Role)
+                new Claim("role", user.Role),
+                new Claim("email", user.Email)
             };
 
             var token = new JwtSecurityToken(
