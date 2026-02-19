@@ -1,11 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StockApi.Dtos;
 using StockApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace StockApi.Controllers
 {
     [ApiController]
     [Route("api/transactions")]
+    [Authorize]
     public class TransactionsController : ControllerBase
     {
         private readonly IStockService _stockService;

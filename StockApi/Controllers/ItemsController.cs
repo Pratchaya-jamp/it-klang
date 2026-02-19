@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using StockApi.Dtos; // ตรวจสอบว่ามี Dtos นี้อยู่จริง
 using StockApi.Services;
 
@@ -6,6 +7,7 @@ namespace StockApi.Controllers
 {
     [ApiController]
     [Route("api/items")]
+    [Authorize]
     public class ItemsController : ControllerBase
     {
         private readonly IItemService _service;

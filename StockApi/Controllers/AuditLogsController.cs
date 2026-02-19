@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using StockApi.Services;
 
 namespace StockApi.Controllers
 {
     [ApiController]
     [Route("api/auditlogs")]
+    [Authorize]
     public class AuditLogsController : ControllerBase
     {
         private readonly IAuditService _auditService;
