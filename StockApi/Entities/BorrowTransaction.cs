@@ -35,6 +35,8 @@ namespace StockApi.Entities
         [MaxLength(50)]
         public string? JobId { get; set; }
 
+        public string? HangfireJobId { get; set; }
+
         public DateTime BorrowDate { get; set; } = DateTime.Now;
         public DateTime? ReturnDate { get; set; }
 
