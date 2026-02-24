@@ -4,13 +4,13 @@ using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Exceptions;
 using StockApi.Repositories;
+using Microsoft.AspNetCore.Http;
 
 namespace StockApi.Services
 {
     public interface IItemService
     {
         Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant);
-
         Task<ItemDto> CreateItemAsync(CreateItemRequest request);
         Task UpdateItemAsync(string itemCode, UpdateItemRequest request);
         Task DeleteItemAsync(string itemCode);
@@ -19,24 +19,30 @@ namespace StockApi.Services
     public class ItemService : IItemService
     {
         private readonly IItemRepository _repo;
-        private readonly ISystemLogRepository _logRepo; // <--- 1. เพิ่มตัวนี้
+        private readonly ISystemLogRepository _logRepo;
         private readonly AppDbContext _context;
         private readonly INotificationService _notiService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ItemService(IItemRepository repo, ISystemLogRepository logRepo, AppDbContext context, INotificationService notiService) // <--- Inject เข้ามา
+        public ItemService(IItemRepository repo, ISystemLogRepository logRepo, AppDbContext context, INotificationService notiService, IHttpContextAccessor httpContextAccessor)
         {
             _repo = repo;
             _logRepo = logRepo;
             _context = context;
             _notiService = notiService;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        // ✅ 4. ฟังก์ชันดึงชื่อคนล็อกอิน
+        private string GetCurrentUserName()
+        {
+            var name = _httpContextAccessor.HttpContext?.User?.FindFirst("name")?.Value;
+            return name ?? "System";
         }
 
         public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant)
         {
-            // 1. รับ Query มา
             var query = _repo.GetDashboardQuery(searchId, category, keyword, variant);
-
-            // 2. ทำ Projection
             var result = await query.Select(x => new ItemDto
             {
                 ItemCode = x.ItemCode,
@@ -60,8 +66,8 @@ namespace StockApi.Services
             try
             {
                 var now = DateTime.Now;
+                string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
 
-                // 1. สร้าง Item
                 var newItem = new Item
                 {
                     ItemCode = request.ItemCode,
@@ -74,7 +80,6 @@ namespace StockApi.Services
                 _context.Items.Add(newItem);
                 await _context.SaveChangesAsync();
 
-                // 2. สร้าง Stock
                 var newStock = new StockBalance
                 {
                     ItemCode = request.ItemCode,
@@ -88,23 +93,23 @@ namespace StockApi.Services
                 _context.StockBalances.Add(newStock);
                 await _context.SaveChangesAsync();
 
-                // 3. *** บันทึก Log: CREATE ***
-                // (ใส่ตรงนี้เพื่อให้รวมอยู่ใน Transaction ถ้าพังก็ Rollback หมด)
+                // ✅ 5. ใช้ currentUser แทน "Admin"
                 await _logRepo.AddLogAsync(
                     "CREATE",
                     "Items",
                     newItem.ItemCode,
                     "-",
                     $"Name: {newItem.Name}, Category: {newItem.Category}, InitialStock: {request.Quantity}",
-                    "Admin"
+                    currentUser
                 );
 
                 await transaction.CommitAsync();
 
+                // ✅ เพิ่มชื่อคนทำในแจ้งเตือนด้วย
                 await _notiService.SendNotificationAsync(
-                    null, 
-                    "เพิ่มอุปกรณ์ใหม่", 
-                    $"เพิ่มอุปกรณ์ '{newItem.Name}' ({newItem.ItemCode}) จำนวน {request.Quantity} {newItem.Unit} ลงในระบบ", 
+                    null,
+                    "เพิ่มอุปกรณ์ใหม่",
+                    $"คุณ {currentUser} เพิ่มอุปกรณ์ '{newItem.Name}' ({newItem.ItemCode}) จำนวน {request.Quantity} {newItem.Unit} ลงในระบบ",
                     "ITEM_CREATE");
 
                 return new ItemDto
@@ -130,12 +135,12 @@ namespace StockApi.Services
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
-            // 1. *** เก็บค่าเก่าก่อนแก้ (OldValue) ***
+            string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
+
             string oldValue = $"Name: {item.Name}, Cat: {item.Category}, Unit: {item.Unit}";
-
             string oldName = item.Name;
-
             var now = DateTime.Now;
+
             item.Name = request.Name;
             item.Category = request.Category;
             item.Unit = request.Unit;
@@ -146,37 +151,30 @@ namespace StockApi.Services
                 item.StockBalance.UpdatedAt = now;
             }
 
-            // 2. *** เตรียมค่าใหม่ (NewValue) ***
             string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}";
 
-            // 3. *** บันทึก Log: UPDATE ***
-            await _logRepo.AddLogAsync("UPDATE", "Items", itemCode, oldValue, newValue, "Admin");
+            // ✅ ใช้ currentUser แทน "Admin"
+            await _logRepo.AddLogAsync("UPDATE", "Items", itemCode, oldValue, newValue, currentUser);
 
             await _repo.UpdateItemAsync(item);
 
             await _notiService.SendNotificationAsync(
                 null,
-                "แก้ไขข้อมูลอุปกรณ์", 
-                $"อัปเดตข้อมูลอุปกรณ์ '{oldName}' ({itemCode}) เรียบร้อยแล้ว", 
+                "แก้ไขข้อมูลอุปกรณ์",
+                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' ({itemCode}) เรียบร้อยแล้ว",
                 "ITEM_UPDATE");
         }
 
         // D: Delete
         public async Task DeleteItemAsync(string itemCode)
         {
-            // 1. หาของก่อน
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
-            // 2. Validation 1: เช็คของคงเหลือ (Safety เบื้องต้น)
             if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
             {
                 throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีอุปกรณ์คงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
             }
-
-            // 3. *** Validation 2: เช็คประวัติการเคลื่อนไหว (Stock Movement) ***
-            // ยอมให้มี CREATE / UPDATE / DELETE ได้ (ถือว่าจัดการข้อมูลทั่วไป)
-            // แต่ห้ามมี STOCK_IN / STOCK_OUT (ถือว่าเป็น Transaction ทางบัญชีแล้ว)
 
             bool hasMovement = await _context.SystemLogs.AnyAsync(x =>
                 x.RecordId == itemCode &&
@@ -188,22 +186,24 @@ namespace StockApi.Services
                 throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากอุปกรณ์นี้เคยมีการ รับเข้า/เบิกออก ไปแล้ว (มี Audit History)");
             }
 
-            // 4. ถ้าผ่านเงื่อนไขข้างบน แสดงว่าเป็นสินค้าที่ "สร้างผิด" หรือ "ยังไม่เคยใช้งานจริง" -> ยอมให้ลบ
+            string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
+
+            // ✅ ใช้ currentUser แทน "Admin"
             await _logRepo.AddLogAsync(
                 "DELETE",
                 "Items",
                 itemCode,
                 $"Name: {item.Name}",
                 "DELETED",
-                "Admin"
+                currentUser
             );
 
             await _repo.DeleteItemAsync(itemCode);
 
             await _notiService.SendNotificationAsync(
                 null,
-                "ลบอุปกรณ์", 
-                $"ลบอุปกรณ์ '{item.Name}' ({itemCode}) ออกจากระบบ", 
+                "ลบอุปกรณ์",
+                $"คุณ {currentUser} ลบอุปกรณ์ '{item.Name}' ({itemCode}) ออกจากระบบ",
                 "ITEM_DELETE");
         }
     }
