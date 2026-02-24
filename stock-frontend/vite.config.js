@@ -14,6 +14,12 @@ export default defineConfig({
         target: 'http://localhost:5217',
         changeOrigin: true,
         secure: false,
+      },
+      // ✅ เพิ่มส่วนนี้สำหรับ SignalR
+      '/hubs': {
+        target: 'http://localhost:5217', // URL ของ Backend คุณ (เปลี่ยนพอร์ตให้ตรง)
+        changeOrigin: true,
+        ws: true, // 🚨 สำคัญมาก! ต้องเปิด WebSockets (ws: true)
       }
     }
   }
