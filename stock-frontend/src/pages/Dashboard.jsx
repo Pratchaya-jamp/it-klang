@@ -114,13 +114,13 @@ const CreatableSelect = ({ label, value, onChange, options, placeholder = "Selec
 };
 
 // 2. Item Modal
-const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
+// ✅ รับ props categories เข้ามาแทนการสร้าง Preset ภายใน
+const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories = [] }) => {
   const isEditMode = !!initialData;
   const [formData, setFormData] = useState({ itemCode: '', name: '', category: '', unit: '', quantity: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const categoryPresets = ['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor'];
 
   useEffect(() => {
     if (isOpen) {
@@ -196,7 +196,8 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
             <input type="text" required placeholder="Product Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <CreatableSelect label="Category" value={formData.category} onChange={(val) => setFormData({...formData, category: val})} options={categoryPresets} placeholder="Select or type..." />
+            {/* ✅ ใช้ Dynamic Categories ที่รับมาจาก Props */}
+            <CreatableSelect label="Category" value={formData.category} onChange={(val) => setFormData({...formData, category: val})} options={categories} placeholder="Select or type..." />
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Unit</label>
               <input type="text" required placeholder="PC, Box..." value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all outline-none" />
@@ -323,6 +324,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const filterRef = useRef(null);
 
+  // ✅ สร้าง State ใหม่สำหรับเก็บ Category แบบไดนามิก
+  const [dbCategories, setDbCategories] = useState([]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterRef.current && !filterRef.current.contains(event.target)) setIsFilterOpen(false);
@@ -338,28 +342,33 @@ export default function Dashboard() {
     if (category) params.append('category', category);
     if (keyword) params.append('keyword', keyword);
     if (variant) params.append('variant', variant);
+    
     const res = await fetchItems(params.toString());
-    setData(res.data || []);
+    const fetchedData = res.data || [];
+    
+    setData(fetchedData);
+
+    // ✅ สะสม Category ที่ดึงมา เพื่อให้ Dropdown มีตัวเลือกครบเสมอ แม้จะกำลังถูก Filter อยู่
+    setDbCategories(prev => {
+      const catSet = new Set(prev);
+      fetchedData.forEach(item => {
+        if (item.category) catSet.add(item.category);
+      });
+      return Array.from(catSet).sort(); // เรียงตัวอักษรให้สวยงาม
+    });
+
     setLoading(false);
     setCurrentPage(1);
   };
 
-  // useEffect(() => {
-  //   const timeoutId = setTimeout(() => fetchData(), 500);
-  //   return () => clearTimeout(timeoutId);
-  // }, [searchId, category, keyword, variant]);
-
   const isFirstRun = useRef(true);
 
   useEffect(() => {
-    // ถ้าเป็นครั้งแรก ให้ยิงเลย ไม่ต้องรอ 500ms
     if (isFirstRun.current) {
       fetchData();
       isFirstRun.current = false;
       return;
     }
-
-    // ครั้งถัดๆ ไป (ตอนพิมพ์ Search) ค่อยหน่วงเวลา
     const timeoutId = setTimeout(() => fetchData(), 500);
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);
@@ -411,6 +420,7 @@ export default function Dashboard() {
   const handleCategoryChange = (val) => { setCategory(val); setKeyword(""); setVariant(""); };
   const clearAllFilters = () => { setCategory(""); setKeyword(""); setVariant(""); setIsFilterOpen(false); };
   const hasActiveFilters = category || keyword || variant;
+  
   const renderSubFilters = () => {
     if (!category) return <div className="p-4 text-center text-xs text-zinc-400 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">Select a category first</div>;
     if (['Mouse', 'Keyboard'].includes(category)) return <CustomSelect label="Connection" options={['USB', 'Wireless']} value={keyword} onChange={setKeyword} />;
@@ -421,7 +431,8 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8 relative">
-      <ItemModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleModalSuccess} initialData={editingItem} />
+      {/* ✅ ส่ง dbCategories เข้าไปให้ ItemModal */}
+      <ItemModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleModalSuccess} initialData={editingItem} categories={dbCategories} />
       <DeleteModal isOpen={!!deletingItem} onClose={() => setDeletingItem(null)} onConfirm={handleConfirmDelete} itemCode={deletingItem?.itemCode} />
 
       <div className="flex items-end justify-between py-6">
@@ -446,7 +457,11 @@ export default function Dashboard() {
               {isFilterOpen && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-zinc-100 p-4 z-30 animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">Filters</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> Reset</button>}</div>
-                  <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} /><div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
+                  <div className="space-y-4">
+                    {/* ✅ ใช้ Dynamic Categories กับ Filter Dropdown */}
+                    <CustomSelect label="Category" options={dbCategories} value={category} onChange={handleCategoryChange} />
+                    <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -479,7 +494,6 @@ export default function Dashboard() {
                       <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
                       <td className="px-6 py-4 text-center text-zinc-500">{item.unit}</td>
                       <td className="px-6 py-4 text-right text-zinc-400 text-xs font-light">{item.createdAt}</td>
-                      {/* ACTION BUTTONS (VISIBLE) */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => handleEdit(item)} className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><Pencil size={15} strokeWidth={2} /></button>
