@@ -14,6 +14,8 @@ namespace StockApi.Config
         public DbSet<User> Users { get; set; }
         public DbSet<UserAuditLog> UserAuditLogs { get; set; }
         public DbSet<BorrowTransaction> BorrowTransactions { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<NotificationRead> NotificationReads { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

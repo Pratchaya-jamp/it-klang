@@ -20,12 +20,14 @@ namespace StockApi.Services
         private readonly BorrowRepository _borrowRepo;
         private readonly ISystemLogRepository _systemLogRepo;
         private readonly AppDbContext _context;
+        private readonly INotificationService _notiService;
 
-        public BorrowService(BorrowRepository borrowRepo, ISystemLogRepository systemLogRepo, AppDbContext context)
+        public BorrowService(BorrowRepository borrowRepo, ISystemLogRepository systemLogRepo, AppDbContext context, INotificationService notiService)
         {
             _borrowRepo = borrowRepo;
             _systemLogRepo = systemLogRepo;
             _context = context;
+            _notiService = notiService;
         }
 
         public async Task<BorrowTransaction> BorrowItemAsync(string staffId, string recorderName, string recorderEmail, BorrowRequestDto request)
@@ -34,8 +36,8 @@ namespace StockApi.Services
                 .Include(i => i.StockBalance)
                 .FirstOrDefaultAsync(i => i.ItemCode == request.ItemCode);
 
-            if (item == null) throw new Exception($"ไม่พบสินค้ารหัส {request.ItemCode}");
-            if (item.StockBalance == null) throw new Exception("สินค้านี้ยังไม่ได้ตั้งค่าสต็อก");
+            if (item == null) throw new Exception($"ไม่พบอุปกรณ์รหัส {request.ItemCode}");
+            if (item.StockBalance == null) throw new Exception("อุปกรณ์นี้ยังไม่ได้ตั้งค่าสต็อก");
 
             int oldBalance = item.StockBalance.Balance;
             if (oldBalance < request.Quantity) throw new Exception($"ของไม่พอ (เหลือ {oldBalance})");
@@ -126,6 +128,12 @@ namespace StockApi.Services
                 await _borrowRepo.AddAsync(borrowLog);
 
                 await transaction.CommitAsync();
+
+                await _notiService.SendNotificationAsync(
+                    null, 
+                    "มีรายการยืมอุปกรณ์", 
+                    $"คุณ {recorderName} ได้ทำรายการยืม '{item.Name}' จำนวน {request.Quantity} ชิ้น", 
+                    "BORROW");
                 return borrowLog;
             }
             catch
@@ -177,6 +185,12 @@ namespace StockApi.Services
 
                 await _borrowRepo.UpdateAsync(borrowLog);
                 await transaction.CommitAsync();
+
+                await _notiService.SendNotificationAsync(
+                    null, 
+                    "คืนอุปกรณ์เรียบร้อย", 
+                    $"คุณ {recorderName} ได้ทำรายการคืน '{borrowLog.ItemName}' จำนวน {borrowLog.Quantity} ชิ้น", 
+                    "RETURN");
                 return borrowLog;
             }
             catch

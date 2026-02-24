@@ -21,12 +21,14 @@ namespace StockApi.Services
         private readonly IItemRepository _repo;
         private readonly ISystemLogRepository _logRepo; // <--- 1. เพิ่มตัวนี้
         private readonly AppDbContext _context;
+        private readonly INotificationService _notiService;
 
-        public ItemService(IItemRepository repo, ISystemLogRepository logRepo, AppDbContext context) // <--- Inject เข้ามา
+        public ItemService(IItemRepository repo, ISystemLogRepository logRepo, AppDbContext context, INotificationService notiService) // <--- Inject เข้ามา
         {
             _repo = repo;
             _logRepo = logRepo;
             _context = context;
+            _notiService = notiService;
         }
 
         public async Task<List<ItemDto>> GetDashboardAsync(string? searchId, string? category, string? keyword, string? variant)
@@ -52,7 +54,7 @@ namespace StockApi.Services
         public async Task<ItemDto> CreateItemAsync(CreateItemRequest request)
         {
             var exists = await _context.Items.AnyAsync(x => x.ItemCode == request.ItemCode);
-            if (exists) throw new BadRequestException($"รหัสสินค้า '{request.ItemCode}' มีอยู่ในระบบแล้ว");
+            if (exists) throw new BadRequestException($"รหัสอุปกรณ์ '{request.ItemCode}' มีอยู่ในระบบแล้ว");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -99,6 +101,12 @@ namespace StockApi.Services
 
                 await transaction.CommitAsync();
 
+                await _notiService.SendNotificationAsync(
+                    null, 
+                    "เพิ่มอุปกรณ์ใหม่", 
+                    $"เพิ่มอุปกรณ์ '{newItem.Name}' ({newItem.ItemCode}) จำนวน {request.Quantity} {newItem.Unit} ลงในระบบ", 
+                    "ITEM_CREATE");
+
                 return new ItemDto
                 {
                     ItemCode = newItem.ItemCode,
@@ -120,10 +128,12 @@ namespace StockApi.Services
         public async Task UpdateItemAsync(string itemCode, UpdateItemRequest request)
         {
             var item = await _repo.GetItemByCodeAsync(itemCode);
-            if (item == null) throw new NotFoundException($"ไม่พบสินค้า Code: {itemCode}");
+            if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
             // 1. *** เก็บค่าเก่าก่อนแก้ (OldValue) ***
             string oldValue = $"Name: {item.Name}, Cat: {item.Category}, Unit: {item.Unit}";
+
+            string oldName = item.Name;
 
             var now = DateTime.Now;
             item.Name = request.Name;
@@ -143,6 +153,12 @@ namespace StockApi.Services
             await _logRepo.AddLogAsync("UPDATE", "Items", itemCode, oldValue, newValue, "Admin");
 
             await _repo.UpdateItemAsync(item);
+
+            await _notiService.SendNotificationAsync(
+                null,
+                "แก้ไขข้อมูลอุปกรณ์", 
+                $"อัปเดตข้อมูลอุปกรณ์ '{oldName}' ({itemCode}) เรียบร้อยแล้ว", 
+                "ITEM_UPDATE");
         }
 
         // D: Delete
@@ -150,12 +166,12 @@ namespace StockApi.Services
         {
             // 1. หาของก่อน
             var item = await _repo.GetItemByCodeAsync(itemCode);
-            if (item == null) throw new NotFoundException($"ไม่พบสินค้า Code: {itemCode}");
+            if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
             // 2. Validation 1: เช็คของคงเหลือ (Safety เบื้องต้น)
             if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
             {
-                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีสินค้าคงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
+                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีอุปกรณ์คงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
             }
 
             // 3. *** Validation 2: เช็คประวัติการเคลื่อนไหว (Stock Movement) ***
@@ -169,7 +185,7 @@ namespace StockApi.Services
 
             if (hasMovement)
             {
-                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากสินค้านี้เคยมีการ รับเข้า/เบิกออก ไปแล้ว (มี Audit History)");
+                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากอุปกรณ์นี้เคยมีการ รับเข้า/เบิกออก ไปแล้ว (มี Audit History)");
             }
 
             // 4. ถ้าผ่านเงื่อนไขข้างบน แสดงว่าเป็นสินค้าที่ "สร้างผิด" หรือ "ยังไม่เคยใช้งานจริง" -> ยอมให้ลบ
@@ -183,6 +199,12 @@ namespace StockApi.Services
             );
 
             await _repo.DeleteItemAsync(itemCode);
+
+            await _notiService.SendNotificationAsync(
+                null,
+                "ลบอุปกรณ์", 
+                $"ลบอุปกรณ์ '{item.Name}' ({itemCode}) ออกจากระบบ", 
+                "ITEM_DELETE");
         }
     }
 }

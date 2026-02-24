@@ -85,6 +85,9 @@ builder.Services.AddHangfire(config => config
     )));
 
 builder.Services.AddHangfireServer();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Config JWT
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -245,6 +248,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseMiddleware<StockApi.Middlewares.RequestLoggingMiddleware>();
+app.MapHub<StockApi.Hubs.NotificationHub>("/hubs/notification");
 app.MapControllers();
 
 // สร้าง Scope ชั่วคราวเพื่อเรียกใช้ Database ตอนเริ่มโปรแกรม

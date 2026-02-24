@@ -13,6 +13,20 @@ namespace StockApi.Middlewares
 
         public async Task Invoke(HttpContext context)
         {
+            var path = context.Request.Path.Value ?? string.Empty;
+
+            // ==========================================================
+            // 🛑 ตัวกรอง Request ขยะ (ไม่ต้อง Log ให้รก Terminal)
+            // ==========================================================
+            if (path.StartsWith("/.well-known", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("favicon.ico", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("aspnetcore-browser-refresh", StringComparison.OrdinalIgnoreCase))
+            {
+                await _next(context);
+                return; // จบการทำงานของ Middleware ตัวนี้ทันที
+            }
+            // ==========================================================
+
             // 1. จับเวลาเริ่มต้น
             var stopwatch = Stopwatch.StartNew();
 

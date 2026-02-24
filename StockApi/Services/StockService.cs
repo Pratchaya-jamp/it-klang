@@ -22,15 +22,17 @@ namespace StockApi.Services
         private readonly ISystemLogRepository _logRepo;
         private readonly AppDbContext _context;          // เพิ่มตัวนี้
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly INotificationService _notiService;
 
         // Constructor ต้องรับค่าเข้ามาให้ครบ 3 ตัว
-        public StockService(IStockRepository repo, ITransactionRepository txRepo, ISystemLogRepository logRepo, AppDbContext context, IHttpContextAccessor httpContextAccessor)
+        public StockService(IStockRepository repo, ITransactionRepository txRepo, ISystemLogRepository logRepo, AppDbContext context, IHttpContextAccessor httpContextAccessor, INotificationService notiService)
         {
             _repo = repo;
             _txRepo = txRepo;
             _logRepo = logRepo;
             _context = context;
             _httpContextAccessor = httpContextAccessor; // ตรงนี้ถึงจะผ่าน
+            _notiService = notiService;
         }
 
         // --- ส่วนดึงข้อมูล (Get Overview) ---
@@ -75,10 +77,12 @@ namespace StockApi.Services
             try
             {
                 string currentUser = GetCurrentUserName();
+                var notiMessages = new List<string>();
+
                 foreach (var request in requests)
                 {
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                    if (stock == null) throw new Exception($"ไม่พบสินค้า Code: {request.ItemCode}");
+                    if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
 
                     int oldBalance = stock.Balance;
 
@@ -139,10 +143,21 @@ namespace StockApi.Services
                         packData,
                         currentUser
                     );
+
+                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (+{request.Quantity})");
                 }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                if (notiMessages.Any())
+                {
+                    await _notiService.SendNotificationAsync(
+                        null, 
+                        "รับของเข้าคลัง", 
+                        $"คุณ {currentUser} รับของเข้าคลัง:\n" + 
+                        string.Join("\n", notiMessages), "STOCK_IN");
+                }
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
@@ -154,13 +169,15 @@ namespace StockApi.Services
             try
             {
                 string currentUser = GetCurrentUserName();
+                var notiMessages = new List<string>();
+
                 foreach (var request in requests)
                 {
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                    if (stock == null) throw new Exception($"ไม่พบสินค้า Code: {request.ItemCode}");
+                    if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
 
                     if (stock.Balance < request.Quantity)
-                        throw new Exception($"สินค้า {stock.ItemCode} ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance})");
+                        throw new Exception($"อุปกรณ์ {stock.ItemCode} ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance})");
 
                     int oldBalance = stock.Balance;
 
@@ -196,10 +213,21 @@ namespace StockApi.Services
                         packData,
                         currentUser
                     );
+
+                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (-{request.Quantity})");
                 }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                if (notiMessages.Any())
+                {
+                    await _notiService.SendNotificationAsync(
+                        null, 
+                        "เบิกของออก", 
+                        $"คุณ {currentUser} เบิกของออก:\n" + 
+                        string.Join("\n", notiMessages), "STOCK_OUT");
+                }
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
