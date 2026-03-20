@@ -53,6 +53,11 @@ namespace StockApi.Services
 
         public async Task RegisterAsync(RegisterRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception("ระบบอนุญาตให้ใช้อีเมลขององค์กร (@cosmo.co.th) ในการสมัครเท่านั้น");
+            }
+
             // 1. เช็คซ้ำ
             if (await _context.Users.AnyAsync(u => u.StaffId == request.StaffId))
                 throw new Exception("Staff ID นี้มีอยู่ในระบบแล้ว");

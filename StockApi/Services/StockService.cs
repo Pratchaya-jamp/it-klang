@@ -13,6 +13,7 @@ namespace StockApi.Services
 
         Task ReceiveStockAsync(List<TransactionRequest> requests);
         Task WithdrawStockAsync(List<TransactionRequest> requests);
+        Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync();
     }
 
     public class StockService : IStockService
@@ -230,6 +231,23 @@ namespace StockApi.Services
                 }
             }
             catch { await transaction.RollbackAsync(); throw; }
+        }
+
+        public async Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync()
+        {
+            var pendingList = await _context.StockBalances
+                .Include(s => s.Item)
+                .Where(s => s.TempWithdrawn > 0) // ดึงเฉพาะอันที่ถูกเบิกไปและรอคืน
+                .Select(s => new PendingWithdrawalDto
+                {
+                    ItemCode = s.ItemCode,
+                    ItemName = s.Item != null ? s.Item.Name : "Unknown",
+                    PendingAmount = s.TempWithdrawn,
+                    LastUpdated = s.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                })
+                .ToListAsync();
+
+            return pendingList;
         }
 
         private string GenerateTransactionNo()

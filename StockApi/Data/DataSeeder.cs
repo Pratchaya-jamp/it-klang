@@ -1,8 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StockApi.Entities;
 using StockApi.Utilities;
-using Microsoft.Extensions.Configuration; // <--- เพิ่ม using
-using Microsoft.Extensions.DependencyInjection; // <--- เพิ่มตัวนี้ (สำหรับ GetRequiredService)
+using Microsoft.Extensions.DependencyInjection;
 using StockApi.Config;
 
 namespace StockApi.Data
@@ -14,41 +13,65 @@ namespace StockApi.Data
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // ไม่ต้องใช้ IConfiguration แล้ว ลบหรือ comment ทิ้งได้เลย
-            // var config = scope.ServiceProvider.GetRequiredService<IConfiguration>(); 
+            // ==========================================
+            // 1. Seed SuperAdmin
+            // ==========================================
+            var adminId = Environment.GetEnvironmentVariable("SUPER_ADMIN_ID");
+            var adminPass = Environment.GetEnvironmentVariable("SUPER_ADMIN_PASS");
+            var adminName = Environment.GetEnvironmentVariable("SUPER_ADMIN_NAME");
+            var adminEmail = Environment.GetEnvironmentVariable("SUPER_ADMIN_EMAIL");
 
-            // *** แก้ตรงนี้: อ่านจาก Environment ตรงๆ ***
-            var staffId = Environment.GetEnvironmentVariable("SUPER_ADMIN_ID");
-            var password = Environment.GetEnvironmentVariable("SUPER_ADMIN_PASS");
-            var name = Environment.GetEnvironmentVariable("SUPER_ADMIN_NAME");
-            var email = Environment.GetEnvironmentVariable("SUPER_ADMIN_EMAIL");
-
-            // เช็คค่า (Debug ดูว่าอ่านเจอไหม)
-            if (string.IsNullOrEmpty(staffId) || string.IsNullOrEmpty(password))
+            if (!string.IsNullOrEmpty(adminId) && !string.IsNullOrEmpty(adminPass))
             {
-                // เพิ่ม Log ให้เห็นชัดๆ ว่าอ่านค่าได้อะไรมาบ้าง
-                Console.WriteLine($"⚠️ Seeding Failed. Env Vars -> ID: '{staffId}', Pass: '{password}'");
-                return;
+                if (!await context.Users.AnyAsync(u => u.StaffId == adminId))
+                {
+                    var superAdmin = new User
+                    {
+                        StaffId = adminId,
+                        Name = adminName ?? "Super Admin",
+                        Email = adminEmail ?? "admin@cosmo.co.th",
+                        Role = "SuperAdmin",
+                        PasswordHash = PasswordHasher.HashPassword(adminPass),
+                        IsForceChangePassword = false,
+                        CreatedAt = DateTime.Now
+                    };
+                    context.Users.Add(superAdmin);
+                    await context.SaveChangesAsync();
+                    Console.WriteLine($"✅ Seeded SuperAdmin: {adminId} Successfully!");
+                }
+            }
+            else
+            {
+                Console.WriteLine("⚠️ SuperAdmin Seeding Skipped: Missing Environment Variables.");
             }
 
-            // ... (ส่วน Logic เช็คและสร้าง User เหมือนเดิม) ...
-            if (await context.Users.AnyAsync(u => u.StaffId == staffId)) return;
-
-            var superAdmin = new User
+            // ==========================================
+            // 2. Seed WebSupporter (เช็คจาก Role)
+            // ==========================================
+            // ตรวจสอบว่ามี Role "WebSupporter" ในระบบหรือยัง ถ้ายังไม่มีให้สร้าง
+            if (!await context.Users.AnyAsync(u => u.Role == "WebSupporter"))
             {
-                StaffId = staffId,
-                Name = name ?? "Super Admin",
-                Email = email ?? "admin@stockapi.com", // (ระวัง typo: gmail.ocm -> .com)
-                Role = "SuperAdmin",
-                PasswordHash = PasswordHasher.HashPassword(password),
-                IsForceChangePassword = false,
-                CreatedAt = DateTime.Now
-            };
+                // ดึงค่าจาก Env (ถ้าไม่มีการตั้งค่าไว้ จะใช้ค่า Default ที่กำหนดให้ด้านหลัง)
+                var supId = Environment.GetEnvironmentVariable("WEB_SUPPORTER_ID") ?? "SUP001";
+                var supPass = Environment.GetEnvironmentVariable("WEB_SUPPORTER_PASS") ?? "support1234";
+                var supName = Environment.GetEnvironmentVariable("WEB_SUPPORTER_NAME") ?? "IT Support Team";
+                var supEmail = Environment.GetEnvironmentVariable("WEB_SUPPORTER_EMAIL") ?? "support@cosmo.co.th";
 
-            context.Users.Add(superAdmin);
-            await context.SaveChangesAsync();
+                var webSupporter = new User
+                {
+                    StaffId = supId,
+                    Name = supName,
+                    Email = supEmail,
+                    Role = "WebSupporter",
+                    PasswordHash = PasswordHasher.HashPassword(supPass),
+                    IsForceChangePassword = false, // กำหนดเป็น false ไปเลยจะได้พร้อมใช้งานเทสต์ได้ทันที
+                    CreatedAt = DateTime.Now
+                };
 
-            Console.WriteLine($"✅ Seeded SuperAdmin: {staffId} Successfully!");
+                context.Users.Add(webSupporter);
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✅ Seeded WebSupporter: {supId} Successfully!");
+            }
         }
     }
 }

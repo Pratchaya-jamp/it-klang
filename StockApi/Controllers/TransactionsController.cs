@@ -17,6 +17,20 @@ namespace StockApi.Controllers
             _stockService = stockService;
         }
 
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPendingWithdrawals()
+        {
+            try
+            {
+                var result = await _stockService.GetPendingWithdrawalsAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         // POST: api/transactions/receive
         [HttpPost("receive")]
         public async Task<IActionResult> Receive([FromBody] List<TransactionRequest> requests)
