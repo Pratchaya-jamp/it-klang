@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Search, ArrowRightLeft, Clock, CheckCircle2, 
-  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, Info
+  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, Info, BellRing
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -26,7 +26,6 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Animation States
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -56,11 +55,8 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
         const itemsList = response?.data || [];
         const foundItem = itemsList.find(item => item.itemCode === formData.itemCode);
 
-        if (foundItem) {
-          setItemName(foundItem.name);
-        } else {
-          setItemName('Item not found');
-        }
+        if (foundItem) setItemName(foundItem.name);
+        else setItemName('Item not found');
       } catch (error) {
         setItemName('Item not found');
       } finally {
@@ -105,6 +101,32 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
   const today = new Date().toISOString().split('T')[0];
 
+  // ✅ ฟังก์ชันคำนวณระยะเวลาและสร้างข้อความแจ้งเตือนอีเมล
+  const getEmailAlertMessage = () => {
+    if (!formData.dueDate) return "เลือกวันที่คืนเพื่อดูรอบการส่งอีเมลแจ้งเตือน";
+    
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // รีเซ็ตเวลาเป็นเที่ยงคืนเพื่อวัดแค่วันที่
+    
+    const [year, month, day] = formData.dueDate.split('-');
+    const dueDate = new Date(year, month - 1, day);
+    
+    const diffTime = dueDate.getTime() - currentDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24)); // แปลงเป็นจำนวนวัน
+
+    if (diffDays === 0) {
+      return "คืนภายในวัน: อีเมลเตือน 12:30 (หากบันทึกก่อน 12:00) หรือ 15:00 (หากบันทึกหลัง 12:30)";
+    } else if (diffDays >= 1 && diffDays <= 3) {
+      return "ระยะเวลา 1-3 วัน: อีเมลแจ้งเตือนเวลา 08:30 ของวันครบกำหนดคืน";
+    } else if (diffDays >= 4 && diffDays <= 5) {
+      return "ระยะเวลา 4-5 วัน: อีเมลเตือนล่วงหน้า 2 วัน ก่อนวันคืนเวลา 08:30";
+    } else if (diffDays >= 6 && diffDays <= 7) {
+      return "ระยะเวลา 6-7 วัน: อีเมลเตือนล่วงหน้า 3 วัน ก่อนวันคืนเวลา 08:30";
+    } else {
+      return `ระยะเวลา ${diffDays} วัน: อีเมลเตือนล่วงหน้า 2 วัน ก่อนวันคืนเวลา 08:30`;
+    }
+  };
+
   if (!isMounted) return null;
 
   return createPortal(
@@ -132,10 +154,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="relative">
               <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input 
-                type="text" 
-                required 
-                placeholder="Ex. 999999999" 
-                value={formData.itemCode} 
+                type="text" required placeholder="Ex. 999999999" value={formData.itemCode} 
                 onChange={e => setFormData({...formData, itemCode: e.target.value})} 
                 className="w-full h-11 pl-9 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
               />
@@ -155,10 +174,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Quantity</label>
               <input 
-                type="number" 
-                required 
-                min="1"
-                value={formData.quantity} 
+                type="number" required min="1" value={formData.quantity} 
                 onChange={e => setFormData({...formData, quantity: e.target.value})} 
                 className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
               />
@@ -166,28 +182,33 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Job ID</label>
               <input 
-                type="text" 
-                required 
-                placeholder="ITSERV1"
-                value={formData.jobId} 
+                type="text" required placeholder="ITSERV1" value={formData.jobId} 
                 onChange={e => setFormData({...formData, jobId: e.target.value.toUpperCase()})} 
                 className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
               />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Expected Due Date</label>
-            <div className="relative">
-              <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-              <input 
-                type="date" 
-                required 
-                min={today}
-                value={formData.dueDate} 
-                onChange={e => setFormData({...formData, dueDate: e.target.value})} 
-                className="w-full h-11 pl-10 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none cursor-text" 
-              />
+          {/* 📅 ปรับปรุงส่วนเลือกวันที่ และ ข้อความแจ้งเตือน */}
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Expected Due Date</label>
+              <div className="relative">
+                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                <input 
+                  type="date" required min={today} value={formData.dueDate} 
+                  onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                  className="w-full h-11 pl-10 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none cursor-text" 
+                />
+              </div>
+            </div>
+            
+            {/* ✅ กล่องข้อความแจ้งเตือนกติกาอีเมล (Dynamic Helper Text) */}
+            <div className={cn("px-3 py-2.5 rounded-lg text-[11px] leading-relaxed border flex items-start gap-2 transition-colors", 
+              formData.dueDate ? "bg-blue-50 border-blue-100 text-blue-700" : "bg-zinc-50 border-zinc-200 text-zinc-500"
+            )}>
+              <BellRing size={14} className="mt-0.5 shrink-0" />
+              <span className="font-medium">{getEmailAlertMessage()}</span>
             </div>
           </div>
 
@@ -196,9 +217,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
               Note <span className="text-zinc-300 font-normal normal-case">(Optional)</span>
             </label>
             <input 
-              type="text" 
-              placeholder="Ex. For emergency server maintenance"
-              value={formData.note} 
+              type="text" placeholder="Ex. For emergency server maintenance" value={formData.note} 
               onChange={e => setFormData({...formData, note: e.target.value})} 
               className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
             />
