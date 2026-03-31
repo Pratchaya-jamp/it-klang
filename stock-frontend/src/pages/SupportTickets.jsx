@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Ticket, Search, Clock, CheckCircle2, MessageSquare, 
-  Send, User, Mail, Hash, Loader2, Reply, Calendar
+  Send, User, Mail, Hash, Loader2, Reply, Calendar, Package 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
