@@ -19,11 +19,28 @@ export default function LoginLogs() {
 
   // 🔒 Security Check: ให้เฉพาะ SuperAdmin เข้าได้
   useEffect(() => {
-    const role = user?.role || user?.data?.role;
-    if (role !== 'SuperAdmin') {
-      showToast("Access Denied: SuperAdmin privileges required.", "error");
-      navigate('/dashboard', { replace: true });
-    }
+    const verifyAccess = async () => {
+      // 1. ลองเช็คจาก Context ก่อนว่ามี Role ไหม
+      let currentRole = user?.role || user?.data?.role;
+
+      // 2. ถ้าใน Context ยังไม่มี Role (เพราะเพิ่งล็อกอินมาสดๆ) ให้ดึงสดจาก API
+      if (!currentRole) {
+        try {
+          const res = await request('/api/auth/me');
+          currentRole = res?.data?.role || res?.role;
+        } catch (err) {
+          console.error("Failed to verify role", err);
+        }
+      }
+
+      // 3. ตัดสินชี้ขาด ถ้าไม่ใช่ SuperAdmin ถึงจะเตะออก
+      if (currentRole !== 'SuperAdmin') {
+        showToast("Access Denied: SuperAdmin privileges required.", "error");
+        navigate('/dashboard', { replace: true });
+      }
+    };
+
+    verifyAccess();
   }, [user, navigate]);
 
   // ฟังก์ชันดึงข้อมูล (รองรับทั้งแบบดึงทั้งหมด และ ดึงตาม Staff ID)

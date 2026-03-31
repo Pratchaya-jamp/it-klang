@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { 
   Search, SlidersHorizontal, ChevronDown, Check, X, Trash2,
   Package, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, 
   Download, RefreshCcw, AlertCircle, CheckCircle2, FileSpreadsheet,
-  ArrowDownLeft, ArrowUpRight, Plus, Calendar, Filter, StickyNote,
-  LayoutList, BarChart2 // 👈 เพิ่ม icon ใหม่
+  LayoutList, BarChart2, ArrowRightLeft, Filter
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useToast } from '../context/ToastContext';
-import InventoryStats from '../components/InventoryStats'; // 👈 Import Component กราฟ
+import InventoryStats from '../components/InventoryStats'; 
 
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -25,236 +25,8 @@ const fetchStocks = async (queryString) => {
   } catch (error) { return []; }
 };
 
-const submitTransaction = async (type, items) => {
-  const endpoint = type === 'IN' ? '/api/transactions/receive' : '/api/transactions/withdraw';
-  
-  // Transform data to match API Spec: Array of Objects
-  const payload = items.map(item => ({
-    itemCode: item.itemCode,
-    quantity: Number(item.quantity),
-    note: item.note || "", 
-    createdBy: "Admin" 
-  }));
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) throw new Error('Transaction failed');
-  return await response.json();
-};
-
-// --- SUB-COMPONENTS (Keep your original modals as is) ---
-// 1. Item Selector Modal
-const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      setSearchTerm("");
-      setCategoryFilter("");
-      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
-    } else {
-      setIsVisible(false);
-      const timer = setTimeout(() => setIsMounted(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  const filteredData = data.filter(item => {
-    const matchesSearch = 
-      item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter ? item.category === categoryFilter : true;
-    return matchesSearch && matchesCategory;
-  });
-
-  const categories = [...new Set(data.map(item => item.category))];
-
-  if (!isMounted) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className={cn("fixed inset-0 bg-zinc-900/60 backdrop-blur-sm transition-opacity duration-300", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-      <div className={cn("relative bg-white w-full max-w-3xl h-[80vh] rounded-2xl shadow-2xl border border-zinc-100 flex flex-col transform transition-all duration-300", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-        <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/80 rounded-t-2xl">
-          <div><h3 className="text-lg font-semibold text-zinc-900">Select Item</h3><p className="text-sm text-zinc-500">Search and select an item from inventory.</p></div>
-          <button onClick={onClose} className="p-2 text-zinc-400 hover:bg-zinc-200 rounded-full transition-colors"><X size={20}/></button>
-        </div>
-        <div className="p-4 border-b border-zinc-100 flex gap-3 bg-white shadow-sm z-10">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-            <input type="text" placeholder="Search by Code or Name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all" autoFocus />
-          </div>
-          <div className="relative w-48">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full h-11 pl-10 pr-8 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 cursor-pointer appearance-none">
-              <option value="">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={14} />
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-zinc-50 text-zinc-500 font-medium uppercase text-xs sticky top-0 z-10 shadow-sm">
-              <tr><th className="px-6 py-3">Code</th><th className="px-6 py-3">Name</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Stock Bal.</th><th className="px-6 py-3 text-center">Action</th></tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filteredData.length > 0 ? (
-                filteredData.map((item) => (
-                  <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors">
-                    <td className="px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td><td className="px-6 py-3 text-zinc-900">{item.name}</td><td className="px-6 py-3 text-zinc-500">{item.category}</td><td className="px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
-                    <td className="px-6 py-3 text-center"><button onClick={() => { onSelect(item); onClose(); }} className="px-4 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-lg hover:bg-zinc-700 transition-all shadow-sm active:scale-95">Select</button></td>
-                  </tr>
-                ))
-              ) : (<tr><td colSpan="5" className="px-6 py-20 text-center text-zinc-400 flex flex-col items-center"><Package size={32} className="opacity-20 mb-2" />No items found.</td></tr>)}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 text-xs text-zinc-400 flex justify-between"><span>Showing {filteredData.length} items</span><span>Press ESC to close</span></div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-// 2. Transaction Modal
-const TransactionModal = ({ isOpen, type, onClose, onSuccess, inventoryData }) => {
-  const [activeType, setActiveType] = useState(type);
-  const [items, setItems] = useState([{ itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [pickingRowIndex, setPickingRowIndex] = useState(null);
-  
-  const [isMounted, setIsMounted] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && type) setActiveType(type);
-  }, [isOpen, type]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      setItems([{ itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
-      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
-    } else {
-      setIsVisible(false);
-      const timer = setTimeout(() => setIsMounted(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  const isReceive = activeType === 'IN';
-
-  const handleOpenPicker = (index) => { setPickingRowIndex(index); setIsPickerOpen(true); };
-  
-  const handleSelectItem = (item) => {
-    if (pickingRowIndex !== null) {
-      const newItems = [...items];
-      newItems[pickingRowIndex] = { 
-        ...newItems[pickingRowIndex], 
-        itemCode: item.itemCode, 
-        itemName: item.name, 
-        currentStock: item.balance, 
-        unit: item.unit, 
-        quantity: 1 
-      };
-      setItems(newItems);
-    }
-  };
-
-  const handleFieldChange = (index, field, val) => {
-    const newItems = [...items];
-    newItems[index][field] = val;
-    setItems(newItems);
-  };
-
-  const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
-  const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
-  
-  const isValid = items.every(item => item.itemCode && item.quantity > 0);
-  
-  const handleSubmit = async () => {
-    if (!isValid) return;
-    setIsSubmitting(true);
-    try {
-      await submitTransaction(activeType, items);
-      onSuccess(`Successfully ${isReceive ? 'received' : 'withdrawn'} items.`, "success");
-      onClose();
-    } catch (error) {
-      onSuccess(`Failed to process transaction.`, "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (!isMounted) return null;
-
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div className={cn("fixed inset-0 bg-zinc-900/40 backdrop-blur-sm transition-opacity duration-300", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-        <div className={cn("relative bg-white w-full max-w-3xl p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col transform transition-all duration-300 overflow-hidden", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-          <div className={cn("px-6 py-4 flex items-center justify-between border-b transition-colors duration-300", isReceive ? "bg-emerald-50/50 border-emerald-100" : "bg-amber-50/50 border-amber-100")}>
-            <div className="flex items-center gap-3">
-              <div className={cn("p-2.5 rounded-xl transition-colors duration-300", isReceive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{isReceive ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}</div>
-              <div><h2 className={cn("text-lg font-semibold transition-colors duration-300", isReceive ? "text-emerald-900" : "text-amber-900")}>{isReceive ? "Receive Stock" : "Withdraw Stock"}</h2><p className="text-sm text-zinc-500">{isReceive ? "Add items to inventory" : "Disburse items from inventory"}</p></div>
-            </div>
-            <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
-          </div>
-          <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
-            <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>Date: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString()}</span></span></div>
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <div key={index} className="flex flex-col sm:flex-row items-start gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
-                  <div className="flex-1 w-full sm:w-auto space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Item</label>
-                    <div className="relative flex gap-2">
-                      <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all bg-white hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium")}>
-                          {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "Click to search item..."}
-                      </div>
-                      <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
-                    </div>
-                    {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1">Current Stock: <span className="font-medium text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
-                  </div>
-                  <div className="w-full sm:w-24 space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Qty</label>
-                    <input type="number" min="1" value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', Number(e.target.value))} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 text-center" />
-                  </div>
-                  <div className="flex-1 w-full sm:w-auto space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Note</label>
-                    <input type="text" placeholder="Optional remark..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 placeholder:text-zinc-300" />
-                  </div>
-                  <div className="w-auto space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider invisible block">Del</label> 
-                      <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={handleAddItem} className="w-full py-3 border border-dashed border-zinc-300 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 transition-all flex items-center justify-center gap-2 text-sm font-medium"><Plus size={16} /> Add Another Item</button>
-          </div>
-          <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3">
-            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white transition-all">Cancel</button>
-            <button onClick={handleSubmit} disabled={!isValid || isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-medium transition-all shadow-md flex items-center justify-center gap-2", isReceive ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>{isSubmitting && <RefreshCcw size={16} className="animate-spin" />} Confirm {isReceive ? 'Receipt' : 'Withdrawal'}</button>
-          </div>
-        </div>
-      </div>
-      <ItemSelectorModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleSelectItem} data={inventoryData} />
-    </>,
-    document.body
-  );
-};
-
-// 3. Export Modal
+// --- SUB-COMPONENTS ---
+// 1. Export Modal
 const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     const [isMounted, setIsMounted] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
@@ -371,9 +143,10 @@ const StockStatusBadge = ({ balance }) => {
 // --- MAIN PAGE ---
 export default function Inventory() {
   const { showToast } = useToast();
+  const navigate = useNavigate(); // ✅ ย้ายเข้ามาอยู่ใน Component แล้ว
   
   // --- STATES ---
-  const [viewMode, setViewMode] = useState('list'); // 👈 เพิ่ม State สำหรับสลับหน้า ('list' | 'chart')
+  const [viewMode, setViewMode] = useState('list');
 
   const [searchId, setSearchId] = useState("");
   const [category, setCategory] = useState(""); 
@@ -386,14 +159,11 @@ export default function Inventory() {
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false); 
-  
-  const [transactionType, setTransactionType] = useState(null);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const filterRef = useRef(null);
 
-  // ... (Effect Hooks เดิมของคุณยังอยู่ครบ) ...
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterRef.current && !filterRef.current.contains(event.target)) setIsFilterOpen(false);
@@ -428,7 +198,6 @@ export default function Inventory() {
     return () => clearTimeout(timeoutId);
   }, [searchId, category, keyword, variant]);
 
-  // ... (Handle Functions เดิมของคุณ) ...
   const handleSync = async () => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -442,11 +211,6 @@ export default function Inventory() {
     setData(items);
     setLoading(false);
     showToast("Data synchronized successfully", "success");
-  };
-
-  const handleTransactionSuccess = (message, type) => {
-    showToast(message, type);
-    if (type === 'success') fetchData();
   };
 
   const processedData = useMemo(() => {
@@ -482,6 +246,7 @@ export default function Inventory() {
   const handleCategoryChange = (val) => { setCategory(val); setKeyword(""); setVariant(""); };
   const clearAllFilters = () => { setCategory(""); setKeyword(""); setVariant(""); setIsFilterOpen(false); };
   const hasActiveFilters = category || keyword || variant;
+  
   const renderSubFilters = () => {
     if (!category) return <div className="p-4 text-center text-xs text-zinc-400 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">Select a category first</div>;
     if (['Mouse', 'Keyboard'].includes(category)) return <CustomSelect label="Connection" options={['USB', 'Wireless']} value={keyword} onChange={setKeyword} />;
@@ -500,14 +265,6 @@ export default function Inventory() {
         data={processedData.all} 
       />
 
-      <TransactionModal 
-        isOpen={!!transactionType} 
-        type={transactionType} 
-        onClose={() => setTransactionType(null)} 
-        onSuccess={handleTransactionSuccess}
-        inventoryData={processedData.all}
-      />
-
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-6">
         <div>
@@ -517,7 +274,7 @@ export default function Inventory() {
         
         {/* ACTION BUTTONS */}
         <div className="flex items-center gap-3">
-           
+            
            {/* 1. View Toggle Buttons (List / Analytics) */}
            <div className="flex bg-zinc-100 p-1 rounded-xl mr-2">
             <button 
@@ -540,18 +297,12 @@ export default function Inventory() {
             </button>
           </div>
 
-           {/* 2. Transaction & Sync Buttons */}
+           {/* 2. ✅ Transactions Button ใหม่ */}
            <button 
-             onClick={() => setTransactionType('IN')}
-             className="h-10 px-4 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+             onClick={() => navigate('/transactions')}
+             className="h-10 px-4 bg-white border border-zinc-200 text-zinc-700 rounded-xl text-sm font-medium hover:bg-zinc-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
            >
-             <ArrowDownLeft size={16}/> <span className="hidden sm:inline">Receive</span>
-           </button>
-           <button 
-             onClick={() => setTransactionType('OUT')}
-             className="h-10 px-4 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl text-sm font-medium hover:bg-amber-100 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-           >
-             <ArrowUpRight size={16}/> <span className="hidden sm:inline">Withdraw</span>
+             <ArrowRightLeft size={16}/> <span className="hidden sm:inline">Transactions</span>
            </button>
            
            <div className="h-6 w-px bg-zinc-200 mx-1 hidden md:block"></div>
@@ -566,7 +317,7 @@ export default function Inventory() {
              <span className="hidden md:inline">Sync</span>
            </button>
            
-           {/* ซ่อนปุ่ม Export เมื่ออยู่ในโหมด Analytics (เพราะกราฟไม่ได้ Export ข้อมูลตาราง) */}
+           {/* ซ่อนปุ่ม Export เมื่ออยู่ในโหมด Analytics */}
            {viewMode === 'list' && (
              <button 
                onClick={() => setIsExportModalOpen(true)}

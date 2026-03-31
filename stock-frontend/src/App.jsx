@@ -14,6 +14,7 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const Transactions = lazy(() => import('./pages/Transactions'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 const Profile = lazy(() => import('./pages/Profile'));
 const EditProfile = lazy(() => import('./pages/EditProfile'));
@@ -77,6 +78,7 @@ function App() {
                 <Route element={<MainLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/transactions" element={<Transactions />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/changepwd" element={<ChangePassword />} />

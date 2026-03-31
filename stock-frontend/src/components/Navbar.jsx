@@ -39,6 +39,11 @@ export default function Navbar() {
 
   // --- EFFECT: Fetch User Data ---
   useEffect(() => {
+    if (!user) {
+      setUserData(null);
+      return;
+    }
+
     const fetchUserData = async () => {
       try {
         const response = await request('/api/auth/me');
@@ -369,7 +374,7 @@ export default function Navbar() {
                   <User size={16} />
                   My Profile
                 </Link>
-                  {(user?.role === 'SuperAdmin' || user?.data?.role === 'SuperAdmin') && (
+                  {(user?.role === 'SuperAdmin' || user?.data?.role === 'SuperAdmin' || userData?.role === 'SuperAdmin') && (
                   <>
                     <Link 
                       to="/user-manage"
