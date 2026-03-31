@@ -58,5 +58,48 @@ namespace StockApi.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        // ✅ GET: api/support/my-tickets (User ดูประวัติแจ้งปัญหาของตัวเอง)
+        [HttpGet("my-tickets")]
+        public async Task<IActionResult> GetMyTickets()
+        {
+            try
+            {
+                var staffId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(staffId)) return Unauthorized();
+
+                var tickets = await _supportService.GetMyTicketsAsync(staffId);
+                return Ok(new { data = tickets, count = tickets.Count });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // ✅ PUT: api/support/ticket/{id}/reply (Supporter พิมพ์ตอบกลับ)
+        [HttpPut("ticket/{ticketNo}/reply")]
+        public async Task<IActionResult> ReplyTicket(string ticketNo, [FromBody] ReplySupportRequest request)
+        {
+            try
+            {
+                var role = User.FindFirst("role")?.Value;
+                if (role != "WebSupporter")
+                {
+                    return StatusCode(403, new { message = "เฉพาะทีมงาน Support เท่านั้นที่สามารถตอบกลับได้" });
+                }
+
+                var supporterId = User.FindFirst("id")?.Value ?? "Unknown";
+                var supporterName = User.FindFirst("name")?.Value ?? "IT Support";
+
+                // โยน ticketNo เข้า Service
+                await _supportService.ReplyTicketAsync(ticketNo, supporterId, supporterName, request);
+                return Ok(new { message = "บันทึกการตอบกลับและส่งอีเมลแจ้งผู้ใช้งานเรียบร้อยแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

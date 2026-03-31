@@ -8,14 +8,27 @@ namespace StockApi.Dtos
         public string Note { get; set; } = string.Empty;
     }
 
+    // ✅ เพิ่ม DTO สำหรับรับค่าตอนกดตอบกลับ
+    public class ReplySupportRequest
+    {
+        [Required(ErrorMessage = "กรุณาระบุข้อความตอบกลับ")]
+        public string ReplyMessage { get; set; } = string.Empty;
+    }
+
+    // ✅ อัปเดต Response ให้คืนค่า Reply กลับไปโชว์ที่หน้าเว็บด้วย
     public class SupportTicketResponse
     {
-        public int Id { get; set; }
+        public string TicketNo { get; set; } = string.Empty;
         public string StaffId { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string CreatedAt { get; set; } = string.Empty;
+
+        // ข้อมูลการตอบกลับ (ถ้ายังไม่ตอบ จะเป็น null)
+        public string? ReplyMessage { get; set; }
+        public string? RepliedBy { get; set; }
+        public string? RepliedAt { get; set; }
     }
 }

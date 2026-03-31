@@ -217,7 +217,7 @@ builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
-app.UseHangfireDashboard();
+//app.UseHangfireDashboard();
 
 // 5. Run Middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -229,6 +229,7 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "Stock API v1");
         options.RoutePrefix = string.Empty; // เปิดมาเจอ Swagger เลย
     });
+    app.UseHangfireDashboard();
 }
 
 app.UseCors("AllowFrontend");

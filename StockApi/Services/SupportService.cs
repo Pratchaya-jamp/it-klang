@@ -9,6 +9,8 @@ namespace StockApi.Services
     {
         Task CreateTicketAsync(string staffId, CreateSupportRequest request);
         Task<List<SupportTicketResponse>> GetAllTicketsAsync();
+        Task<List<SupportTicketResponse>> GetMyTicketsAsync(string staffId);
+        Task ReplyTicketAsync(string ticketNo, string supporterStaffId, string supporterName, ReplySupportRequest request);
     }
 
     public class SupportService : ISupportService
@@ -24,6 +26,17 @@ namespace StockApi.Services
             _notiService = notiService;
         }
 
+        private string GenerateTicketNo()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            // สุ่ม 8 ตัวอักษร เช่น 9A4X7B21
+            var randomString = new string(Enumerable.Repeat(chars, 8)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+
+            return $"TK-{randomString}"; // ผลลัพธ์: TK-9A4X7B21
+        }
+
         public async Task CreateTicketAsync(string staffId, CreateSupportRequest request)
         {
             // 1. ดึงข้อมูล User ที่กำลังแจ้งปัญหา
@@ -33,6 +46,7 @@ namespace StockApi.Services
             // 2. บันทึกลง Database
             var ticket = new SupportTicket
             {
+                TicketNo = GenerateTicketNo(),
                 StaffId = user.StaffId,
                 Name = user.Name,
                 Email = user.Email,
@@ -73,18 +87,86 @@ namespace StockApi.Services
 
         public async Task<List<SupportTicketResponse>> GetAllTicketsAsync()
         {
+            // ดึง Ticket ทั้งหมด และเรียงจากล่าสุดไปเก่าสุด
             return await _context.SupportTickets
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new SupportTicketResponse
                 {
-                    Id = t.Id,
+                    TicketNo = t.TicketNo,
                     StaffId = t.StaffId,
                     Name = t.Name,
                     Email = t.Email,
                     Note = t.Note,
                     Status = t.Status,
-                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                    // ✅ แมปฟิลด์การตอบกลับให้โชว์ในฝั่ง Supporter ด้วย
+                    ReplyMessage = t.ReplyMessage,
+                    RepliedBy = t.RepliedBy,
+                    RepliedAt = t.RepliedAt.HasValue ? t.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null
                 }).ToListAsync();
+        }
+
+        public async Task<List<SupportTicketResponse>> GetMyTicketsAsync(string staffId)
+        {
+            return await _context.SupportTickets
+                .Where(t => t.StaffId == staffId)
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new SupportTicketResponse
+                {
+                    TicketNo = t.TicketNo,
+                    StaffId = t.StaffId,
+                    Name = t.Name,
+                    Email = t.Email,
+                    Note = t.Note,
+                    Status = t.Status,
+                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                    ReplyMessage = t.ReplyMessage,
+                    RepliedBy = t.RepliedBy,
+                    RepliedAt = t.RepliedAt.HasValue ? t.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null
+                }).ToListAsync();
+        }
+
+        public async Task ReplyTicketAsync(string ticketNo, string supporterStaffId, string supporterName, ReplySupportRequest request)
+        {
+            var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.TicketNo == ticketNo);
+            if (ticket == null) throw new Exception("ไม่พบข้อมูล Ticket นี้");
+            if (ticket.Status == "Resolved") throw new Exception("Ticket นี้ได้รับการแก้ไขไปแล้ว");
+
+            // อัปเดตข้อมูล Ticket
+            ticket.Status = "Resolved"; // เปลี่ยนสถานะเป็นสำเร็จ
+            ticket.ReplyMessage = request.ReplyMessage;
+            ticket.RepliedBy = supporterName;
+            ticket.RepliedAt = DateTime.Now;
+
+            _context.SupportTickets.Update(ticket);
+            await _context.SaveChangesAsync();
+
+            // 📩 ส่งอีเมลแจ้ง User ว่าปัญหาได้รับการแก้ไขและตอบกลับแล้ว
+            string subject = $"✅ อัปเดตสถานะการแจ้งปัญหา Ticket #{ticket.TicketNo}";
+            string body = $@"
+                <div style='font-family: sans-serif;'>
+                    <h3>สวัสดีคุณ {ticket.Name}</h3>
+                    <p>ปัญหาที่คุณได้แจ้งเข้ามา (Ticket #{ticket.TicketNo}) ได้รับการตรวจสอบและตอบกลับจากทีมงานแล้ว</p>
+                    <hr/>
+                    <p><b>ปัญหาที่แจ้ง:</b> {ticket.Note}</p>
+                    <p><b>การตอบกลับจากทีมงาน:</b></p>
+                    <div style='background-color:#d4edda; color:#155724; padding:15px; border-radius:5px;'>
+                        {request.ReplyMessage}
+                    </div>
+                    <p style='color:#6c757d; font-size:12px; margin-top:20px;'>
+                        ตอบกลับโดย: {supporterName} เมื่อ {ticket.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss")}
+                    </p>
+                </div>
+            ";
+            await _emailService.SendEmailAsync(ticket.Email, subject, body);
+
+            // 🔔 ส่ง Noti ไปที่กระดิ่งหน้าเว็บของ User
+            await _notiService.SendNotificationAsync(
+                ticket.StaffId,
+                "ปัญหาของคุณได้รับการแก้ไขแล้ว",
+                $"ทีมงานได้ตอบกลับ Ticket #{ticket.Id} ของคุณแล้ว: {request.ReplyMessage}",
+                "SUPPORT_RESOLVED"
+            );
         }
     }
 }
