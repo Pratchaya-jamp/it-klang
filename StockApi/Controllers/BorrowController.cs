@@ -39,7 +39,7 @@ namespace StockApi.Controllers
                 // (staffId, recorderName, recorderEmail, request)
                 var result = await _borrowService.BorrowItemAsync(staffId!, recorderName, recorderEmail, request);
 
-                return Ok(new { message = "ยืมสำเร็จ", data = result });
+                return StatusCode(201, new { message = "ยืมสำเร็จ", data = result });
             }
             catch (Exception ex)
             {
@@ -58,7 +58,7 @@ namespace StockApi.Controllers
                 // ✅ ส่ง transactionId (string) ไปให้ Service
                 var result = await _borrowService.ReturnItemAsync(staffId!, recorderName, transactionId);
 
-                return Ok(new { message = "คืนของสำเร็จ", data = result });
+                return StatusCode(201, new { message = "คืนของสำเร็จ", data = result });
             }
             catch (Exception ex)
             {

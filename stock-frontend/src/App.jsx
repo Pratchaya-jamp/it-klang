@@ -21,6 +21,8 @@ const EditProfile = lazy(() => import('./pages/EditProfile'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const LoginLogs = lazy(() => import('./pages/LoginLogs'));
 const Borrowing = lazy(() => import('./pages/Borrowing'));
+const Troubleshoot = lazy(() => import('./pages/Troubleshoot'));
+const SupportTickets = lazy(() => import('./pages/SupportTickets'));
 
 // --- LAYOUTS ---
 
@@ -86,6 +88,8 @@ function App() {
                   <Route path="/user-manage" element={<UserManagement />} />
                   <Route path="/access-logs" element={<LoginLogs />} />
                   <Route path="/borrowing" element={<Borrowing />} />
+                  <Route path="/troubleshoot" element={<Troubleshoot />} />
+                  <Route path="/support-tickets" element={<SupportTickets />} />
                   {/* เพิ่มหน้าอื่นๆ ที่นี่ */}
                 </Route>
               </Route>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User, 
-  Users, LogOut, ChevronDown, Loader2, Activity, CheckCheck 
+  Users, LogOut, ChevronDown, Loader2, Activity, CheckCheck, X, LifeBuoy, Ticket 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -395,11 +395,32 @@ export default function Navbar() {
                     </Link>
                   </>
                 )}
+                
                 </div>
 
                 <div className="h-px bg-zinc-50 mx-2 my-1"></div>
 
                 <div className="p-1">
+                  {(user?.role !== 'WebSupporter' && userData?.role !== 'WebSupporter') && (
+                    <Link 
+                      to="/troubleshoot"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
+                    >
+                      <LifeBuoy size={16} />
+                      Support Contact
+                    </Link>
+                  )}
+                  {(user?.role === 'WebSupporter' || userData?.role === 'WebSupporter') && (
+                    <Link 
+                      to="/support-tickets"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
+                    >
+                      <Ticket size={16} />
+                      Support Tickets
+                    </Link>
+                  )}
                   <button 
                     onClick={handleLogout}
                     disabled={isLoggingOut}
