@@ -94,42 +94,34 @@ namespace StockApi.Services
                     stock.LastReceivedDate = DateTime.Now;
 
                     // --- 2. Logic ใหม่ของ Total & Balance ---
-                    // Balance เพิ่มเสมอ (เพราะของเข้าคลัง)
                     stock.Balance += request.Quantity;
 
-                    // คำนวณการเติมของ
-                    int amountToFillHole = 0; // จำนวนที่เอาไปโปะยอดที่ขาด
-                    int amountExpansion = 0;  // จำนวนที่เป็นของใหม่จริงๆ (ส่วนเกิน)
+                    int amountToFillHole = 0;
+                    int amountExpansion = 0;
 
                     if (stock.TempWithdrawn > 0)
                     {
-                        // ถ้ามียอดขาด ให้เอาไปเติมยอดขาดก่อน
                         amountToFillHole = Math.Min(stock.TempWithdrawn, request.Quantity);
                         stock.TempWithdrawn -= amountToFillHole;
-
-                        // ส่วนที่เหลือคือนับเป็นของใหม่
                         amountExpansion = request.Quantity - amountToFillHole;
                     }
                     else
                     {
-                        // ถ้าไม่มียอดขาดเลย ถือเป็นของใหม่ทั้งหมด
                         amountExpansion = request.Quantity;
                     }
 
-                    // *** จุดสำคัญ: Total เพิ่มเฉพาะส่วนที่เป็นของใหม่ (Expansion) เท่านั้น ***
-                    // ถ้าแค่ซื้อมาเติมคืน (FillHole) Total จะเท่าเดิม
                     stock.TotalQuantity += amountExpansion;
-
                     stock.UpdatedAt = DateTime.Now;
 
                     // --- 3. Logs ---
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
-                        TransactionNo = $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}",
+                        TransactionNo = GenerateTransactionNo(),
                         ItemCode = request.ItemCode,
                         Type = "IN",
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
+                        JobNo = request.JobNo, // 🔥 เพิ่ม JobNo ตรงนี้
                         Note = request.Note,
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
@@ -137,7 +129,7 @@ namespace StockApi.Services
 
                     string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
                     await _logRepo.AddLogAsync(
-                        $"STOCK_IN (+{request.Quantity})",
+                        $"STOCK_IN (+{request.Quantity}) [Job: {request.JobNo}]", // แอบใส่ JobNo ให้เห็นใน System Log ด้วย
                         "StockBalances",
                         request.ItemCode,
                         $"Balance: {oldBalance}",
@@ -145,7 +137,7 @@ namespace StockApi.Services
                         currentUser
                     );
 
-                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (+{request.Quantity})");
+                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (+{request.Quantity}) [Job: {request.JobNo}]");
                 }
 
                 await _context.SaveChangesAsync();
@@ -154,9 +146,9 @@ namespace StockApi.Services
                 if (notiMessages.Any())
                 {
                     await _notiService.SendNotificationAsync(
-                        null, 
-                        "รับของเข้าคลัง", 
-                        $"คุณ {currentUser} รับของเข้าคลัง:\n" + 
+                        null,
+                        "รับของเข้าคลัง",
+                        $"คุณ {currentUser} รับของเข้าคลัง:\n" +
                         string.Join("\n", notiMessages), "STOCK_IN");
                 }
             }
@@ -182,24 +174,18 @@ namespace StockApi.Services
 
                     int oldBalance = stock.Balance;
 
-                    // --- Logic ใหม่ ---
-                    stock.Balance -= request.Quantity;       // ของบนชั้นหายไป
-                    stock.TempWithdrawn += request.Quantity; // ไปอยู่ที่ "ยอดรอเติม/ถูกเบิก"
-
-                    // *** จุดสำคัญ: TotalQuantity ไม่ลด! ***
-                    // เพราะเราถือว่าทรัพย์สินยังเป็นของบริษัท (แค่เปลี่ยนสถานะจาก Shelf -> In Use/Missing)
-                    // stock.TotalQuantity -= request.Quantity; // <--- บรรทัดนี้ลบทิ้งไปเลย
-
+                    stock.Balance -= request.Quantity;
+                    stock.TempWithdrawn += request.Quantity;
                     stock.UpdatedAt = DateTime.Now;
 
-                    // --- Logs ---
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
-                        TransactionNo = $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}",
+                        TransactionNo = GenerateTransactionNo(),
                         ItemCode = request.ItemCode,
                         Type = "OUT",
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
+                        JobNo = request.JobNo,
                         Note = request.Note,
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
@@ -207,7 +193,7 @@ namespace StockApi.Services
 
                     string packData = $"Balance: {stock.Balance}|Withdraw:-{request.Quantity}|Receive:+0";
                     await _logRepo.AddLogAsync(
-                        $"STOCK_OUT (-{request.Quantity})",
+                        $"STOCK_OUT (-{request.Quantity}) [Job: {request.JobNo}]",
                         "StockBalances",
                         request.ItemCode,
                         $"Balance: {oldBalance}",
@@ -215,7 +201,7 @@ namespace StockApi.Services
                         currentUser
                     );
 
-                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (-{request.Quantity})");
+                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (-{request.Quantity}) [Job: {request.JobNo}]");
                 }
 
                 await _context.SaveChangesAsync();
@@ -224,9 +210,9 @@ namespace StockApi.Services
                 if (notiMessages.Any())
                 {
                     await _notiService.SendNotificationAsync(
-                        null, 
-                        "เบิกของออก", 
-                        $"คุณ {currentUser} เบิกของออก:\n" + 
+                        null,
+                        "เบิกของออก",
+                        $"คุณ {currentUser} เบิกของออก:\n" +
                         string.Join("\n", notiMessages), "STOCK_OUT");
                 }
             }
@@ -235,17 +221,41 @@ namespace StockApi.Services
 
         public async Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync()
         {
-            var pendingList = await _context.StockBalances
-                .Include(s => s.Item)
-                .Where(s => s.TempWithdrawn > 0) // ดึงเฉพาะอันที่ถูกเบิกไปและรอคืน
-                .Select(s => new PendingWithdrawalDto
+            // 1. ดึงประวัติ (Transactions) ทั้งหมด จัดกลุ่มตาม JobNo และ ItemCode
+            var groupedTransactions = await _context.StockTransactions
+                .Where(t => !string.IsNullOrEmpty(t.JobNo)) // เอาเฉพาะรายการที่มี JobNo
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
+                .Select(g => new
                 {
-                    ItemCode = s.ItemCode,
-                    ItemName = s.Item != null ? s.Item.Name : "Unknown",
-                    PendingAmount = s.TempWithdrawn,
-                    LastUpdated = s.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                    JobNo = g.Key.JobNo,
+                    ItemCode = g.Key.ItemCode,
+                    // รวมยอดเบิก (OUT) และยอดคืน (IN) ของ Job นี้
+                    Withdrawn = g.Where(x => x.Type == "OUT").Sum(x => x.Quantity),
+                    Returned = g.Where(x => x.Type == "IN").Sum(x => x.Quantity),
+                    LastTransactionDate = g.Max(x => x.CreatedAt)
                 })
+                // 2. กรองเอาเฉพาะอันที่ ยืมไป > คืนกลับมา (แปลว่ายังค้างอยู่)
+                .Where(x => (x.Withdrawn - x.Returned) > 0)
                 .ToListAsync();
+
+            // 3. ดึงชื่อ Item Name จากฐานข้อมูลมาผูก เพื่อให้ได้ชื่อภาษาคน
+            var itemCodes = groupedTransactions.Select(t => t.ItemCode).Distinct().ToList();
+            var itemsDict = await _context.StockBalances
+                .Include(b => b.Item)
+                .Where(b => itemCodes.Contains(b.ItemCode))
+                .ToDictionaryAsync(b => b.ItemCode, b => b.Item?.Name ?? "Unknown");
+
+            // 4. แมปข้อมูลส่งกลับไปให้หน้าบ้าน
+            var pendingList = groupedTransactions.Select(t => new PendingWithdrawalDto
+            {
+                JobNo = t.JobNo,
+                ItemCode = t.ItemCode,
+                ItemName = itemsDict.ContainsKey(t.ItemCode) ? itemsDict[t.ItemCode] : "Unknown",
+                PendingAmount = t.Withdrawn - t.Returned, // จำนวนที่ยังค้างของ Job นี้ล้วนๆ
+                LastUpdated = t.LastTransactionDate.ToString("dd/MM/yyyy HH:mm:ss")
+            })
+            .OrderByDescending(x => x.LastUpdated)
+            .ToList();
 
             return pendingList;
         }

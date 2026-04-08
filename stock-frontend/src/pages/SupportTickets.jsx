@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Ticket, Search, Clock, CheckCircle2, MessageSquare, 
-  Send, User, Mail, Hash, Loader2, Reply, Calendar, Package 
+  Send, User, Mail, Hash, Loader2, Reply, Calendar, Star
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -17,7 +17,6 @@ export default function SupportTickets() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // เก็บ State ของข้อความ Reply แยกตาม TicketNo
   const [replyTexts, setReplyTexts] = useState({});
   const [submittingIds, setSubmittingIds] = useState({});
 
@@ -46,7 +45,6 @@ export default function SupportTickets() {
     });
   }, [tickets, searchQuery]);
 
-  // ฟังก์ชันส่งข้อความตอบกลับ
   const handleSendReply = async (ticketNo) => {
     const message = replyTexts[ticketNo];
     if (!message || !message.trim()) return;
@@ -54,7 +52,6 @@ export default function SupportTickets() {
     setSubmittingIds(prev => ({ ...prev, [ticketNo]: true }));
 
     try {
-      // 🚀 หน่วงเวลา 2 วินาทีตามความต้องการ
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       await request(`/api/support/ticket/${ticketNo}/reply`, {
@@ -62,21 +59,23 @@ export default function SupportTickets() {
         body: JSON.stringify({ replyMessage: message.trim() })
       });
 
-      // ✅ อัปเดตสถานะใน List ทันทีแบบ Real-time
       setTickets(prev => prev.map(t => {
         if (t.ticketNo === ticketNo) {
           return {
             ...t,
             status: 'Resolved',
             replyMessage: message.trim(),
-            repliedAt: new Date().toLocaleString('en-GB').replace(',', '') // จำลองวันเวลาที่ตอบ
+            repliedAt: new Date().toLocaleString('en-GB').replace(',', ''),
+            repliedBy: 'WebCosmo', // เปลี่ยนเป็นชื่อคนล็อกอินได้
+            rating: 0,          // ✅ เซ็ตค่าเริ่มต้นเป็นยังไม่ประเมิน
+            ratedAt: null       // ✅ เซ็ตค่าเริ่มต้นเป็นยังไม่ประเมิน
           };
         }
         return t;
       }));
 
       showToast(`Replied to ${ticketNo} successfully`, "success");
-      setReplyTexts(prev => ({ ...prev, [ticketNo]: '' })); // เคลียร์ข้อความ
+      setReplyTexts(prev => ({ ...prev, [ticketNo]: '' })); 
     } catch (error) {
       showToast(error.message || "Failed to send reply", "error");
     } finally {
@@ -87,7 +86,6 @@ export default function SupportTickets() {
   return (
     <div className="max-w-6xl mx-auto pb-20 px-4 md:px-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Header */}
       <div className="pt-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
           <Ticket className="text-zinc-900" size={24}/>
@@ -98,7 +96,6 @@ export default function SupportTickets() {
         </p>
       </div>
 
-      {/* Toolbar */}
       <div className="relative group">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
         <input 
@@ -110,7 +107,6 @@ export default function SupportTickets() {
         />
       </div>
 
-      {/* Tickets List */}
       <div className="space-y-6">
         {loading ? (
           [...Array(3)].map((_, i) => (
@@ -123,7 +119,6 @@ export default function SupportTickets() {
           filteredTickets.map((ticket, index) => (
             <div key={index} className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col">
               
-              {/* Header Info */}
               <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                   <div className="flex items-center gap-2">
@@ -152,7 +147,6 @@ export default function SupportTickets() {
               </div>
 
               <div className="p-6">
-                {/* User Message */}
                 <div className="flex gap-4 mb-6">
                   <div className="h-10 w-10 shrink-0 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-500">
                     <MessageSquare size={20} />
@@ -166,7 +160,6 @@ export default function SupportTickets() {
                   </div>
                 </div>
 
-                {/* Reply Section */}
                 {ticket.status?.toLowerCase() === 'pending' ? (
                   <div className="flex items-end gap-3 ml-14">
                     <div className="flex-1 relative group">
@@ -191,7 +184,6 @@ export default function SupportTickets() {
                     </div>
                   </div>
                 ) : (
-                  /* Show Reply if Resolved */
                   <div className="ml-14 bg-blue-50/50 border border-blue-100 rounded-2xl p-5 relative">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
@@ -200,9 +192,27 @@ export default function SupportTickets() {
                       <span className="text-xs font-bold text-blue-700">Response from {ticket.repliedBy || 'Support Team'}</span>
                     </div>
                     <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{ticket.replyMessage}</p>
-                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-blue-400 font-medium">
-                      <Calendar size={10} />
-                      <span>Replied at {ticket.repliedAt}</span>
+                    
+                    {/* ✅ ส่วนที่เพิ่มเข้ามา: วันที่ตอบกลับ + สถานะการประเมิน */}
+                    <div className="mt-4 pt-3 border-t border-blue-200/60 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-1.5 text-[11px] text-blue-500 font-medium">
+                        <Calendar size={12} />
+                        <span>Replied at {ticket.repliedAt}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                        {ticket.ratedAt ? (
+                          <span className="text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                            <Star size={12} className={cn(ticket.rating > 0 ? "fill-emerald-500 text-emerald-500" : "text-emerald-600")} /> 
+                            {ticket.rating > 0 ? `Evaluated (${ticket.rating}/5)` : 'Evaluated'} on {ticket.ratedAt}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500 flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-zinc-200">
+                            <Clock size={12} /> 
+                            Not evaluated yet
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

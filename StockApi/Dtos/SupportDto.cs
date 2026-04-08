@@ -30,5 +30,14 @@ namespace StockApi.Dtos
         public string? ReplyMessage { get; set; }
         public string? RepliedBy { get; set; }
         public string? RepliedAt { get; set; }
+
+        public decimal? Rating { get; set; }
+        public string? RatedAt { get; set; }
+    }
+
+    public class RateTicketRequest
+    {
+        [Range(0.5, 5.0, ErrorMessage = "คะแนนต้องอยู่ระหว่าง 0.5 ถึง 5.0")]
+        public decimal Rating { get; set; }
     }
 }

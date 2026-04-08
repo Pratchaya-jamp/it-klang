@@ -3,17 +3,15 @@ import { createPortal } from 'react-dom';
 import { 
   ArrowDownToLine, ArrowUpFromLine, Search, Package, 
   Hash, Clock, X, Loader2, CheckCircle2, FileText,
-  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Plus
+  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Layers, Plus 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { request } from '../utils/fetchUtils';
 import { useToast } from '../context/ToastContext';
 
-// Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// 🚀 ความเร็ว 200ms เด้งติดนิ้ว
 const ANIMATION_CLASSES = "transform transition-all duration-200 ease-out will-change-[transform,opacity]";
 
 // --- 1. ITEM SELECTOR MODAL ---
@@ -107,10 +105,11 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   );
 };
 
-// --- 2. GENERAL TRANSACTION MODAL ---
+// --- 2. GENERAL TRANSACTION MODAL (WITHDRAW / RECEIVE) ---
 const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const [activeType, setActiveType] = useState(type);
-  const [items, setItems] = useState([{ itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+  // ✅ เพิ่ม jobNo เข้าไปใน State เริ่มต้น
+  const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
   const [inventoryData, setInventoryData] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -127,11 +126,12 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      setItems([{ itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+      // ✅ เพิ่ม jobNo: '' ตอน Reset Form
+      setItems([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
       
       request('/api/stocks/overview').then(res => {
         setInventoryData(Array.isArray(res) ? res : (res?.data || []));
-      }).catch(err => console.error("Failed to load stock data for picker", err));
+      }).catch(err => console.error("Failed to load stock data", err));
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -150,7 +150,14 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const handleSelectItem = (item) => {
     if (pickingRowIndex !== null) {
       const newItems = [...items];
-      newItems[pickingRowIndex] = { ...newItems[pickingRowIndex], itemCode: item.itemCode, itemName: item.name, currentStock: item.balance, unit: item.unit, quantity: 1 };
+      // ✅ ป้องกันไม่ให้ Quantity ถูกรีเซ็ตเป็น 1 หากผู้ใช้กรอกมาก่อนหน้าแล้ว
+      newItems[pickingRowIndex] = { 
+        ...newItems[pickingRowIndex], 
+        itemCode: item.itemCode, 
+        itemName: item.name, 
+        currentStock: item.balance, 
+        unit: item.unit
+      };
       setItems(newItems);
     }
   };
@@ -161,16 +168,25 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
     setItems(newItems);
   };
 
-  const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+  const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
   const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
-  const isValid = items.every(item => item.itemCode && item.quantity > 0);
+  
+  // ✅ ตรวจสอบว่ากรอก itemCode, จำนวน > 0 และ jobNo ครบถ้วน
+  const isValid = items.every(item => item.itemCode && Number(item.quantity) > 0 && item.jobNo.trim() !== "");
   
   const handleSubmit = async () => {
     if (!isValid) return;
     setIsSubmitting(true);
     try {
       const endpoint = activeType === 'IN' ? '/api/transactions/receive' : '/api/transactions/withdraw';
-      const payload = items.map(item => ({ itemCode: item.itemCode, quantity: Number(item.quantity), note: item.note || "" }));
+      
+      // ✅ แปลงข้อมูลเป็น Payload โครงสร้างใหม่
+      const payload = items.map(item => ({ 
+        itemCode: item.itemCode, 
+        jobNo: item.jobNo.trim(), 
+        quantity: Number(item.quantity), // ชัวร์ๆ ว่าแปลงเป็นตัวเลขตอนส่ง
+        note: item.note || "" 
+      }));
       
       await request(endpoint, { method: 'POST', body: JSON.stringify(payload) });
       onSuccess(`Successfully ${isReceive ? 'received' : 'withdrawn'} items.`, "success");
@@ -200,29 +216,41 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
             <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>Date: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString('en-GB')}</span></span></div>
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={index} className="flex flex-col sm:flex-row items-start gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
-                  <div className="flex-1 w-full sm:w-auto space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Item</label>
-                    <div className="relative flex gap-2">
-                      <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all bg-white hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium")}>
-                          {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "Click to search item..."}
+                <div key={index} className="flex flex-col gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
+                  
+                  {/* แถวที่ 1: เลือก Item และปุ่มลบ */}
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Item Code</label>
+                      <div className="relative flex gap-2">
+                        <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all bg-white hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium")}>
+                            {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "Click to search item..."}
+                        </div>
+                        <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
                       </div>
-                      <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
+                      {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1">Current Stock: <span className="font-medium text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
                     </div>
-                    {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1">Current Stock: <span className="font-medium text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
-                  </div>
-                  <div className="w-full sm:w-24 space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Qty</label>
-                    <input type="number" min="1" value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', Number(e.target.value))} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 text-center" />
-                  </div>
-                  <div className="flex-1 w-full sm:w-auto space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Note</label>
-                    <input type="text" placeholder="Optional remark..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:border-zinc-400 placeholder:text-zinc-300" />
-                  </div>
-                  <div className="w-auto space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider invisible block">Del</label> 
+                    <div className="w-10 pt-5">
                       <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
+                    </div>
                   </div>
+
+                  {/* ✅ แถวที่ 2: Job No, Qty, Note (เพิ่มช่อง Job No แล้ว) */}
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    <div className="w-full sm:w-1/3 space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">Job No <span className="text-red-400">*</span></label>
+                      <input type="text" required placeholder="Ex. JOB-001" value={item.jobNo} onChange={(e) => handleFieldChange(index, 'jobNo', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all" />
+                    </div>
+                    <div className="w-full sm:w-1/4 space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">Qty <span className="text-red-400">*</span></label>
+                      <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 text-center transition-all" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Note</label>
+                      <input type="text" placeholder="Optional remark..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 placeholder:text-zinc-300 transition-all" />
+                    </div>
+                  </div>
+
                 </div>
               ))}
             </div>
@@ -240,7 +268,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   );
 };
 
-// --- 3. PENDING RECEIVE MODAL (ปรับให้ดึง pendingAmount) ---
+// --- 3. PENDING RECEIVE MODAL ---
 const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   const [receiveList, setReceiveList] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,10 +279,11 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     if (isOpen && pendingItem) {
       setIsMounted(true);
       
-      // ✅ แมปข้อมูลโดยใช้ pendingAmount ตาม Payload แบบใหม่
+      // ✅ เพิ่ม jobNo ใน State เริ่มต้น
       setReceiveList([{
         itemCode: pendingItem.itemCode,
         itemName: pendingItem.itemName,
+        jobNo: '', // ค่าว่างให้ User กรอก
         withdrawnQty: pendingItem.pendingAmount,
         receiveQty: pendingItem.pendingAmount,
         note: ''
@@ -282,8 +311,11 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     setIsSubmitting(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // ✅ แปลง Payload สำหรับ Receive จาก Pending
       const payload = receiveList.map(item => ({
         itemCode: item.itemCode,
+        jobNo: item.jobNo.trim(),
         quantity: Number(item.receiveQty),
         note: item.note
       }));
@@ -297,6 +329,9 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
       setIsSubmitting(false);
     }
   };
+
+  // ตรวจสอบความถูกต้องของแบบฟอร์ม (Job No ต้องไม่ว่าง, Qty ต้องมากกว่า 0)
+  const isFormInvalid = receiveList.some(i => !i.receiveQty || Number(i.receiveQty) <= 0 || !i.jobNo.trim());
 
   if (!isMounted || !pendingItem) return null;
 
@@ -332,9 +367,15 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
                     Pending: {item.withdrawnQty}
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <div className="w-24">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Recv Qty</label>
+
+                {/* ✅ เพิ่มช่องกรอก Job No สำหรับการรับคืน */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="w-full sm:w-1/3">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Job No <span className="text-red-400">*</span></label>
+                    <input type="text" required placeholder="Required" value={item.jobNo} onChange={e => updateField(index, 'jobNo', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
+                  </div>
+                  <div className="w-full sm:w-1/4">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Recv Qty <span className="text-red-400">*</span></label>
                     <input type="number" required min="1" max={item.withdrawnQty} value={item.receiveQty} onChange={e => updateField(index, 'receiveQty', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
                   </div>
                   <div className="flex-1">
@@ -342,13 +383,14 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
                     <input type="text" placeholder="Condition details..." value={item.note} onChange={e => updateField(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
                   </div>
                 </div>
+
               </div>
             ))}
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex gap-3 shrink-0 mt-2">
             <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all">Cancel</button>
-            <button type="submit" disabled={isSubmitting || receiveList.some(i => !i.receiveQty || i.receiveQty <= 0)} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-100">
+            <button type="submit" disabled={isSubmitting || isFormInvalid} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-100">
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Confirm Receive
             </button>
@@ -375,7 +417,6 @@ export default function Transactions() {
     setLoading(true);
     try {
       const pendingRes = await request('/api/transactions/pending');
-      // ✅ ดึง data ออกมาตรงๆ ตามโครงสร้าง Payload ใหม่
       const pData = Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || []);
       setPendingItems(pData);
     } catch (error) {
@@ -392,7 +433,6 @@ export default function Transactions() {
     if (!Array.isArray(pendingItems)) return [];
     return pendingItems.filter(item => {
       const searchTxt = searchQuery.toLowerCase();
-      // ✅ ค้นหาแค่ itemCode กับ itemName ตาม Payload ใหม่
       return item.itemCode?.toLowerCase().includes(searchTxt) || 
              item.itemName?.toLowerCase().includes(searchTxt);
     });

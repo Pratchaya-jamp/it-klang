@@ -60,7 +60,15 @@ namespace StockApi.Services
 
             // 1. เช็คซ้ำ
             if (await _context.Users.AnyAsync(u => u.StaffId == request.StaffId))
+            {
                 throw new Exception("Staff ID นี้มีอยู่ในระบบแล้ว");
+            }
+
+            // 🔥 2. เช็ค Email ซ้ำ (กฏ: 1 อีเมล = 1 Account)
+            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+            {
+                throw new Exception("อีเมลนี้ถูกลงทะเบียนในระบบแล้ว กรุณาใช้อีเมลอื่น");
+            }
 
             // 2. Auto-Generate Password (สุ่ม 8 ตัวอักษร)
             string tempPassword = Guid.NewGuid().ToString().Substring(0, 8);

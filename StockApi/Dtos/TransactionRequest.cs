@@ -7,6 +7,9 @@ namespace StockApi.Dtos
         [Required]
         public string ItemCode { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "กรุณาระบุรหัสอ้างอิง Job (Job No)")]
+        public string JobNo { get; set; } = string.Empty;
+
         [Required]
         [Range(1, int.MaxValue, ErrorMessage = "จำนวนต้องมากกว่า 0")]
         public int Quantity { get; set; }

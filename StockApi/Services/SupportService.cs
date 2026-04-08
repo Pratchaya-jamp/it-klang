@@ -11,6 +11,9 @@ namespace StockApi.Services
         Task<List<SupportTicketResponse>> GetAllTicketsAsync();
         Task<List<SupportTicketResponse>> GetMyTicketsAsync(string staffId);
         Task ReplyTicketAsync(string ticketNo, string supporterStaffId, string supporterName, ReplySupportRequest request);
+
+        Task RateTicketAsync(string ticketNo, string staffId, RateTicketRequest request);
+        Task<List<SupportTicketResponse>> GetAllTicketsByConditionAsync(string userRole);
     }
 
     public class SupportService : ISupportService
@@ -122,7 +125,12 @@ namespace StockApi.Services
                     CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                     ReplyMessage = t.ReplyMessage,
                     RepliedBy = t.RepliedBy,
-                    RepliedAt = t.RepliedAt.HasValue ? t.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null
+                    RepliedAt = t.RepliedAt.HasValue ? t.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null,
+
+                    // 🔥 ตาม Requirement: ไม่เอา Rating มาโชว์ (ให้เป็น null) 
+                    // แต่เอามาแค่ RatedAt เพื่อให้หน้าเว็บรู้ว่าประเมินไปแล้ว
+                    Rating = null,
+                    RatedAt = t.RatedAt.HasValue ? t.RatedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null
                 }).ToListAsync();
         }
 
@@ -167,6 +175,70 @@ namespace StockApi.Services
                 $"ทีมงานได้ตอบกลับ Ticket #{ticket.Id} ของคุณแล้ว: {request.ReplyMessage}",
                 "SUPPORT_RESOLVED"
             );
+        }
+
+        // ✅ 1. เพิ่มฟังก์ชันประเมิน (สำหรับ User)
+        public async Task RateTicketAsync(string ticketNo, string staffId, RateTicketRequest request)
+        {
+            var ticket = await _context.SupportTickets.FirstOrDefaultAsync(t => t.TicketNo == ticketNo && t.StaffId == staffId);
+
+            if (ticket == null) throw new Exception("ไม่พบข้อมูล Ticket");
+
+            // 🔥 ดักตรงนี้: ถ้าสถานะยังไม่ใช่ Resolved หรือยังไม่มีข้อความตอบกลับ จะเตะออกทันที
+            if (ticket.Status != "Resolved" || string.IsNullOrEmpty(ticket.ReplyMessage))
+            {
+                throw new Exception("ไม่สามารถประเมินได้ ต้องรอให้ทีมงานตอบกลับและแก้ไขปัญหาก่อนครับ");
+            }
+
+            // เช็คว่าเคยประเมินไปแล้วหรือยัง
+            if (ticket.Rating.HasValue) throw new Exception("Ticket นี้ได้รับการประเมินไปแล้ว");
+
+            ticket.Rating = request.Rating;
+            ticket.RatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+        }
+
+        // ✅ 2. ปรับการดึงข้อมูลเพื่อดักเงื่อนไข "วันสิ้นเดือน"
+        public async Task<List<SupportTicketResponse>> GetAllTicketsByConditionAsync(string userRole)
+        {
+            var today = DateTime.Now;
+            // เช็คว่าเป็นวันสุดท้ายของเดือนไหม?
+            bool isLastDayOfMonth = today.Day == DateTime.DaysInMonth(today.Year, today.Month);
+
+            var query = _context.SupportTickets.AsQueryable();
+
+            // 🔥 ถ้าเป็น WebSupporter และเป็นวันสุดท้ายของเดือน ให้ดึงเฉพาะของเดือนปัจจุบันเท่านั้น
+            if (userRole == "WebSupporter" && isLastDayOfMonth)
+            {
+                query = query.Where(t => t.CreatedAt.Month == today.Month && t.CreatedAt.Year == today.Year);
+            }
+
+            var tickets = await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
+
+            return tickets.Select(t => new SupportTicketResponse
+            {
+                TicketNo = t.TicketNo,
+                Status = t.Status,
+                CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                Note = t.Note,
+                ReplyMessage = t.ReplyMessage,
+                RepliedBy = t.RepliedBy,
+                RepliedAt = t.RepliedAt.HasValue ? t.RepliedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null,
+
+                // 🔒 เงื่อนไขการโชว์คะแนนสำหรับ WebSupporter
+                // 1. ถ้าเป็น User เจ้าของ หรือ Admin -> เห็นตลอด
+                // 2. ถ้าเป็น WebSupporter -> เห็นเฉพาะวันสุดท้ายของเดือน และต้องเป็นของเดือนปัจจุบัน
+                // 3. นอกนั้น (วันปกติ) -> เห็นแค่สถานะว่าประเมินหรือยัง (Status) และ RatedAt แต่ไม่เห็นคะแนน (Rating = 0)
+
+                Rating = (userRole == "WebSupporter" && !isLastDayOfMonth) ? 0 : (t.Rating ?? 0),
+                RatedAt = t.RatedAt.HasValue ? t.RatedAt.Value.ToString("dd/MM/yyyy HH:mm:ss") : null,
+
+                // ข้อมูลอื่นจำพวก StaffId, Name, Email ยังคงเดิม
+                StaffId = t.StaffId,
+                Name = t.Name,
+                Email = t.Email
+            }).ToList();
         }
     }
 }

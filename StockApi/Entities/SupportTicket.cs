@@ -20,5 +20,8 @@ namespace StockApi.Entities
         public string? ReplyMessage { get; set; }
         public string? RepliedBy { get; set; }
         public DateTime? RepliedAt { get; set; }
+
+        public decimal? Rating { get; set; } // คะแนนเต็ม 5 (ทศนิยม 1 ตำแหน่ง)
+        public DateTime? RatedAt { get; set; }
     }
 }

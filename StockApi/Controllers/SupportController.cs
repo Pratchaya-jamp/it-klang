@@ -36,6 +36,25 @@ namespace StockApi.Controllers
             }
         }
 
+        // POST: api/support/ticket/{ticketNo}/rate
+        // สำหรับ User ทั่วไปใช้ประเมินคะแนน
+        [HttpPost("ticket/{ticketNo}/rate")]
+        public async Task<IActionResult> RateTicket(string ticketNo, [FromBody] RateTicketRequest request)
+        {
+            try
+            {
+                var staffId = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(staffId)) return Unauthorized();
+
+                await _supportService.RateTicketAsync(ticketNo, staffId, request);
+                return Ok(new { message = "ขอบคุณสำหรับการประเมินครับ" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // GET: api/support/tickets (WebSupporter หรือ Admin ใช้ดูรายการ)
         [HttpGet("tickets")]
         public async Task<IActionResult> GetTickets()
@@ -50,7 +69,8 @@ namespace StockApi.Controllers
                     return StatusCode(403, new { message = "ไม่มีสิทธิ์เข้าถึงข้อมูลนี้" });
                 }
 
-                var tickets = await _supportService.GetAllTicketsAsync();
+                // ส่ง Role เข้าไปเพื่อให้ Service ตัดสินใจว่าจะโชว์คะแนนไหม
+                var tickets = await _supportService.GetAllTicketsByConditionAsync(role);
                 return Ok(new { data = tickets, count = tickets.Count });
             }
             catch (Exception ex)

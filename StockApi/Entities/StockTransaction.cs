@@ -13,6 +13,9 @@ namespace StockApi.Entities
         public string TransactionNo { get; set; } = string.Empty; // เลขที่เอกสาร (เช่น TRX-20260210-001)
 
         [Required]
+        public string JobNo { get; set; } = string.Empty;
+
+        [Required]
         public string ItemCode { get; set; } = string.Empty;
 
         [Required]
