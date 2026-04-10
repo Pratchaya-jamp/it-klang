@@ -273,6 +273,18 @@ namespace StockApi.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == staffId);
             if (user == null) throw new Exception("ไม่พบข้อมูลผู้ใช้งาน");
 
+            // 🔥 1. ดักโดเมนอีเมล
+            if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
+            }
+
+            // 🔥 2. เช็คอีเมลซ้ำ (เช็คเฉพาะตอนที่เปลี่ยนอีเมลใหม่ ไม่ตรงกับของเดิม)
+            if (user.Email != request.Email && await _context.Users.AnyAsync(u => u.Email == request.Email))
+            {
+                throw new Exception("อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น");
+            }
+
             // อัปเดตเฉพาะข้อมูลทั่วไป
             user.Name = request.Name;
             user.Email = request.Email;
@@ -287,6 +299,18 @@ namespace StockApi.Services
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
             if (user == null) throw new Exception($"ไม่พบผู้ใช้งาน ID: {targetStaffId}");
+
+            // 🔥 1. ดักโดเมนอีเมล
+            if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
+            }
+
+            // 🔥 2. เช็คอีเมลซ้ำ (เช็คเฉพาะตอนที่แอดมินเปลี่ยนใหม่อีเมลใหม่)
+            if (user.Email != request.Email && await _context.Users.AnyAsync(u => u.Email == request.Email))
+            {
+                throw new Exception("อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น");
+            }
 
             user.Name = request.Name;
             user.Email = request.Email;

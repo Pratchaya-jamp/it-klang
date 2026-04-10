@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
       // ✅ แก้ไข: เช็คว่ามี key "data" หุ้มอยู่ไหม ถ้ามีให้แกะออกมา
       const userData = response.data || response;
       
-      console.log("CheckAuth User:", userData); // Debug ดูว่าได้ Role มาถูกต้องไหม
+      // console.log("CheckAuth User:", userData); // Debug ดูว่าได้ Role มาถูกต้องไหม
       setUser(userData);
 
     } catch (error) {
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     // ปรับบรรทัดนี้ให้ตรงกับ Response จริงของ Login API
     const userData = response.data || response.user || response;
     
-    console.log("Login User:", userData); // Debug
+    // console.log("Login User:", userData); // Debug
     setUser(userData); 
     
     return { success: true };
