@@ -58,6 +58,15 @@ namespace StockApi.Services
                 throw new Exception("ระบบอนุญาตให้ใช้อีเมลขององค์กร (@cosmo.co.th) ในการสมัครเท่านั้น");
             }
 
+            if (request.Role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                bool superAdminExists = await _context.Users.AnyAsync(u => u.Role == "SuperAdmin");
+                if (superAdminExists)
+                {
+                    throw new Exception("ไม่อนุญาตให้สมัครใช้งาน เนื่องจากระบบมีบัญชี SuperAdmin อยู่แล้ว (จำกัด 1 บัญชีเท่านั้น)");
+                }
+            }
+
             // 1. เช็คซ้ำ
             if (await _context.Users.AnyAsync(u => u.StaffId == request.StaffId))
             {
@@ -279,17 +288,26 @@ namespace StockApi.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.StaffId == targetStaffId);
             if (user == null) throw new Exception($"ไม่พบผู้ใช้งาน ID: {targetStaffId}");
 
-            // 1. อัปเดตข้อมูลทั่วไป
             user.Name = request.Name;
             user.Email = request.Email;
 
-            // 2. อัปเดต Role (แบบ Custom / กรอกมือ)
+            // อัปเดต Role
             if (!string.IsNullOrWhiteSpace(request.Role))
             {
-                // ตัดช่องว่างหน้า-หลังทิ้ง เพื่อความสะอาดของข้อมูล
                 string cleanRole = request.Role.Trim();
 
-                // บันทึกลง DB เลย ไม่ต้องเช็ค List อะไรทั้งนั้น
+                // 🔥 ดักจับการเปลี่ยนสิทธิ์ใครก็ตามให้กลายเป็น SuperAdmin
+                if (cleanRole.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase))
+                {
+                    // เช็คว่าในระบบมี SuperAdmin อยู่แล้วหรือยัง (โดยไม่นับตัวคนที่กำลังโดนแก้ เผื่อเขาเป็น SuperAdmin อยู่แล้วและแค่อัปเดตชื่อ)
+                    bool superAdminExists = await _context.Users.AnyAsync(u => u.Role == "SuperAdmin" && u.StaffId != targetStaffId);
+
+                    if (superAdminExists)
+                    {
+                        throw new Exception("ไม่สามารถอัปเดตสิทธิ์เป็น SuperAdmin ได้ เนื่องจากระบบจำกัดให้มีตำแหน่งนี้ได้เพียง 1 บัญชีเท่านั้น");
+                    }
+                }
+
                 user.Role = cleanRole;
             }
 
