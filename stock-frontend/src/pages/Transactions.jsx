@@ -376,7 +376,7 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
                   </div>
                   <div className="w-full sm:w-1/4">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Recv Qty <span className="text-red-400">*</span></label>
-                    <input type="number" required min="1" max={item.withdrawnQty} value={item.receiveQty} onChange={e => updateField(index, 'receiveQty', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
+                    <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 text-center transition-all" />
                   </div>
                   <div className="flex-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Note <span className="text-zinc-300 normal-case">(Opt)</span></label>
@@ -472,9 +472,9 @@ export default function Transactions() {
           <button onClick={() => setTransactionType('OUT')} className="h-10 px-4 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl text-sm font-medium hover:bg-amber-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
             <ArrowUpRight size={16} /> <span className="hidden sm:inline">Withdraw</span>
           </button>
-          <button onClick={() => setTransactionType('IN')} className="h-10 px-4 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
+          {/* <button onClick={() => setTransactionType('IN')} className="h-10 px-4 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
             <ArrowDownLeft size={16} /> <span className="hidden sm:inline">Receive</span>
-          </button>
+          </button> */}
         </div>
       </div>
 

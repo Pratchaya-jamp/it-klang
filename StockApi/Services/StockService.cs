@@ -87,29 +87,50 @@ namespace StockApi.Services
 
                     int oldBalance = stock.Balance;
 
-                    // --- 1. จัดการยอดรายวัน (Logic เดิม) ---
+                    // --- 1. จัดการยอดรายวัน ---
                     var today = DateTime.Now.Date;
                     if (stock.LastReceivedDate.Date < today) stock.Received = request.Quantity;
                     else stock.Received += request.Quantity;
                     stock.LastReceivedDate = DateTime.Now;
 
-                    // --- 2. Logic ใหม่ของ Total & Balance ---
+                    // --- 2. Logic รับของคืน + ซื้อเผื่อขาด (อิงตาม Job) ---
                     stock.Balance += request.Quantity;
 
                     int amountToFillHole = 0;
                     int amountExpansion = 0;
 
-                    if (stock.TempWithdrawn > 0)
+                    // 🔥 ค้นหาว่า Job นี้ "ติดหนี้" อุปกรณ์ชิ้นนี้อยู่เท่าไหร่? (เบิกไป - เคยคืนแล้ว)
+                    var jobOut = await _context.StockTransactions
+                        .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && t.Type == "OUT")
+                        .SumAsync(t => t.Quantity);
+
+                    var jobIn = await _context.StockTransactions
+                        .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && t.Type == "IN")
+                        .SumAsync(t => t.Quantity);
+
+                    int jobDeficit = jobOut - jobIn; // เช่น เบิกไป 2 คืนมา 0 = ติดหนี้ 2
+
+                    if (jobDeficit > 0)
                     {
-                        amountToFillHole = Math.Min(stock.TempWithdrawn, request.Quantity);
+                        // โปะยอดค้าง "เฉพาะของ Job นี้" (สูงสุดไม่เกินที่ติดหนี้ และไม่เกินที่รับเข้ามา)
+                        amountToFillHole = Math.Min(jobDeficit, request.Quantity);
+
+                        // กัน Error: เผื่อ TempWithdrawn ในระบบเพี้ยน
+                        if (stock.TempWithdrawn < amountToFillHole)
+                            amountToFillHole = stock.TempWithdrawn;
+
                         stock.TempWithdrawn -= amountToFillHole;
+
+                        // 🔥 ส่วนที่เกินจากหนี้ของ Job นี้ ถือเป็นการ "ซื้อเผื่อขาด (ของใหม่เข้าคลัง)"
                         amountExpansion = request.Quantity - amountToFillHole;
                     }
                     else
                     {
+                        // ถ้า Job นี้ไม่เคยติดหนี้เลย (หรือแค่ซื้อของใหม่รหัสนี้เข้ามา) นำไปบวกเป็นของใหม่ทั้งหมด
                         amountExpansion = request.Quantity;
                     }
 
+                    // TotalQuantity จะเพิ่มขึ้นเฉพาะส่วนที่เป็นของเผื่อขาดเท่านั้น
                     stock.TotalQuantity += amountExpansion;
                     stock.UpdatedAt = DateTime.Now;
 
@@ -121,7 +142,7 @@ namespace StockApi.Services
                         Type = "IN",
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
-                        JobNo = request.JobNo, // 🔥 เพิ่ม JobNo ตรงนี้
+                        JobNo = request.JobNo,
                         Note = request.Note,
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
@@ -129,7 +150,7 @@ namespace StockApi.Services
 
                     string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
                     await _logRepo.AddLogAsync(
-                        $"STOCK_IN (+{request.Quantity}) [Job: {request.JobNo}]", // แอบใส่ JobNo ให้เห็นใน System Log ด้วย
+                        $"STOCK_IN (+{request.Quantity}) [Job: {request.JobNo}]",
                         "StockBalances",
                         request.ItemCode,
                         $"Balance: {oldBalance}",
