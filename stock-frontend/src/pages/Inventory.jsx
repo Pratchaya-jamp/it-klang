@@ -44,6 +44,7 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     }, [isOpen]);
   
     const handleDownload = () => {
+      // ✅ เพิ่ม Borrowed ลงในข้อมูลที่จะ Export ออก Excel
       const formattedData = data.map(item => ({
         "Item Code": item.itemCode,
         "Product Name": item.name,
@@ -52,13 +53,15 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
         "Total Quantity": item.totalQuantity,   
         "Received": item.received,
         "Temp Withdrawn": item.tempWithdrawn,   
+        "Borrowed": item.borrowed || 0, // 👈 เพิ่มฟิลด์ Borrowed
         "Balance": item.balance,
         "Status": item.balance === 0 ? "Out of Stock" : item.balance < 5 ? "Low Stock" : "In Stock",
         "Date Added": item.createdAt,           
         "Last Updated": item.updatedAt
       }));
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      const wscols = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }];
+      // ✅ ปรับความกว้างคอลัมน์ Excel ให้พอดีกับ Borrowed
+      const wscols = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }];
       worksheet['!cols'] = wscols;
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory Report");
@@ -71,7 +74,7 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     return createPortal(
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className={cn("fixed inset-0 bg-zinc-900/40 backdrop-blur-sm transition-opacity duration-300", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-        <div className={cn("relative bg-white w-full max-w-3xl p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col gap-6 transform transition-all duration-300", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+        <div className={cn("relative bg-white w-full max-w-4xl p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col gap-6 transform transition-all duration-300", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
           <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-green-50 text-green-600 rounded-xl"><FileSpreadsheet size={24} strokeWidth={1.5} /></div>
@@ -85,11 +88,23 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-medium uppercase tracking-wider">
-                    <tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Category</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Recv</th><th className="px-4 py-3 text-right">W/D</th><th className="px-4 py-3 text-right">Bal</th><th className="px-4 py-3">Last Update</th></tr>
+                    {/* ✅ เพิ่มหัวคอลัมน์ Brw (Borrowed) ใน Preview */}
+                    <tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Category</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Recv</th><th className="px-4 py-3 text-right">W/D</th><th className="px-4 py-3 text-right">Brw</th><th className="px-4 py-3 text-right">Bal</th><th className="px-4 py-3">Last Update</th></tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
                     {data.slice(0, 5).map((item, idx) => (
-                      <tr key={idx} className="bg-white hover:bg-zinc-50/50"><td className="px-4 py-2.5 font-mono text-zinc-500">{item.itemCode}</td><td className="px-4 py-2.5 text-zinc-900 font-medium">{item.name}</td><td className="px-4 py-2.5 text-zinc-500">{item.category}</td><td className="px-4 py-2.5 text-right text-zinc-500">{item.totalQuantity}</td><td className="px-4 py-2.5 text-right text-emerald-600">{item.received}</td><td className="px-4 py-2.5 text-right text-amber-600">{item.tempWithdrawn}</td><td className="px-4 py-2.5 text-right font-bold text-zinc-900">{item.balance}</td><td className="px-4 py-2.5 text-zinc-400">{item.updatedAt}</td></tr>
+                      <tr key={idx} className="bg-white hover:bg-zinc-50/50">
+                        <td className="px-4 py-2.5 font-mono text-zinc-500">{item.itemCode}</td>
+                        <td className="px-4 py-2.5 text-zinc-900 font-medium">{item.name}</td>
+                        <td className="px-4 py-2.5 text-zinc-500">{item.category}</td>
+                        <td className="px-4 py-2.5 text-right text-zinc-500">{item.totalQuantity}</td>
+                        <td className="px-4 py-2.5 text-right text-emerald-600">{item.received}</td>
+                        <td className="px-4 py-2.5 text-right text-amber-600">{item.tempWithdrawn}</td>
+                        {/* ✅ แสดงคอลัมน์ Borrowed ใน Preview (สีน้ำเงิน) */}
+                        <td className="px-4 py-2.5 text-right text-blue-600 font-medium">{item.borrowed || 0}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-zinc-900">{item.balance}</td>
+                        <td className="px-4 py-2.5 text-zinc-400">{item.updatedAt}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -143,7 +158,7 @@ const StockStatusBadge = ({ balance }) => {
 // --- MAIN PAGE ---
 export default function Inventory() {
   const { showToast } = useToast();
-  const navigate = useNavigate(); // ✅ ย้ายเข้ามาอยู่ใน Component แล้ว
+  const navigate = useNavigate(); 
   
   // --- STATES ---
   const [viewMode, setViewMode] = useState('list');
@@ -275,7 +290,6 @@ export default function Inventory() {
         {/* ACTION BUTTONS */}
         <div className="flex items-center gap-3">
             
-           {/* 1. View Toggle Buttons (List / Analytics) */}
            <div className="flex bg-zinc-100 p-1 rounded-xl mr-2">
             <button 
               onClick={() => setViewMode('list')}
@@ -297,7 +311,6 @@ export default function Inventory() {
             </button>
           </div>
 
-           {/* 2. ✅ Transactions Button ใหม่ */}
            <button 
              onClick={() => navigate('/transactions')}
              className="h-10 px-4 bg-white border border-zinc-200 text-zinc-700 rounded-xl text-sm font-medium hover:bg-zinc-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
@@ -317,7 +330,6 @@ export default function Inventory() {
              <span className="hidden md:inline">Sync</span>
            </button>
            
-           {/* ซ่อนปุ่ม Export เมื่ออยู่ในโหมด Analytics */}
            {viewMode === 'list' && (
              <button 
                onClick={() => setIsExportModalOpen(true)}
@@ -334,12 +346,9 @@ export default function Inventory() {
 
       {/* --- CONTENT SWITCHER --- */}
       {viewMode === 'chart' ? (
-        // === VIEW: ANALYTICS (GRAPH) ===
         <InventoryStats />
       ) : (
-        // === VIEW: LIST (TABLE & SEARCH) ===
         <>
-          {/* Toolbar */}
           <div className="flex flex-col gap-4 mb-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-3 w-full">
               <div className="relative flex-1 group">
@@ -376,7 +385,6 @@ export default function Inventory() {
             )}
           </div>
 
-          {/* Table Container */}
           <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -398,12 +406,14 @@ export default function Inventory() {
                     </th>
                     <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Received</th>
                     <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Withdrawn</th>
+                    {/* ✅ เพิ่มหัวคอลัมน์ Borrowed */}
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Borrowed</th>
                     <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
                   {loading ? (
-                    [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
+                    [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="8" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
                   ) : processedData.paginated.length > 0 ? (
                     processedData.paginated.map((item) => (
                       <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0">
@@ -413,11 +423,12 @@ export default function Inventory() {
                         <td className="px-6 py-4 text-right"><span className="font-bold text-zinc-900">{item.balance}</span> <span className="text-xs text-zinc-400 font-normal ml-0.5">{item.unit}</span></td>
                         <td className="px-6 py-4 text-right text-zinc-500">{item.received}</td>
                         <td className="px-6 py-4 text-right text-zinc-500">{item.tempWithdrawn}</td>
+                        <td className="px-6 py-4 text-right text-zinc-500 font-medium">{item.borrowed || 0}</td>
                         <td className="px-6 py-4 text-right"><StockStatusBadge balance={item.balance} /></td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="7" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No stock data found</p></div></td></tr>
+                    <tr><td colSpan="8" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No stock data found</p></div></td></tr>
                   )}
                 </tbody>
               </table>

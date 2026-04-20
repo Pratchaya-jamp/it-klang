@@ -43,6 +43,20 @@ namespace StockApi.Services
 
             var today = DateTime.Now.Date;
 
+            var itemCodes = data.Select(x => x.ItemCode).ToList();
+
+            // 🔥 3. ไปคำนวณหายอดยืมที่ยังไม่คืนจากตาราง BorrowTransactions
+            // (หมายเหตุ: ถ้าใน AppDbContext ของคุณตั้งชื่อ DbSet เป็นอย่างอื่น ให้เปลี่ยน _context.BorrowTransactions ตามชื่อนั้นนะครับ)
+            var borrowedData = await _context.BorrowTransactions
+                .Where(b => itemCodes.Contains(b.ItemCode) && b.Status == "Borrowed")
+                .GroupBy(b => b.ItemCode)
+                .Select(g => new
+                {
+                    ItemCode = g.Key,
+                    TotalBorrowed = g.Sum(x => x.Quantity) // รวม Quantity ของทุก Transaction ที่ยังไม่คืน
+                })
+                .ToDictionaryAsync(k => k.ItemCode, v => v.TotalBorrowed);
+
             return data.Select(x => new StockBalanceDto
             {
                 ItemCode = x.ItemCode,
@@ -54,6 +68,7 @@ namespace StockApi.Services
                 TotalQuantity = x.TotalQuantity,
                 Balance = x.Balance,
                 TempWithdrawn = x.TempWithdrawn,
+                Borrowed = borrowedData.ContainsKey(x.ItemCode) ? borrowedData[x.ItemCode] : 0,
 
                 // *** จุดสำคัญ: ถ้า LastReceivedDate ไม่ใช่วันนี้ ให้โชว์ 0 ***
                 Received = (x.LastReceivedDate.Date == today) ? x.Received : 0,
