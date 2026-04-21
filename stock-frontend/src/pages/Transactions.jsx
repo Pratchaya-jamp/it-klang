@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   ArrowDownToLine, ArrowUpFromLine, Search, Package, 
   Hash, Clock, X, Loader2, CheckCircle2, FileText,
-  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Layers, Plus 
+  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -26,11 +26,7 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
       setIsMounted(true);
       setSearchTerm("");
       setCategoryFilter("");
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsVisible(true);
-        });
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
     } else {
       setIsVisible(false);
       setTimeout(() => setIsMounted(false), 200); 
@@ -105,10 +101,9 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   );
 };
 
-// --- 2. GENERAL TRANSACTION MODAL (WITHDRAW / RECEIVE) ---
+// --- 2. GENERAL TRANSACTION MODAL (WITHDRAW / RECEIVE อิสระ) ---
 const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const [activeType, setActiveType] = useState(type);
-  // ✅ เพิ่ม jobNo เข้าไปใน State เริ่มต้น
   const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
   const [inventoryData, setInventoryData] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,18 +121,13 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      // ✅ เพิ่ม jobNo: '' ตอน Reset Form
       setItems([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
       
       request('/api/stocks/overview').then(res => {
         setInventoryData(Array.isArray(res) ? res : (res?.data || []));
       }).catch(err => console.error("Failed to load stock data", err));
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsVisible(true);
-        });
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
     } else {
       setIsVisible(false);
       setTimeout(() => setIsMounted(false), 200);
@@ -150,7 +140,6 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const handleSelectItem = (item) => {
     if (pickingRowIndex !== null) {
       const newItems = [...items];
-      // ✅ ป้องกันไม่ให้ Quantity ถูกรีเซ็ตเป็น 1 หากผู้ใช้กรอกมาก่อนหน้าแล้ว
       newItems[pickingRowIndex] = { 
         ...newItems[pickingRowIndex], 
         itemCode: item.itemCode, 
@@ -171,7 +160,6 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
   const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
   
-  // ✅ ตรวจสอบว่ากรอก itemCode, จำนวน > 0 และ jobNo ครบถ้วน
   const isValid = items.every(item => item.itemCode && Number(item.quantity) > 0 && item.jobNo.trim() !== "");
   
   const handleSubmit = async () => {
@@ -179,12 +167,10 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
     setIsSubmitting(true);
     try {
       const endpoint = activeType === 'IN' ? '/api/transactions/receive' : '/api/transactions/withdraw';
-      
-      // ✅ แปลงข้อมูลเป็น Payload โครงสร้างใหม่
       const payload = items.map(item => ({ 
         itemCode: item.itemCode, 
         jobNo: item.jobNo.trim(), 
-        quantity: Number(item.quantity), // ชัวร์ๆ ว่าแปลงเป็นตัวเลขตอนส่ง
+        quantity: Number(item.quantity), 
         note: item.note || "" 
       }));
       
@@ -218,7 +204,6 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
               {items.map((item, index) => (
                 <div key={index} className="flex flex-col gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
                   
-                  {/* แถวที่ 1: เลือก Item และปุ่มลบ */}
                   <div className="flex items-start gap-3 w-full">
                     <div className="flex-1 space-y-1">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Item Code</label>
@@ -235,7 +220,6 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
                     </div>
                   </div>
 
-                  {/* ✅ แถวที่ 2: Job No, Qty, Note (เพิ่มช่อง Job No แล้ว) */}
                   <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <div className="w-full sm:w-1/3 space-y-1">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">Job No <span className="text-red-400">*</span></label>
@@ -268,7 +252,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   );
 };
 
-// --- 3. PENDING RECEIVE MODAL ---
+// --- 3. PENDING RECEIVE MODAL (รับของจากค้างจ่าย) ---
 const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   const [receiveList, setReceiveList] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -279,21 +263,16 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     if (isOpen && pendingItem) {
       setIsMounted(true);
       
-      // ✅ เพิ่ม jobNo ใน State เริ่มต้น
       setReceiveList([{
         itemCode: pendingItem.itemCode,
         itemName: pendingItem.itemName,
-        jobNo: '', // ค่าว่างให้ User กรอก
+        jobNo: pendingItem.jobNo || 'N/A', // ✅ ดึง JobNo มาจาก Backend
         withdrawnQty: pendingItem.pendingAmount,
         receiveQty: pendingItem.pendingAmount,
         note: ''
       }]);
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsVisible(true);
-        });
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
     } else {
       setIsVisible(false);
       setTimeout(() => setIsMounted(false), 200);
@@ -312,10 +291,9 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // ✅ แปลง Payload สำหรับ Receive จาก Pending
       const payload = receiveList.map(item => ({
         itemCode: item.itemCode,
-        jobNo: item.jobNo.trim(),
+        jobNo: item.jobNo,
         quantity: Number(item.receiveQty),
         note: item.note
       }));
@@ -330,8 +308,7 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     }
   };
 
-  // ตรวจสอบความถูกต้องของแบบฟอร์ม (Job No ต้องไม่ว่าง, Qty ต้องมากกว่า 0)
-  const isFormInvalid = receiveList.some(i => !i.receiveQty || Number(i.receiveQty) <= 0 || !i.jobNo.trim());
+  const isFormInvalid = receiveList.some(i => !i.receiveQty || Number(i.receiveQty) <= 0 || !i.jobNo);
 
   if (!isMounted || !pendingItem) return null;
 
@@ -368,15 +345,28 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
                   </div>
                 </div>
 
-                {/* ✅ เพิ่มช่องกรอก Job No สำหรับการรับคืน */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="w-full sm:w-1/3">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Job No <span className="text-red-400">*</span></label>
-                    <input type="text" required placeholder="Required" value={item.jobNo} onChange={e => updateField(index, 'jobNo', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Job No</label>
+                    {/* ✅ ล็อคช่อง Job No ไม่ให้แก้ (Read-only) + ดีไซน์สีเทา */}
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={item.jobNo} 
+                      className="w-full h-10 px-3 bg-zinc-100 border border-zinc-200 rounded-lg text-sm text-zinc-500 cursor-not-allowed outline-none" 
+                    />
                   </div>
                   <div className="w-full sm:w-1/4">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between mb-1">Recv Qty <span className="text-red-400">*</span></label>
-                    <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 text-center transition-all" />
+                    {/* ✅ ปลดล็อคเพดาน! ใส่ตัวเลขได้อิสระ ไม่ดีดกลับ */}
+                    <input 
+                      type="number" 
+                      required 
+                      min="1" 
+                      value={item.receiveQty} 
+                      onChange={e => updateField(index, 'receiveQty', e.target.value)} 
+                      className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+                    />
                   </div>
                   <div className="flex-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Note <span className="text-zinc-300 normal-case">(Opt)</span></label>
@@ -434,7 +424,8 @@ export default function Transactions() {
     return pendingItems.filter(item => {
       const searchTxt = searchQuery.toLowerCase();
       return item.itemCode?.toLowerCase().includes(searchTxt) || 
-             item.itemName?.toLowerCase().includes(searchTxt);
+             item.itemName?.toLowerCase().includes(searchTxt) ||
+             item.jobNo?.toLowerCase().includes(searchTxt); // รองรับค้นหาด้วย JobNo
     });
   }, [pendingItems, searchQuery]);
 
@@ -485,7 +476,7 @@ export default function Transactions() {
           </h3>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <input type="text" placeholder="Search item code or name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 pl-9 pr-3 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all" />
+            <input type="text" placeholder="Search by Code, Name, or Job..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 pl-9 pr-3 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all" />
           </div>
         </div>
 
@@ -493,8 +484,8 @@ export default function Transactions() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Item Code</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Item Name</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Item Details</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Job No</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center">Pending Amount</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Last Updated</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right">Action</th>
@@ -507,13 +498,19 @@ export default function Transactions() {
                 filteredItems.map((item, index) => (
                   <tr key={index} className="group hover:bg-zinc-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Hash size={14} className="text-zinc-400" />
-                        <span className="font-mono text-zinc-900 font-medium">{item.itemCode}</span>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-medium">
+                          <Hash size={12} className="text-zinc-400" /> {item.itemCode}
+                        </div>
+                        <span className="text-xs text-zinc-500 mt-0.5">{item.itemName || 'Unknown Item'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-zinc-700">{item.itemName || 'Unknown Item'}</span>
+                      {/* ✅ เพิ่มคอลัมน์ Job No ให้ดูง่ายๆ ในตาราง */}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-xs font-bold text-zinc-700">
+                        <Briefcase size={12} className="text-zinc-500"/>
+                        {item.jobNo || '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md bg-orange-50 text-orange-700 font-bold text-xs border border-orange-100">
