@@ -36,7 +36,7 @@ export default function ResetPassword() {
     const verifyTokenOnServer = async () => {
       // 1.1 เช็คโครงสร้าง
       if (!urlToken || !validateStructure(urlToken)) {
-         handleInvalid("Security check failed: Malformed token.");
+         handleInvalid("ตรวจสอบความปลอดภัยไม่ผ่าน: รูปแบบโทเค็นไม่ถูกต้อง");
          return;
       }
 
@@ -49,13 +49,13 @@ export default function ResetPassword() {
         setIsValidToken(true);
         
         if (!isToastShown.current) {
-          showToast("Identity verified. Please set your new password.", "info");
+          showToast("ยืนยันตัวตนสำเร็จ กรุณาตั้งรหัสผ่านใหม่ของคุณ", "info");
           isToastShown.current = true;
         }
 
       } catch (error) {
         console.error("Verification failed:", error);
-        handleInvalid("Invalid, expired, or tampered token.");
+        handleInvalid("โทเค็นไม่ถูกต้อง หมดอายุ หรือถูกดัดแปลง");
       } finally {
         setIsVerifying(false); // หยุด Loading หน้าเว็บ
       }
@@ -79,11 +79,11 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      showToast("Passwords do not match", "error");
+      showToast("รหัสผ่านไม่ตรงกัน", "error");
       return;
     }
     if (newPassword.length < 6) {
-      showToast("Password must be at least 6 characters", "error");
+      showToast("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร", "error");
       return;
     }
 
@@ -99,7 +99,7 @@ export default function ResetPassword() {
       });
 
       // 2. ✅ สำเร็จ -> แจ้งเตือน -> รอแป๊บนึง -> ดีดไป Login
-      showToast("Password updated successfully! Redirecting...", "success");
+      showToast("อัปเดตรหัสผ่านเรียบร้อยแล้ว! กำลังเปลี่ยนหน้า...", "success");
       
       // รออีก 1 วินาที ให้ User อ่าน Toast ก่อนเด้ง
       setTimeout(() => {
@@ -107,7 +107,7 @@ export default function ResetPassword() {
       }, 1000);
 
     } catch (error) {
-      showToast(error.message || "Reset failed.", "error");
+      showToast(error.message || "รีเซ็ตรหัสผ่านไม่สำเร็จ", "error");
       setStatus('idle'); // หยุดหมุน ถ้าพลาด
       
       if (error.message?.toLowerCase().includes('token')) {
@@ -123,7 +123,7 @@ export default function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
           <Loader2 size={40} className="animate-spin text-zinc-900" />
-          <p className="text-zinc-500 text-sm font-medium tracking-wide">Verifying security token...</p>
+          <p className="text-zinc-500 text-sm font-medium tracking-wide">กำลังตรวจสอบโทเค็นความปลอดภัย...</p>
         </div>
       </div>
     );
@@ -137,9 +137,9 @@ export default function ResetPassword() {
           <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
             <ShieldAlert size={32} />
           </div>
-          <h2 className="text-xl font-bold text-zinc-900">Access Denied</h2>
+          <h2 className="text-xl font-bold text-zinc-900">ปฏิเสธการเข้าถึง</h2>
           <p className="text-zinc-500 mt-2 text-sm px-4">
-             Token validation failed. Redirecting to login...
+              ตรวจสอบโทเค็นไม่ผ่าน กำลังเปลี่ยนไปยังหน้าเข้าสู่ระบบ...
           </p>
         </div>
       </div>
@@ -153,19 +153,19 @@ export default function ResetPassword() {
         <div className="p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 text-white mb-4 shadow-lg shadow-zinc-200"><KeyRound size={20} /></div>
-            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Set New Password</h1>
-            <p className="text-sm text-zinc-500 mt-2">Create a new password for your account.</p>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">ตั้งรหัสผ่านใหม่</h1>
+            <p className="text-sm text-zinc-500 mt-2">สร้างรหัสผ่านใหม่สำหรับบัญชีของคุณ</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">New Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสผ่านใหม่</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-zinc-800"><Lock size={18} /></div>
                 <input type="password" required placeholder="••••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Confirm Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ยืนยันรหัสผ่านใหม่</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-zinc-800"><Lock size={18} /></div>
                 <input type="password" required placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all" />
@@ -173,7 +173,7 @@ export default function ResetPassword() {
             </div>
             <button type="submit" disabled={status === 'loading'} className="w-full h-12 bg-zinc-900 text-white rounded-xl text-sm font-semibold hover:bg-zinc-800 active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 disabled:opacity-70 flex items-center justify-center gap-2">
               {/* ถ้า Loading ให้ขึ้น Loading ตรงนี้เลย */}
-              {status === 'loading' ? <><Loader2 size={18} className="animate-spin" /> Resetting...</> : <>Reset Password <ArrowRight size={18} /></>}
+              {status === 'loading' ? <><Loader2 size={18} className="animate-spin" /> กำลังรีเซ็ต...</> : <>รีเซ็ตรหัสผ่าน <ArrowRight size={18} /></>}
             </button>
           </form>
         </div>

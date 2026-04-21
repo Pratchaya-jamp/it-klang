@@ -7,7 +7,7 @@ import { request } from '../utils/fetchUtils';
 import { useToast } from '../context/ToastContext';
 
 export default function Profile() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,7 @@ export default function Profile() {
         setProfile(response.data);
       } catch (error) {
         console.error("Failed to load profile", error);
-        showToast("Failed to load profile data", "error");
+        showToast("ไม่สามารถดึงข้อมูลโปรไฟล์ได้", "error");
       } finally {
         setLoading(false);
       }
@@ -31,7 +31,7 @@ export default function Profile() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-zinc-400">
         <Loader2 size={40} className="animate-spin mb-4 text-zinc-300" />
-        <p className="text-sm font-medium">Loading profile...</p>
+        <p className="text-sm font-medium">กำลังโหลดข้อมูลโปรไฟล์...</p>
       </div>
     );
   }
@@ -50,8 +50,8 @@ export default function Profile() {
       
       {/* Page Title */}
       <div className="mb-8 px-2">
-        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">My Profile</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage your account information and security.</p>
+        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">โปรไฟล์ของฉัน</h1>
+        <p className="text-sm text-zinc-500 mt-1">จัดการข้อมูลบัญชีผู้ใช้และความปลอดภัย</p>
       </div>
 
       {/* Profile Card */}
@@ -81,7 +81,7 @@ export default function Profile() {
                 </div>
               </div>
               {/* Status Dot */}
-              <div className="absolute bottom-2 right-2 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full" title="Active"></div>
+              <div className="absolute bottom-2 right-2 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full" title="ออนไลน์"></div>
             </div>
 
             {/* Name & Role (Pushed down to White Area) */}
@@ -94,7 +94,7 @@ export default function Profile() {
                   {profile.role}
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
-                  Active Status
+                  สถานะใช้งาน
                 </span>
               </div>
             </div>
@@ -102,11 +102,11 @@ export default function Profile() {
             {/* Edit Button (Aligned Right) */}
             <div className="pt-0 sm:pt-20 w-full sm:w-auto">
               <button 
-                  onClick={() => navigate('/profile/edit')} // 👈 เพิ่ม onClick ตรงนี้
+                  onClick={() => navigate('/profile/edit')} 
                   className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-800 active:scale-[0.98] transition-all shadow-lg shadow-zinc-200"
                 >
                   <Edit3 size={16} /> 
-                  Edit Profile
+                  แก้ไขโปรไฟล์
                 </button>
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function Profile() {
                 <IdCard size={24} strokeWidth={1.5} />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Staff ID</p>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">รหัสพนักงาน</p>
                 <p className="text-base font-bold text-zinc-900 font-mono tracking-wide">{profile.staffId}</p>
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function Profile() {
                 <Mail size={24} strokeWidth={1.5} />
               </div>
               <div className="overflow-hidden">
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Email Address</p>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ที่อยู่อีเมล</p>
                 <p className="text-base font-bold text-zinc-900 truncate">{profile.email}</p>
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function Profile() {
                 <Calendar size={24} strokeWidth={1.5} />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Joined Date</p>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">วันที่เข้าร่วม</p>
                 <p className="text-base font-bold text-zinc-900">{joinDate}</p>
               </div>
             </div>
@@ -155,11 +155,11 @@ export default function Profile() {
                 <Shield size={24} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Security</p>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ความปลอดภัย</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-base font-bold text-zinc-900">Password</p>
+                  <p className="text-base font-bold text-zinc-900">รหัสผ่าน</p>
                   <Link to="/changepwd" state={{ staffId: profile.staffId }} className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline px-2 py-1 rounded hover:bg-blue-50 transition-colors">
-                    Change Password
+                    เปลี่ยนรหัสผ่าน
                   </Link>
                 </div>
               </div>

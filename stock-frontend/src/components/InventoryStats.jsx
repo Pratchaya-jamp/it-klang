@@ -21,10 +21,14 @@ ChartJS.register(
   BarElement, Title, Tooltip, Legend, Filler
 );
 
+// ตั้งค่าฟอนต์เริ่มต้นให้รองรับภาษาไทยสวยงามขึ้น
+ChartJS.defaults.font.family = "'Prompt', 'Inter', sans-serif";
+ChartJS.defaults.color = '#71717a'; // text-zinc-500
+
 export default function InventoryStats() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(30); // Default 30 วัน
+  const [timeRange, setTimeRange] = useState(7); // Default 30 วัน
 
   // 1. Fetch Audit Logs ทั้งหมดเพื่อมาคำนวณ
   useEffect(() => {
@@ -75,7 +79,6 @@ export default function InventoryStats() {
       dailyStats[dateKey].out += wit;
 
       // 2.4 Group by Item Code/Name (สำหรับกราฟแท่ง)
-      // ใช้ recordId หรือจะใช้ชื่อสินค้าก็ได้ถ้าใน Log มีเก็บไว้ (ในตัวอย่าง Payload มีแต่ recordId)
       const itemKey = log.recordId; 
       if (!itemStats[itemKey]) itemStats[itemKey] = { in: 0, out: 0 };
       itemStats[itemKey].in += rec;
@@ -96,20 +99,26 @@ export default function InventoryStats() {
         labels: dates,
         datasets: [
           {
-            label: 'Total Receive (Stock In)',
+            label: 'รับเข้าคลัง',
             data: dates.map(d => dailyStats[d].in),
             borderColor: '#10b981', // Emerald 500
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
             tension: 0.4,
             fill: true,
+            pointBackgroundColor: '#10b981',
+            pointBorderWidth: 2,
+            pointHoverRadius: 6,
           },
           {
-            label: 'Total Withdraw (Stock Out)',
+            label: 'เบิกจ่าย',
             data: dates.map(d => dailyStats[d].out),
             borderColor: '#f59e0b', // Amber 500
             backgroundColor: 'rgba(245, 158, 11, 0.1)',
             tension: 0.4,
             fill: true,
+            pointBackgroundColor: '#f59e0b',
+            pointBorderWidth: 2,
+            pointHoverRadius: 6,
           }
         ]
       },
@@ -117,16 +126,18 @@ export default function InventoryStats() {
         labels: items,
         datasets: [
           {
-            label: 'Received',
+            label: 'รับเข้า',
             data: items.map(i => itemStats[i].in),
             backgroundColor: '#10b981',
             borderRadius: 4,
+            barPercentage: 0.7,
           },
           {
-            label: 'Withdrawn',
+            label: 'เบิกจ่าย',
             data: items.map(i => itemStats[i].out),
             backgroundColor: '#f59e0b',
             borderRadius: 4,
+            barPercentage: 0.7,
           }
         ]
       }
@@ -134,22 +145,22 @@ export default function InventoryStats() {
   }, [logs, timeRange]);
 
   if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-zinc-400"/></div>;
-  if (!chartData) return <div className="p-10 text-center text-zinc-400">No data available for analysis.</div>;
+  if (!chartData) return <div className="p-10 text-center text-zinc-400">ไม่มีข้อมูลสำหรับการวิเคราะห์ในช่วงเวลานี้</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* FILTER HEADER */}
       <div className="flex items-center justify-end gap-2 mb-4">
-        <span className="text-sm text-zinc-500 flex items-center gap-1"><Calendar size={14}/> Period:</span>
+        <span className="text-sm text-zinc-500 flex items-center gap-1"><Calendar size={14}/> ระยะเวลา:</span>
         <select 
           value={timeRange} 
           onChange={(e) => setTimeRange(Number(e.target.value))}
           className="bg-white border border-zinc-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer"
         >
-          <option value={7}>Last 7 Days</option>
-          <option value={30}>Last 30 Days</option>
-          <option value={90}>Last 3 Months</option>
+          <option value={7}>7 วันที่ผ่านมา</option>
+          <option value={30}>30 วันที่ผ่านมา</option>
+          <option value={90}>3 เดือนที่ผ่านมา</option>
         </select>
       </div>
 
@@ -158,8 +169,8 @@ export default function InventoryStats() {
         {/* GRAPH 1: TIMELINE (LINE CHART) */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-zinc-900">Movement Trends</h3>
-            <p className="text-xs text-zinc-500">Comparing total stock-in vs stock-out over time.</p>
+            <h3 className="text-lg font-semibold text-zinc-900">แนวโน้มการเคลื่อนไหว</h3>
+            <p className="text-xs text-zinc-500">เปรียบเทียบยอดการรับเข้าและเบิกจ่ายอุปกรณ์ตามช่วงเวลา</p>
           </div>
           <div className="h-[300px] w-full">
             <Line 
@@ -167,8 +178,32 @@ export default function InventoryStats() {
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top', align: 'end' } },
-                scales: { y: { beginAtZero: true, grid: { color: '#f4f4f5' } }, x: { grid: { display: false } } }
+                interaction: {
+                  mode: 'index', // ช่วยให้โชว์ tooltip ของทั้ง 2 เส้นพร้อมกันเวลาเอาเมาส์ชี้แนวตั้ง
+                  intersect: false,
+                },
+                plugins: { 
+                  legend: { 
+                    position: 'top', 
+                    align: 'end',
+                    labels: { usePointStyle: true, boxWidth: 8 } // ทำให้จุด Legend เป็นวงกลมแทนสี่เหลี่ยม
+                  },
+                  tooltip: {
+                    padding: 12,
+                    backgroundColor: 'rgba(24, 24, 27, 0.9)', // สอดคล้องกับธีม Zinc
+                    titleFont: { size: 14, weight: 'bold' }
+                  }
+                },
+                scales: { 
+                  y: { 
+                    beginAtZero: true, 
+                    grid: { color: '#f4f4f5', drawBorder: false }, // ซ่อนขอบแกน ทำให้ดูสะอาดตา
+                    ticks: { precision: 0 } // แสดงตัวเลขจำนวนเต็ม
+                  }, 
+                  x: { 
+                    grid: { display: false, drawBorder: false } 
+                  } 
+                }
               }} 
             />
           </div>
@@ -177,8 +212,8 @@ export default function InventoryStats() {
         {/* GRAPH 2: BY ITEM (BAR CHART) */}
         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-zinc-900">Top Active Items</h3>
-            <p className="text-xs text-zinc-500">Items with highest movement volume.</p>
+            <h3 className="text-lg font-semibold text-zinc-900">อุปกรณ์ที่เคลื่อนไหวสูงสุด 10 อันดับ</h3>
+            <p className="text-xs text-zinc-500">เรียงตามปริมาณการทำรายการ (รวมรับเข้าและเบิกจ่าย)</p>
           </div>
           <div className="h-[300px] w-full">
             <Bar 
@@ -186,9 +221,32 @@ export default function InventoryStats() {
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
-                indexAxis: 'y', // กราฟแนวนอน (อ่านชื่อสินค้าง่ายกว่า)
-                plugins: { legend: { position: 'bottom' } },
-                scales: { x: { beginAtZero: true, grid: { color: '#f4f4f5' } }, y: { grid: { display: false } } }
+                indexAxis: 'y', // กราฟแนวนอน (อ่านชื่ออุปกรณ์ง่ายกว่า)
+                interaction: {
+                  mode: 'index',
+                  intersect: false,
+                },
+                plugins: { 
+                  legend: { 
+                    position: 'bottom',
+                    labels: { usePointStyle: true, boxWidth: 8 }
+                  },
+                  tooltip: {
+                    padding: 12,
+                    backgroundColor: 'rgba(24, 24, 27, 0.9)'
+                  }
+                },
+                scales: { 
+                  x: { 
+                    beginAtZero: true, 
+                    grid: { color: '#f4f4f5', drawBorder: false },
+                    ticks: { precision: 0 }
+                  }, 
+                  y: { 
+                    grid: { display: false, drawBorder: false },
+                    ticks: { autoSkip: false } // ป้องกันไม่ให้ชื่ออุปกรณ์โดนซ่อนเมื่อพื้นที่แคบ
+                  } 
+                }
               }} 
             />
           </div>

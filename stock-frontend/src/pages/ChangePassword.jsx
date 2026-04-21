@@ -41,7 +41,7 @@ export default function ChangePassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.newPassword !== formData.confirmPassword) {
-      showToast("Passwords do not match", "error");
+      showToast("รหัสผ่านไม่ตรงกัน", "error");
       return;
     }
 
@@ -59,7 +59,7 @@ export default function ChangePassword() {
         })
       });
 
-      showToast("Password updated successfully!", "success");
+      showToast("อัปเดตรหัสผ่านเรียบร้อยแล้ว!", "success");
 
       if (isFirstLogin) {
         // กรณีบังคับเปลี่ยนครั้งแรก: ให้ Logout เพื่อไป Login ใหม่ด้วยรหัสใหม่
@@ -71,7 +71,7 @@ export default function ChangePassword() {
       }
 
     } catch (error) {
-      showToast(error.message || "Failed to update password", "error");
+      showToast(error.message || "เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน", "error");
     } finally {
       setLoading(false);
     }
@@ -87,19 +87,19 @@ export default function ChangePassword() {
               <ShieldCheck size={20} />
             </div>
             <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
-              {isFirstLogin ? 'Secure Your Account' : 'Change Password'}
+              {isFirstLogin ? 'ตั้งค่าความปลอดภัย' : 'เปลี่ยนรหัสผ่าน'}
             </h1>
             <p className="text-sm text-zinc-500 mt-2 leading-relaxed">
               {isFirstLogin 
-                ? 'Your account requires a password update.' 
-                : 'Please enter your current and new password.'}
+                ? 'โปรดเปลี่ยนรหัสผ่านสำหรับการเข้าสู่ระบบครั้งแรก' 
+                : 'กรุณากรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่ของคุณ'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Current Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสผ่านปัจจุบัน</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <KeyRound size={18} />
@@ -120,7 +120,7 @@ export default function ChangePassword() {
             <hr className="border-zinc-50 my-2" />
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">New Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสผ่านใหม่</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <Lock size={18} />
@@ -137,7 +137,7 @@ export default function ChangePassword() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Confirm New Password</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ยืนยันรหัสผ่านใหม่</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <Lock size={18} />
@@ -161,11 +161,11 @@ export default function ChangePassword() {
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Updating...
+                  กำลังอัปเดต...
                 </>
               ) : (
                 <>
-                  Update Password
+                  อัปเดตรหัสผ่าน
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -177,7 +177,7 @@ export default function ChangePassword() {
                 onClick={() => navigate(-1)}
                 className="w-full text-zinc-400 text-xs hover:text-zinc-600 transition-colors py-2"
               >
-                Go Back
+                ย้อนกลับ
               </button>
             )}
 

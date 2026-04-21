@@ -31,10 +31,10 @@ export default function Navbar() {
   const notifRef = useRef(null);
 
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
-    { name: 'Inventory', path: '/inventory', icon: Package },
-    { name: 'Borrowing', path: '/borrowing', icon: ArrowRightLeft },
-    { name: 'Audit Log', path: '/audit', icon: Settings },
+    { name: 'หน้าหลัก', path: '/dashboard', icon: LayoutGrid },
+    { name: 'คลัง', path: '/inventory', icon: Package },
+    { name: 'บันทึกการยืม', path: '/borrowing', icon: ArrowRightLeft },
+    { name: 'ข้อมูลในระบบ', path: '/audit', icon: Settings },
   ];
 
   // --- EFFECT: Fetch User Data ---
@@ -270,13 +270,13 @@ export default function Navbar() {
                 
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
-                  <h3 className="text-sm font-bold text-zinc-900">Notifications</h3>
+                  <h3 className="text-sm font-bold text-zinc-900">การแจ้งเตือน</h3>
                   {unreadCount > 0 && (
                     <button 
                       onClick={handleReadAll}
                       className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
                     >
-                      <CheckCheck size={14} /> Read all
+                      <CheckCheck size={14} /> อ่านทั้งหมด
                     </button>
                   )}
                 </div>
@@ -326,7 +326,7 @@ export default function Navbar() {
                   ) : (
                     <div className="py-8 text-center flex flex-col items-center justify-center">
                       <Bell size={24} className="text-zinc-200 mb-2" />
-                      <p className="text-sm text-zinc-500">No new notifications</p>
+                      <p className="text-sm text-zinc-500">ยังไม่พบรายการแจ้งเตือน</p>
                     </div>
                   )}
                 </div>
@@ -372,7 +372,7 @@ export default function Navbar() {
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                 >
                   <User size={16} />
-                  My Profile
+                  ข้อมูลส่วนตัว
                 </Link>
                   {(user?.role === 'SuperAdmin' || user?.data?.role === 'SuperAdmin' || userData?.role === 'SuperAdmin') && (
                   <>
@@ -382,7 +382,7 @@ export default function Navbar() {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                     >
                       <Users size={16} />
-                      User Management
+                      การจัดการผู้ใช้ในระบบ
                     </Link>
 
                     <Link 
@@ -391,7 +391,7 @@ export default function Navbar() {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                     >
                       <Activity size={16} />
-                      Access Logs
+                      ข้อมูลบันทึกเข้าใช้งานระบบ
                     </Link>
                   </>
                 )}
@@ -408,7 +408,7 @@ export default function Navbar() {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                     >
                       <LifeBuoy size={16} />
-                      Support Contact
+                      ติดต่อ Support
                     </Link>
                   )}
                   {(user?.role === 'WebSupporter' || userData?.role === 'WebSupporter') && (
@@ -418,7 +418,7 @@ export default function Navbar() {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                     >
                       <Ticket size={16} />
-                      Support Tickets
+                      กล่องTickets
                     </Link>
                   )}
                   <button 
@@ -429,12 +429,12 @@ export default function Navbar() {
                     {isLoggingOut ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
-                        Signing out...
+                        กำลังออกจากระบบ. . .
                       </>
                     ) : (
                       <>
                         <LogOut size={14} />
-                        Sign out
+                        ออกจากระบบ
                       </>
                     )}
                   </button>

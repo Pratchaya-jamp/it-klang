@@ -13,10 +13,8 @@ import { twMerge } from 'tailwind-merge';
 import { useToast } from '../context/ToastContext';
 import InventoryStats from '../components/InventoryStats'; 
 
-// Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// --- API SERVICES ---
 const fetchStocks = async (queryString) => {
   try {
     const response = await fetch(`/api/stocks/overview?${queryString}`);
@@ -25,8 +23,7 @@ const fetchStocks = async (queryString) => {
   } catch (error) { return []; }
 };
 
-// --- SUB-COMPONENTS ---
-// 1. Export Modal
+// --- 1. Export Modal ---
 const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     const [isMounted, setIsMounted] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
@@ -44,7 +41,6 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     }, [isOpen]);
   
     const handleDownload = () => {
-      // ✅ เพิ่ม Borrowed ลงในข้อมูลที่จะ Export ออก Excel
       const formattedData = data.map(item => ({
         "Item Code": item.itemCode,
         "Product Name": item.name,
@@ -53,14 +49,13 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
         "Total Quantity": item.totalQuantity,   
         "Received": item.received,
         "Temp Withdrawn": item.tempWithdrawn,   
-        "Borrowed": item.borrowed || 0, // 👈 เพิ่มฟิลด์ Borrowed
+        "Borrowed": item.borrowed || 0, 
         "Balance": item.balance,
         "Status": item.balance === 0 ? "Out of Stock" : item.balance < 5 ? "Low Stock" : "In Stock",
         "Date Added": item.createdAt,           
         "Last Updated": item.updatedAt
       }));
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      // ✅ ปรับความกว้างคอลัมน์ Excel ให้พอดีกับ Borrowed
       const wscols = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }];
       worksheet['!cols'] = wscols;
       const workbook = XLSX.utils.book_new();
@@ -78,18 +73,17 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
           <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-green-50 text-green-600 rounded-xl"><FileSpreadsheet size={24} strokeWidth={1.5} /></div>
-              <div><h2 className="text-lg font-semibold text-zinc-900">Export Inventory</h2><p className="text-sm text-zinc-500">Preview data before downloading Excel file.</p></div>
+              <div><h2 className="text-lg font-semibold text-zinc-900">ส่งออกข้อมูลคลังอุปกรณ์</h2><p className="text-sm text-zinc-500">ดูตัวอย่างข้อมูลก่อนดาวน์โหลดไฟล์ Excel</p></div>
             </div>
             <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors"><X size={20} /></button>
           </div>
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-zinc-50 p-3 rounded-lg border border-zinc-100"><span className="text-sm text-zinc-500 font-medium">Total Items to Export:</span><span className="text-lg font-bold text-zinc-900">{data.length} <span className="text-xs font-normal text-zinc-400">rows</span></span></div>
+            <div className="flex justify-between items-center bg-zinc-50 p-3 rounded-lg border border-zinc-100"><span className="text-sm text-zinc-500 font-medium">จำนวนรายการที่จะส่งออก:</span><span className="text-lg font-bold text-zinc-900">{data.length} <span className="text-xs font-normal text-zinc-400">แถว</span></span></div>
             <div className="border border-zinc-200 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-medium uppercase tracking-wider">
-                    {/* ✅ เพิ่มหัวคอลัมน์ Brw (Borrowed) ใน Preview */}
-                    <tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Category</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Recv</th><th className="px-4 py-3 text-right">W/D</th><th className="px-4 py-3 text-right">Brw</th><th className="px-4 py-3 text-right">Bal</th><th className="px-4 py-3">Last Update</th></tr>
+                    <tr><th className="px-4 py-3">รหัส</th><th className="px-4 py-3">ชื่ออุปกรณ์</th><th className="px-4 py-3">หมวดหมู่</th><th className="px-4 py-3 text-right">ทั้งหมด</th><th className="px-4 py-3 text-right">รับเข้า</th><th className="px-4 py-3 text-right">เบิก</th><th className="px-4 py-3 text-right">ยืม</th><th className="px-4 py-3 text-right">คงเหลือ</th><th className="px-4 py-3">อัปเดตล่าสุด</th></tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
                     {data.slice(0, 5).map((item, idx) => (
@@ -100,7 +94,6 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
                         <td className="px-4 py-2.5 text-right text-zinc-500">{item.totalQuantity}</td>
                         <td className="px-4 py-2.5 text-right text-emerald-600">{item.received}</td>
                         <td className="px-4 py-2.5 text-right text-amber-600">{item.tempWithdrawn}</td>
-                        {/* ✅ แสดงคอลัมน์ Borrowed ใน Preview (สีน้ำเงิน) */}
                         <td className="px-4 py-2.5 text-right text-blue-600 font-medium">{item.borrowed || 0}</td>
                         <td className="px-4 py-2.5 text-right font-bold text-zinc-900">{item.balance}</td>
                         <td className="px-4 py-2.5 text-zinc-400">{item.updatedAt}</td>
@@ -109,12 +102,12 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
                   </tbody>
                 </table>
               </div>
-              {data.length > 5 && <div className="bg-zinc-50 px-4 py-2 text-center text-xs text-zinc-400 italic border-t border-zinc-200">...and {data.length - 5} more items will be included in the file</div>}
+              {data.length > 5 && <div className="bg-zinc-50 px-4 py-2 text-center text-xs text-zinc-400 italic border-t border-zinc-200">...และมีอีก {data.length - 5} รายการที่จะถูกรวมอยู่ในไฟล์</div>}
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all cursor-pointer">Cancel</button>
-            <button onClick={handleDownload} className="flex-1 h-11 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 cursor-pointer"><Download size={16} /> Download .XLSX</button>
+            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all cursor-pointer">ยกเลิก</button>
+            <button onClick={handleDownload} className="flex-1 h-11 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 cursor-pointer"><Download size={16} /> ดาวน์โหลด .XLSX</button>
           </div>
         </div>
       </div>,
@@ -122,7 +115,7 @@ const ExportPreviewModal = ({ isOpen, onClose, data }) => {
     );
 };
 
-const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..." }) => {
+const CustomSelect = ({ label, value, onChange, options, placeholder = "เลือก..." }) => {
     const [isOpen, setIsOpen] = useState(false);
     const wrapperRef = useRef(null);
     useEffect(() => {
@@ -138,11 +131,13 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
         </button>
         {isOpen && (
           <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-lg shadow-xl max-h-48 overflow-auto animate-in fade-in zoom-in-95 duration-100">
-            {options.map((opt) => (
+            {options.length > 0 ? options.map((opt) => (
               <div key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={cn("px-3 py-2 text-sm cursor-pointer hover:bg-zinc-50", value === opt ? "bg-zinc-50 font-medium" : "")}>
                 {opt} {value === opt && <Check size={14} className="float-right mt-1"/>}
               </div>
-            ))}
+            )) : (
+              <div className="px-3 py-2 text-sm text-zinc-400 italic text-center">ไม่มีตัวเลือก</div>
+            )}
           </div>
         )}
       </div>
@@ -150,9 +145,9 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = "Select..
 };
   
 const StockStatusBadge = ({ balance }) => {
-    if (balance === 0) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100"><AlertCircle size={12} /> Out of Stock</span>;
-    if (balance < 5) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100"><AlertCircle size={12} /> Low Stock</span>;
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"><CheckCircle2 size={12} /> In Stock</span>;
+    if (balance === 0) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100"><AlertCircle size={12} /> อุปกรณ์หมด</span>;
+    if (balance < 5) return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100"><AlertCircle size={12} /> อุปกรณ์เหลือน้อย</span>;
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"><CheckCircle2 size={12} /> มีในคลัง</span>;
 };
 
 // --- MAIN PAGE ---
@@ -225,7 +220,7 @@ export default function Inventory() {
     const items = Array.isArray(result) ? result : (result.data || []);
     setData(items);
     setLoading(false);
-    showToast("Data synchronized successfully", "success");
+    showToast("ซิงค์ข้อมูลสำเร็จ", "success");
   };
 
   const processedData = useMemo(() => {
@@ -258,15 +253,23 @@ export default function Inventory() {
     }
   };
 
+  // ✅ 1. ดึงข้อมูล Category ที่มีอยู่จริงในระบบมาจาก State data
+  const availableCategories = useMemo(() => {
+    if (!Array.isArray(data)) return [];
+    // แมพเอาเฉพาะ field category, กรองค่าว่างทิ้ง, ทำให้เป็น Unique (Set), และเรียงตามตัวอักษร
+    return [...new Set(data.map(item => item.category).filter(Boolean))].sort();
+  }, [data]);
+
   const handleCategoryChange = (val) => { setCategory(val); setKeyword(""); setVariant(""); };
   const clearAllFilters = () => { setCategory(""); setKeyword(""); setVariant(""); setIsFilterOpen(false); };
   const hasActiveFilters = category || keyword || variant;
   
   const renderSubFilters = () => {
-    if (!category) return <div className="p-4 text-center text-xs text-zinc-400 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">Select a category first</div>;
-    if (['Mouse', 'Keyboard'].includes(category)) return <CustomSelect label="Connection" options={['USB', 'Wireless']} value={keyword} onChange={setKeyword} />;
-    if (category === 'SSD') return <div className="space-y-3"><CustomSelect label="Interface" options={['SATA', 'M.2']} value={keyword} onChange={setKeyword} /><CustomSelect label="Capacity" options={['120GB', '240GB', '500GB', '1TB']} value={variant} onChange={setVariant} /></div>;
-    if (category === 'RAM') return <div className="space-y-3"><CustomSelect label="Type" options={['DDR3', 'DDR4']} value={keyword} onChange={setKeyword} /><CustomSelect label="Capacity" options={['4GB', '8GB', '16GB']} value={variant} onChange={setVariant} /></div>;
+    if (!category) return <div className="p-4 text-center text-xs text-zinc-400 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">โปรดเลือกหมวดหมู่ก่อน</div>;
+    // Sub-filters ยังคงยึดตามคำหลักที่มีในระบบเพื่อความง่ายในการเลือก Variant
+    if (category.toLowerCase().includes('mouse') || category.toLowerCase().includes('keyboard')) return <CustomSelect label="การเชื่อมต่อ" options={['USB', 'Wireless']} value={keyword} onChange={setKeyword} />;
+    if (category.toLowerCase().includes('ssd')) return <div className="space-y-3"><CustomSelect label="อินเทอร์เฟซ" options={['SATA', 'M.2']} value={keyword} onChange={setKeyword} /><CustomSelect label="ความจุ" options={['120GB', '240GB', '500GB', '1TB']} value={variant} onChange={setVariant} /></div>;
+    if (category.toLowerCase().includes('ram')) return <div className="space-y-3"><CustomSelect label="ประเภท" options={['DDR3', 'DDR4']} value={keyword} onChange={setKeyword} /><CustomSelect label="ความจุ" options={['4GB', '8GB', '16GB']} value={variant} onChange={setVariant} /></div>;
     return null;
   };
 
@@ -283,8 +286,8 @@ export default function Inventory() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Inventory Overview</h1>
-          <p className="text-zinc-500 text-sm font-light mt-1">Track stock levels and movement.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">ภาพรวมคลังอุปกรณ์</h1>
+          <p className="text-zinc-500 text-sm font-light mt-1">ติดตามระดับสต็อกและการเคลื่อนไหวของอุปกรณ์</p>
         </div>
         
         {/* ACTION BUTTONS */}
@@ -298,7 +301,7 @@ export default function Inventory() {
                 viewMode === 'list' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
               )}
             >
-              <LayoutList size={16} /> <span className="hidden sm:inline">List</span>
+              <LayoutList size={16} /> <span className="hidden sm:inline">รายการ</span>
             </button>
             <button 
               onClick={() => setViewMode('chart')}
@@ -307,7 +310,7 @@ export default function Inventory() {
                 viewMode === 'chart' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
               )}
             >
-              <BarChart2 size={16} /> <span className="hidden sm:inline">Analytics</span>
+              <BarChart2 size={16} /> <span className="hidden sm:inline">การวิเคราะห์</span>
             </button>
           </div>
 
@@ -315,7 +318,7 @@ export default function Inventory() {
              onClick={() => navigate('/transactions')}
              className="h-10 px-4 bg-white border border-zinc-200 text-zinc-700 rounded-xl text-sm font-medium hover:bg-zinc-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
            >
-             <ArrowRightLeft size={16}/> <span className="hidden sm:inline">Transactions</span>
+             <ArrowRightLeft size={16}/> <span className="hidden sm:inline">ประวัติการทำรายการ</span>
            </button>
            
            <div className="h-6 w-px bg-zinc-200 mx-1 hidden md:block"></div>
@@ -324,10 +327,10 @@ export default function Inventory() {
              onClick={handleSync}
              disabled={loading}
              className="h-10 w-10 md:w-auto md:px-4 bg-white border border-zinc-200 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-50 hover:text-zinc-900 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-70"
-             title="Sync Data"
+             title="ซิงค์ข้อมูล"
            >
              <RefreshCcw size={16} className={cn("transition-all", loading && "animate-spin text-zinc-400")}/> 
-             <span className="hidden md:inline">Sync</span>
+             <span className="hidden md:inline">ซิงค์</span>
            </button>
            
            {viewMode === 'list' && (
@@ -335,10 +338,10 @@ export default function Inventory() {
                onClick={() => setIsExportModalOpen(true)}
                disabled={loading}
                className="h-10 w-10 md:w-auto md:px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-70"
-               title="Export Excel"
+               title="ส่งออก Excel"
              >
                <Download size={16}/> 
-               <span className="hidden md:inline">Export</span>
+               <span className="hidden md:inline">ส่งออก</span>
              </button>
            )}
         </div>
@@ -353,7 +356,7 @@ export default function Inventory() {
             <div className="flex items-center gap-3 w-full">
               <div className="relative flex-1 group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-                <input type="text" placeholder="Search by Item Code or Name..." value={searchId} onChange={(e) => setSearchId(e.target.value)}
+                <input type="text" placeholder="ค้นหาด้วยรหัสหรือชื่ออุปกรณ์..." value={searchId} onChange={(e) => setSearchId(e.target.value)}
                   className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm"
                 />
               </div>
@@ -365,9 +368,12 @@ export default function Inventory() {
                 </button>
                 {isFilterOpen && (
                   <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-zinc-100 p-4 z-30 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">Filters</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> Reset</button>}</div>
-                    <div className="space-y-4"><CustomSelect label="Category" options={['Mouse', 'Keyboard', 'SSD', 'RAM', 'Flash Drive', 'Monitor']} value={category} onChange={handleCategoryChange} />
-                    <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div></div>
+                    <div className="flex justify-between mb-4"><span className="text-sm font-semibold text-zinc-900">ตัวกรอง</span>{hasActiveFilters && <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:underline flex items-center gap-1"><Trash2 size={10}/> รีเซ็ต</button>}</div>
+                    <div className="space-y-4">
+                      {/* ✅ 2. จ่าย availableCategories เข้าไปใน CustomSelect */}
+                      <CustomSelect label="หมวดหมู่" options={availableCategories} value={category} onChange={handleCategoryChange} />
+                      <div className="pt-2 border-t border-zinc-100">{renderSubFilters()}</div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -375,7 +381,7 @@ export default function Inventory() {
 
             {hasActiveFilters && (
               <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-2 fade-in">
-                <span className="text-xs text-zinc-400 font-medium mr-1">Active Filters:</span>
+                <span className="text-xs text-zinc-400 font-medium mr-1">ตัวกรองที่ใช้งาน:</span>
                 {[category, keyword, variant].filter(Boolean).map((t) => (
                   <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
                     {t} <button onClick={() => {if(t===category)setCategory("");if(t===keyword)setKeyword("");if(t===variant)setVariant("")}} className="hover:text-red-500 transition-colors"><X size={12}/></button>
@@ -392,23 +398,22 @@ export default function Inventory() {
                   <tr className="border-b border-zinc-100 bg-zinc-50/30">
                     <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={() => handleSort('itemCode')}>
                       <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
-                        Item Code
+                        รหัสอุปกรณ์
                         <div className="flex flex-col">{sortBy === 'itemCode' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Item Name</th>
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Category</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">ชื่ออุปกรณ์</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">หมวดหมู่</th>
                     <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none text-right" onClick={() => handleSort('balance')}>
                         <div className="flex items-center justify-end gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">
-                        Balance
+                        คงเหลือ
                         <div className="flex flex-col">{sortBy === 'balance' ? (sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>) : <div className="h-3 w-3" />}</div>
                       </div>
                     </th>
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Received</th>
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Withdrawn</th>
-                    {/* ✅ เพิ่มหัวคอลัมน์ Borrowed */}
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Borrowed</th>
-                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">Status</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">รับเข้า</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">เบิกจ่าย</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">ยืม</th>
+                    <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">สถานะ</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -423,12 +428,12 @@ export default function Inventory() {
                         <td className="px-6 py-4 text-right"><span className="font-bold text-zinc-900">{item.balance}</span> <span className="text-xs text-zinc-400 font-normal ml-0.5">{item.unit}</span></td>
                         <td className="px-6 py-4 text-right text-zinc-500">{item.received}</td>
                         <td className="px-6 py-4 text-right text-zinc-500">{item.tempWithdrawn}</td>
-                        <td className="px-6 py-4 text-right text-zinc-500 font-medium">{item.borrowed || 0}</td>
+                        <td className="px-6 py-4 text-right text-blue-600 font-medium">{item.borrowed || 0}</td>
                         <td className="px-6 py-4 text-right"><StockStatusBadge balance={item.balance} /></td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="8" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">No stock data found</p></div></td></tr>
+                    <tr><td colSpan="8" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Package size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">ไม่พบข้อมูลอุปกรณ์</p></div></td></tr>
                   )}
                 </tbody>
               </table>
@@ -437,7 +442,7 @@ export default function Inventory() {
             {/* Pagination */}
             <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-sm text-zinc-500">
-                <span>Rows:</span>
+                <span>จำนวนแถว:</span>
                 <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 cursor-pointer">
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -445,7 +450,7 @@ export default function Inventory() {
                 </select>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-zinc-500">Page <span className="font-medium text-zinc-900">{currentPage}</span> of <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
+                <span className="text-sm text-zinc-500">หน้า <span className="font-medium text-zinc-900">{currentPage}</span> จาก <span className="font-medium text-zinc-900">{processedData.totalPages || 1}</span></span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
                   <button onClick={() => setCurrentPage(p => Math.min(processedData.totalPages, p + 1))} disabled={currentPage >= processedData.totalPages || processedData.totalPages === 0} className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>

@@ -31,7 +31,7 @@ export default function AuditLog() {
       setIsFiltered(!!code);
     } catch (error) {
       console.error(error);
-      showToast("Failed to load audit logs", "error");
+      showToast("ดึงข้อมูลบันทึกระบบไม่สำเร็จ", "error");
       setLogs([]);
     } finally {
       setLoading(false);
@@ -65,9 +65,9 @@ export default function AuditLog() {
         <div>
           <div className="flex items-center gap-2 text-zinc-900 mb-1">
             <div className="p-2 bg-zinc-100 rounded-lg"><History size={24} /></div>
-            <h1 className="text-2xl font-bold tracking-tight">Audit Logs</h1>
+            <h1 className="text-2xl font-bold tracking-tight">บันทึกการทำงานของระบบ</h1>
           </div>
-          <p className="text-zinc-500 text-sm">System activity and movement history.</p>
+          <p className="text-zinc-500 text-sm">ประวัติกิจกรรมและการเคลื่อนไหวของระบบ</p>
         </div>
       </div>
 
@@ -78,23 +78,23 @@ export default function AuditLog() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
             <input 
               type="text" 
-              placeholder="Filter by Item Code..." 
+              placeholder="ค้นหาด้วยรหัสอุปกรณ์..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-10 pl-9 pr-4 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all"
             />
           </div>
           <button type="submit" className="h-10 px-4 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-800 transition-colors shadow-sm flex items-center gap-2">
-            <Filter size={14} /> Search
+            <Filter size={14} /> ค้นหา
           </button>
           {isFiltered && (
-            <button type="button" onClick={handleReset} className="h-10 w-10 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
+            <button type="button" onClick={handleReset} className="h-10 w-10 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition-colors" title="รีเซ็ต">
               <RotateCcw size={16} />
             </button>
           )}
         </form>
         <div className="text-xs text-zinc-400 font-medium px-2 border-l border-zinc-100 pl-4 hidden sm:block">
-          {logs.length} Records found
+          พบ {logs.length} รายการ
         </div>
       </div>
 
@@ -105,22 +105,22 @@ export default function AuditLog() {
             <thead className="bg-zinc-50/80 border-b border-zinc-200 text-xs uppercase text-zinc-500 font-semibold sticky top-0 z-10">
               <tr>
                 {/* 1. Date & Time (Fixed Width) */}
-                <th className="px-4 py-3 w-[160px] whitespace-nowrap">Timestamp</th>
+                <th className="px-4 py-3 w-[160px] whitespace-nowrap">วันเวลา</th>
                 
                 {/* 2. Item Code (Fixed Width) */}
-                <th className="px-4 py-3 w-[140px] whitespace-nowrap">Item Code</th>
+                <th className="px-4 py-3 w-[140px] whitespace-nowrap">รหัสอุปกรณ์</th>
 
                 {/* 3. Action (Fixed Width) */}
-                <th className="px-4 py-3 w-[150px] whitespace-nowrap">Action</th>
+                <th className="px-4 py-3 w-[150px] whitespace-nowrap">การกระทำ</th>
 
                 {/* 4. Movement (Fixed Width) */}
-                <th className="px-4 py-3 w-[100px] text-center whitespace-nowrap">Change</th>
+                <th className="px-4 py-3 w-[100px] text-center whitespace-nowrap">การเปลี่ยนแปลง</th>
 
                 {/* 5. Detail (Fluid - กินพื้นที่ที่เหลือ) */}
-                <th className="px-4 py-3 min-w-[300px]">Detail (Old → New)</th>
+                <th className="px-4 py-3 min-w-[300px]">รายละเอียด (เดิม → ใหม่)</th>
 
                 {/* 6. User (Fixed Width) */}
-                <th className="px-4 py-3 w-[140px] text-right whitespace-nowrap">User</th>
+                <th className="px-4 py-3 w-[140px] text-right whitespace-nowrap">ผู้ทำรายการ</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-zinc-100">
@@ -159,7 +159,7 @@ export default function AuditLog() {
                          </span>
                        ) : log.withdraw !== "+0" && log.withdraw !== "0" ? (
                          <span className="text-amber-600 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                           -{log.withdraw.replace('+', '')}
+                           {log.withdraw.replace('+', '')}
                          </span>
                        ) : (
                          <span className="text-zinc-300">-</span>
@@ -176,7 +176,6 @@ export default function AuditLog() {
                         <span className="text-zinc-900 font-semibold bg-white px-1.5 py-0.5 rounded border border-zinc-200 shadow-sm">
                           {log.newValue.replace('Balance: ', '')}
                         </span>
-                        {/* Table Name Badge (Optional) */}
                       </div>
                     </td>
 
@@ -197,7 +196,7 @@ export default function AuditLog() {
                   <td colSpan="6" className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center justify-center text-zinc-400">
                       <FileClock size={48} strokeWidth={1} className="mb-3 opacity-20"/>
-                      <p className="text-zinc-900 font-medium">No logs found</p>
+                      <p className="text-zinc-900 font-medium">ไม่พบประวัติการทำรายการ</p>
                     </div>
                   </td>
                 </tr>

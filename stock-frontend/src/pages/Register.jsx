@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  User, Mail, Briefcase, IdCard, Loader2, ArrowRight, // <-- เปลี่ยนตรงนี้
+  User, Mail, Briefcase, IdCard, Loader2, ArrowRight,
   CheckCircle2, Sparkles 
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
@@ -39,11 +39,11 @@ export default function Register() {
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed. Please check your inputs.');
+        throw new Error('การลงทะเบียนล้มเหลว กรุณาตรวจสอบข้อมูลของคุณอีกครั้ง');
       }
 
       // Success Logic
-      showToast("Account created! Please check your email for the password.", "success");
+      showToast("สร้างบัญชีสำเร็จ! กรุณาตรวจสอบอีเมลของคุณเพื่อรับรหัสผ่าน", "success");
       
       // Delay navigation slightly to let user read the success toast
       setTimeout(() => navigate('/login'), 2000);
@@ -70,8 +70,8 @@ export default function Register() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 text-white mb-4 shadow-lg shadow-zinc-200">
               <Sparkles size={20} />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Create Account</h1>
-            <p className="text-sm text-zinc-500 mt-2">Join the inventory management system.</p>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">สร้างบัญชีผู้ใช้</h1>
+            <p className="text-sm text-zinc-500 mt-2">เข้าร่วมระบบจัดการอุปกรณ์</p>
           </div>
 
           {/* Form */}
@@ -79,7 +79,7 @@ export default function Register() {
             
             {/* Staff ID */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Staff ID</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสพนักงาน</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <IdCard size={18} />
@@ -88,7 +88,7 @@ export default function Register() {
                   type="text" 
                   name="staffId"
                   required
-                  placeholder="e.g. 000001"
+                  placeholder="เช่น 000001"
                   value={formData.staffId}
                   onChange={handleChange}
                   className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
@@ -98,7 +98,7 @@ export default function Register() {
 
             {/* Full Name */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Full Name</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ชื่อ - นามสกุล</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <User size={18} />
@@ -107,7 +107,7 @@ export default function Register() {
                   type="text" 
                   name="name"
                   required
-                  placeholder="e.g. FirstName"
+                  placeholder="เช่น สมชาย ใจดี"
                   value={formData.name}
                   onChange={handleChange}
                   className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
@@ -117,7 +117,7 @@ export default function Register() {
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email Address</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ที่อยู่อีเมล</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <Mail size={18} />
@@ -136,7 +136,7 @@ export default function Register() {
 
             {/* Role */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Role / Position</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">บทบาท / ตำแหน่ง</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <Briefcase size={18} />
@@ -145,7 +145,7 @@ export default function Register() {
                   type="text" 
                   name="role"
                   required
-                  placeholder="e.g. Internship IT Support"
+                  placeholder="เช่น Internship IT Support"
                   value={formData.role}
                   onChange={handleChange}
                   className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
@@ -159,7 +159,7 @@ export default function Register() {
                 <CheckCircle2 size={12} />
               </div>
               <p className="text-xs text-blue-700/80 leading-relaxed">
-                Your login password will be generated automatically and sent to the email address provided above.
+                รหัสผ่านสำหรับเข้าสู่ระบบจะถูกสร้างขึ้นโดยอัตโนมัติ และส่งไปยังที่อยู่อีเมลที่คุณระบุไว้ด้านบน
               </p>
             </div>
 
@@ -172,11 +172,11 @@ export default function Register() {
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Creating Account...
+                  กำลังสร้างบัญชี...
                 </>
               ) : (
                 <>
-                  Register
+                  ลงทะเบียน
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -187,9 +187,9 @@ export default function Register() {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-sm text-zinc-500">
-              Already have an account?{' '}
+              มีบัญชีอยู่แล้วใช่ไหม?{' '}
               <Link to="/login" className="font-semibold text-zinc-900 hover:text-zinc-700 hover:underline transition-colors">
-                Sign in here
+                เข้าสู่ระบบที่นี่
               </Link>
             </p>
           </div>

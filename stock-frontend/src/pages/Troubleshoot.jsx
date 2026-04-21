@@ -46,10 +46,10 @@ const RatingModal = ({ isOpen, onClose, onSuccess, ticketNo }) => {
         body: JSON.stringify({ rating })
       });
 
-      onSuccess(`Rated ${rating} stars successfully`, "success", rating);
+      onSuccess(`ให้คะแนน ${rating} ดาวสำเร็จ`, "success", rating);
       onClose();
     } catch (error) {
-      onSuccess(error.message || "Failed to submit rating", "error");
+      onSuccess(error.message || "ส่งผลการประเมินไม่สำเร็จ", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -66,8 +66,8 @@ const RatingModal = ({ isOpen, onClose, onSuccess, ticketNo }) => {
           <Star size={32} className="fill-amber-500" />
         </div>
         
-        <h2 className="text-xl font-bold text-zinc-900">Rate our Service</h2>
-        <p className="text-sm text-zinc-500 mt-2 mb-8">How satisfied are you with the resolution of Ticket <span className="font-mono font-bold text-zinc-800">{ticketNo}</span>?</p>
+        <h2 className="text-xl font-bold text-zinc-900">ประเมินความพึงพอใจ</h2>
+        <p className="text-sm text-zinc-500 mt-2 mb-8">คุณพึงพอใจกับการแก้ไขปัญหาของหมายเลข <span className="font-mono font-bold text-zinc-800">{ticketNo}</span> ในระดับใด?</p>
 
         {/* Star Selection Area */}
         <div className="flex items-center gap-1 mb-10">
@@ -109,7 +109,7 @@ const RatingModal = ({ isOpen, onClose, onSuccess, ticketNo }) => {
 
         <div className="flex gap-3 w-full">
           <button onClick={onClose} className="flex-1 h-12 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all">
-            Cancel
+            ยกเลิก
           </button>
           <button 
             onClick={handleSubmit}
@@ -117,7 +117,7 @@ const RatingModal = ({ isOpen, onClose, onSuccess, ticketNo }) => {
             className="flex-[2] h-12 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-zinc-200"
           >
             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-            Submit Rating ({rating})
+            ยืนยันการประเมิน ({rating})
           </button>
         </div>
       </div>
@@ -126,7 +126,7 @@ const RatingModal = ({ isOpen, onClose, onSuccess, ticketNo }) => {
   );
 };
 
-// --- 2. NEW TICKET MODAL (เหมือนเดิม) ---
+// --- 2. NEW TICKET MODAL ---
 const NewTicketModal = ({ isOpen, onClose, onSuccess }) => {
   const [note, setNote] = useState('');
   const [userInfo, setUserInfo] = useState({ staffId: '', name: '', email: '' });
@@ -162,9 +162,9 @@ const NewTicketModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       await request('/api/support/ticket', { method: 'POST', body: JSON.stringify({ note: note.trim() }) });
-      onSuccess("Support ticket submitted successfully", "success");
+      onSuccess("ส่งรายการแจ้งปัญหาสำเร็จ", "success");
       onClose();
-    } catch (error) { onSuccess(error.message || "Failed to submit ticket", "error"); } 
+    } catch (error) { onSuccess(error.message || "ส่งการแจ้งปัญหาไม่สำเร็จ", "error"); } 
     finally { setIsSubmitting(false); }
   };
 
@@ -175,22 +175,22 @@ const NewTicketModal = ({ isOpen, onClose, onSuccess }) => {
       <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
       <div className={cn("relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2"><Ticket size={20} /> Submit New Ticket</h2>
+          <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2"><Ticket size={20} /> แจ้งปัญหาใหม่</h2>
           <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 rounded-full"><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-zinc-50/50 border border-zinc-200/60 rounded-xl p-4 space-y-3">
-            <div className="flex justify-between text-sm"><span className="text-zinc-500">Staff ID:</span><span className="font-mono font-medium text-zinc-900">{userInfo.staffId}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-zinc-500">Name:</span><span className="font-medium text-zinc-900">{userInfo.name}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-zinc-500">รหัสพนักงาน:</span><span className="font-mono font-medium text-zinc-900">{userInfo.staffId}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-zinc-500">ชื่อ:</span><span className="font-medium text-zinc-900">{userInfo.name}</span></div>
           </div>
           <div className="space-y-1 pt-2">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase ml-1">Issue Description</label>
-            <textarea required rows={4} placeholder="Describe the problem..." value={note} onChange={e => setNote(e.target.value)} className="w-full p-3 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-zinc-900/10 outline-none resize-none" />
+            <label className="text-[11px] font-bold text-zinc-400 uppercase ml-1">รายละเอียดปัญหา</label>
+            <textarea required rows={4} placeholder="อธิบายปัญหาที่คุณพบ..." value={note} onChange={e => setNote(e.target.value)} className="w-full p-3 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-zinc-900/10 outline-none resize-none" />
           </div>
           <div className="pt-4 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50">ยกเลิก</button>
             <button type="submit" disabled={isSubmitting || isLoadingUser || !note.trim()} className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 flex items-center justify-center gap-2">
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Submit
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} ส่งรายการ
             </button>
           </div>
         </form>
@@ -218,7 +218,7 @@ export default function Troubleshoot() {
       const response = await request('/api/support/my-tickets');
       setTickets(response?.data || []);
     } catch (error) {
-      showToast("Failed to load tickets", "error");
+      showToast("ดึงข้อมูลการแจ้งปัญหาไม่สำเร็จ", "error");
       setTickets([]);
     } finally {
       setLoading(false);
@@ -245,7 +245,7 @@ export default function Troubleshoot() {
           return {
             ...t,
             rating: newRating,
-            ratedAt: new Date().toLocaleString('en-GB').replace(',', '')
+            ratedAt: new Date().toLocaleString('th-TH').replace(',', '')
           };
         }
         return t;
@@ -256,9 +256,9 @@ export default function Troubleshoot() {
   const renderStatusBadge = (status) => {
     const statusLower = status?.toLowerCase();
     if (statusLower === 'resolved') {
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase tracking-wide"><CheckCircle2 size={12} strokeWidth={2.5}/> Resolved</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase tracking-wide"><CheckCircle2 size={12} strokeWidth={2.5}/> แก้ไขแล้ว</span>;
     }
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200/60 uppercase tracking-wide"><Clock size={12} strokeWidth={2.5}/> {status || 'Pending'}</span>;
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200/60 uppercase tracking-wide"><Clock size={12} strokeWidth={2.5}/> รอดำเนินการ</span>;
   };
 
   return (
@@ -270,15 +270,15 @@ export default function Troubleshoot() {
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2"><LifeBuoy className="text-zinc-900" size={24}/> Support Tickets</h1>
-          <p className="text-zinc-500 text-sm font-light mt-1">Track your issue reports and communication with the development team.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2"><LifeBuoy className="text-zinc-900" size={24}/> ติดตามการแจ้งปัญหา</h1>
+          <p className="text-zinc-500 text-sm font-light mt-1">ติดตามประวัติการแจ้งปัญหาและการตอบกลับจากทีมงาน</p>
         </div>
-        <button onClick={() => setIsTicketModalOpen(true)} className="h-10 px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 flex items-center gap-2 shadow-sm active:scale-95"><Plus size={16} /> <span>New Ticket</span></button>
+        <button onClick={() => setIsTicketModalOpen(true)} className="h-10 px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 flex items-center gap-2 shadow-sm active:scale-95"><Plus size={16} /> <span>แจ้งปัญหาใหม่</span></button>
       </div>
 
       <div className="relative group">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-        <input type="text" placeholder="Search by Ticket No. or issue..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm outline-none transition-all shadow-sm" />
+        <input type="text" placeholder="ค้นหาด้วยหมายเลขแจ้งปัญหา หรือรายละเอียด..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm outline-none transition-all shadow-sm" />
       </div>
 
       <div className="space-y-4">
@@ -309,14 +309,14 @@ export default function Troubleshoot() {
                 <div className="px-5 pb-5">
                   <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5 relative mt-2">
                     <div className="absolute -top-3 left-6 bg-white px-2 text-xs font-bold text-blue-600 border border-blue-100 rounded-full flex items-center gap-1.5">
-                      <Reply size={12} /> Response from {ticket.repliedBy || 'Support Team'}
+                      <Reply size={12} /> การตอบกลับจาก {ticket.repliedBy || 'ทีมสนับสนุน'}
                     </div>
                     <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{ticket.replyMessage}</p>
                     
                     {/* ✅ Footer: Replied Time + Evaluation Status/Button */}
                     <div className="mt-4 pt-3 border-t border-blue-200/60 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-1.5 text-[11px] text-blue-500 font-medium">
-                        <Clock size={12} /> Replied at {ticket.repliedAt}
+                        <Clock size={12} /> ตอบกลับเมื่อ {ticket.repliedAt}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export default function Troubleshoot() {
                           /* โชว์เมื่อประเมินแล้ว */
                           <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
                             <Star size={12} className={cn(ticket.rating > 0 && "fill-emerald-500")} />
-                            Evaluated on {ticket.ratedAt}
+                            ประเมินผลเมื่อ {ticket.ratedAt}
                           </div>
                         ) : (
                           /* ปุ่มโชว์เมื่อยังไม่ประเมิน */
@@ -332,7 +332,7 @@ export default function Troubleshoot() {
                             onClick={() => setRatingTicketNo(ticket.ticketNo)}
                             className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 bg-white hover:bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 transition-all active:scale-95"
                           >
-                            <Star size={12} /> Rate Service
+                            <Star size={12} /> ประเมินความพึงพอใจ
                           </button>
                         )}
                       </div>
@@ -345,7 +345,7 @@ export default function Troubleshoot() {
         ) : (
           <div className="bg-white rounded-2xl border border-zinc-200/60 p-16 flex flex-col items-center justify-center text-center shadow-sm">
             <LifeBuoy size={48} strokeWidth={1} className="text-zinc-300 mb-4" />
-            <h3 className="text-lg font-medium text-zinc-900">No tickets found</h3>
+            <h3 className="text-lg font-medium text-zinc-900">ไม่พบประวัติการแจ้งปัญหา</h3>
           </div>
         )}
       </div>

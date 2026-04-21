@@ -27,7 +27,7 @@ export default function EditProfile() {
         setOriginalData(data);
         setFormData(data);
       } catch (error) {
-        showToast("Failed to load profile", "error");
+        showToast("ไม่สามารถดึงข้อมูลโปรไฟล์ได้", "error");
       } finally {
         setLoading(false);
       }
@@ -47,7 +47,7 @@ export default function EditProfile() {
 
     setIsSaving(true);
     try {
-      // หน่วงเวลาจำลองการทำงานตามสไตล์ที่คุณชอบ
+      // หน่วงเวลาจำลองการทำงาน
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       await request('/api/auth/profile', {
@@ -55,14 +55,14 @@ export default function EditProfile() {
         body: JSON.stringify(formData),
       });
 
-      showToast("Profile updated successfully", "success");
+      showToast("อัปเดตโปรไฟล์สำเร็จ", "success");
       // อัปเดต originalData ให้เป็นค่าใหม่ที่เพิ่งบันทึกไป เพื่อให้ปุ่มกลับไป Disable
       setOriginalData(formData); 
       
       // หลังจาก 1.5 วิ ให้กลับไปหน้า Profile
       setTimeout(() => navigate('/profile'), 1500);
     } catch (error) {
-      showToast(error.message || "Update failed", "error");
+      showToast(error.message || "อัปเดตข้อมูลไม่สำเร็จ", "error");
     } finally {
       setIsSaving(false);
     }
@@ -89,8 +89,8 @@ export default function EditProfile() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Edit Profile</h1>
-            <p className="text-sm text-zinc-500">Update your personal information.</p>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">แก้ไขโปรไฟล์</h1>
+            <p className="text-sm text-zinc-500">อัปเดตข้อมูลส่วนตัวของคุณ</p>
           </div>
         </div>
       </div>
@@ -100,7 +100,7 @@ export default function EditProfile() {
           
           {/* Name Input */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Full Name</label>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ชื่อ - นามสกุล</label>
             <div className="relative group">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-900 transition-colors">
                 <User size={18} />
@@ -110,7 +110,7 @@ export default function EditProfile() {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="Enter your name"
+                placeholder="ระบุชื่อของคุณ"
                 className="w-full h-12 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all"
               />
             </div>
@@ -118,7 +118,7 @@ export default function EditProfile() {
 
           {/* Email Input */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email Address</label>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ที่อยู่อีเมล</label>
             <div className="relative group">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-900 transition-colors">
                 <Mail size={18} />
@@ -138,8 +138,8 @@ export default function EditProfile() {
           <div className="flex gap-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
              <Info className="text-blue-500 shrink-0" size={18} />
              <p className="text-xs text-blue-700 leading-relaxed">
-                For security reasons, Staff ID and Role cannot be changed by the user. 
-                Please contact IT Support if these details are incorrect.
+               เพื่อความปลอดภัย ระบบไม่อนุญาตให้แก้ไขรหัสพนักงานและตำแหน่งด้วยตนเอง 
+               หากข้อมูลไม่ถูกต้อง กรุณาติดต่อฝ่าย IT Support
              </p>
           </div>
         </div>
@@ -151,7 +151,7 @@ export default function EditProfile() {
              onClick={() => navigate(-1)}
              className="px-6 py-2.5 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
            >
-             Cancel
+             ยกเลิก
            </button>
            <button 
              type="submit"
@@ -160,7 +160,7 @@ export default function EditProfile() {
              className="flex items-center gap-2 px-8 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed transition-all shadow-lg shadow-zinc-200"
            >
              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-             Save Changes
+             บันทึกการเปลี่ยนแปลง
            </button>
         </div>
       </form>

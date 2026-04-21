@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Ticket, Search, Clock, CheckCircle2, MessageSquare, 
-  Send, User, Mail, Hash, Loader2, Reply, Calendar, Star
+  Send, User, Mail, Hash, Loader2, Reply, Calendar, Star, Package
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,7 +27,7 @@ export default function SupportTickets() {
         const response = await request('/api/support/tickets');
         setTickets(response?.data || []);
       } catch (error) {
-        showToast("Failed to load tickets", "error");
+        showToast("ดึงข้อมูลการแจ้งปัญหาไม่สำเร็จ", "error");
       } finally {
         setLoading(false);
       }
@@ -65,7 +65,7 @@ export default function SupportTickets() {
             ...t,
             status: 'Resolved',
             replyMessage: message.trim(),
-            repliedAt: new Date().toLocaleString('en-GB').replace(',', ''),
+            repliedAt: new Date().toLocaleString('th-TH').replace(',', ''),
             repliedBy: 'WebCosmo', // เปลี่ยนเป็นชื่อคนล็อกอินได้
             rating: 0,          // ✅ เซ็ตค่าเริ่มต้นเป็นยังไม่ประเมิน
             ratedAt: null       // ✅ เซ็ตค่าเริ่มต้นเป็นยังไม่ประเมิน
@@ -74,10 +74,10 @@ export default function SupportTickets() {
         return t;
       }));
 
-      showToast(`Replied to ${ticketNo} successfully`, "success");
+      showToast(`ตอบกลับหมายเลข ${ticketNo} สำเร็จ`, "success");
       setReplyTexts(prev => ({ ...prev, [ticketNo]: '' })); 
     } catch (error) {
-      showToast(error.message || "Failed to send reply", "error");
+      showToast(error.message || "ส่งข้อความตอบกลับไม่สำเร็จ", "error");
     } finally {
       setSubmittingIds(prev => ({ ...prev, [ticketNo]: false }));
     }
@@ -89,10 +89,10 @@ export default function SupportTickets() {
       <div className="pt-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
           <Ticket className="text-zinc-900" size={24}/>
-          Support Management
+          จัดการการแจ้งปัญหา
         </h1>
         <p className="text-zinc-500 text-sm font-light mt-1">
-          Review and respond to issues reported by users.
+          ตรวจสอบและตอบกลับปัญหาที่ได้รับแจ้งจากผู้ใช้งาน
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export default function SupportTickets() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
         <input 
           type="text" 
-          placeholder="Search by Ticket No, Name, or Issue..." 
+          placeholder="ค้นหาด้วยหมายเลขแจ้งปัญหา, ชื่อ หรือรายละเอียดปัญหา..." 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" 
@@ -137,11 +137,11 @@ export default function SupportTickets() {
                 
                 {ticket.status?.toLowerCase() === 'resolved' ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase tracking-wide">
-                    <CheckCircle2 size={12} /> Resolved
+                    <CheckCircle2 size={12} /> แก้ไขแล้ว
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200/60 uppercase tracking-wide">
-                    <Clock size={12} /> Pending
+                    <Clock size={12} /> รอดำเนินการ
                   </span>
                 )}
               </div>
@@ -153,7 +153,7 @@ export default function SupportTickets() {
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-bold text-zinc-900">Issue Description</span>
+                      <span className="text-xs font-bold text-zinc-900">รายละเอียดปัญหา</span>
                       <span className="text-[10px] text-zinc-400">{ticket.createdAt}</span>
                     </div>
                     <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{ticket.note}</p>
@@ -164,7 +164,7 @@ export default function SupportTickets() {
                   <div className="flex items-end gap-3 ml-14">
                     <div className="flex-1 relative group">
                       <textarea 
-                        placeholder="Write your response here..."
+                        placeholder="พิมพ์ข้อความตอบกลับของคุณที่นี่..."
                         value={replyTexts[ticket.ticketNo] || ''}
                         onChange={(e) => setReplyTexts({ ...replyTexts, [ticket.ticketNo]: e.target.value })}
                         className="w-full p-4 pr-12 bg-zinc-50 border border-zinc-200 rounded-2xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-400 transition-all outline-none resize-none min-h-[80px]"
@@ -189,7 +189,7 @@ export default function SupportTickets() {
                       <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                         <Reply size={12} />
                       </div>
-                      <span className="text-xs font-bold text-blue-700">Response from {ticket.repliedBy || 'Support Team'}</span>
+                      <span className="text-xs font-bold text-blue-700">ตอบกลับโดย {ticket.repliedBy || 'ทีมสนับสนุน (Support Team)'}</span>
                     </div>
                     <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{ticket.replyMessage}</p>
                     
@@ -197,19 +197,19 @@ export default function SupportTickets() {
                     <div className="mt-4 pt-3 border-t border-blue-200/60 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-1.5 text-[11px] text-blue-500 font-medium">
                         <Calendar size={12} />
-                        <span>Replied at {ticket.repliedAt}</span>
+                        <span>ตอบกลับเมื่อ {ticket.repliedAt}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 text-[11px] font-bold">
                         {ticket.ratedAt ? (
                           <span className="text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
                             <Star size={12} className={cn(ticket.rating > 0 ? "fill-emerald-500 text-emerald-500" : "text-emerald-600")} /> 
-                            {ticket.rating > 0 ? `Evaluated (${ticket.rating}/5)` : 'Evaluated'} on {ticket.ratedAt}
+                            {ticket.rating > 0 ? `ให้คะแนนแล้ว (${ticket.rating}/5)` : 'ประเมินผลแล้ว'} เมื่อ {ticket.ratedAt}
                           </span>
                         ) : (
                           <span className="text-zinc-500 flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-zinc-200">
                             <Clock size={12} /> 
-                            Not evaluated yet
+                            ยังไม่ได้รับการประเมิน
                           </span>
                         )}
                       </div>
@@ -223,7 +223,7 @@ export default function SupportTickets() {
         ) : (
           <div className="bg-white rounded-3xl border border-zinc-200/60 p-20 flex flex-col items-center justify-center text-center">
             <Package size={48} strokeWidth={1} className="text-zinc-200 mb-4" />
-            <p className="text-zinc-500 font-medium">No tickets found in the system</p>
+            <p className="text-zinc-500 font-medium">ไม่พบการแจ้งปัญหาในระบบ</p>
           </div>
         )}
       </div>

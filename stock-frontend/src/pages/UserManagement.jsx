@@ -43,10 +43,10 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
         body: JSON.stringify({ targetStaffId: user.staffId })
       });
 
-      showToast("OTP sent successfully", "success");
+      showToast("ส่งรหัส OTP สำเร็จ", "success");
       setStep(1); // ไปหน้ากรอก OTP
     } catch (error) {
-      showToast(error.message || "Failed to request OTP", "error");
+      showToast(error.message || "ขอรหัส OTP ไม่สำเร็จ", "error");
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
   const handleSubmitOtp = (e) => {
     e.preventDefault();
     if (otpCode.length !== 6) {
-      showToast("Please enter a valid 6-digit OTP", "error");
+      showToast("กรุณากรอกรหัส OTP 6 หลักให้ถูกต้อง", "error");
       return;
     }
     setStep(2); // ไปหน้ายืนยันครั้งสุดท้ายเลย (ไม่ต้องกรอกรหัสผ่านแล้ว)
@@ -77,10 +77,10 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
         })
       });
 
-      showToast("Password reset successfully. System has generated a new password.", "success");
+      showToast("รีเซ็ตรหัสผ่านสำเร็จ ระบบได้สร้างรหัสผ่านใหม่แล้ว", "success");
       onClose(); 
     } catch (error) {
-      showToast(error.message || "Failed to reset password", "error");
+      showToast(error.message || "รีเซ็ตรหัสผ่านไม่สำเร็จ", "error");
       // ถ้า Error ให้กลับไปแก้ OTP
       setStep(1); 
     } finally {
@@ -97,9 +97,9 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
-              <KeyRound size={20} className="text-zinc-900"/> Admin Password Reset
+              <KeyRound size={20} className="text-zinc-900"/> รีเซ็ตรหัสผ่านโดยแอดมิน
             </h3>
-            <p className="text-sm text-zinc-500">Target: <span className="font-mono font-bold text-zinc-700">{user.staffId}</span></p>
+            <p className="text-sm text-zinc-500">เป้าหมาย: <span className="font-mono font-bold text-zinc-700">{user.staffId}</span></p>
           </div>
           <button onClick={onClose} disabled={loading} className="p-1 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-zinc-900 transition-colors">
             <X size={20} />
@@ -114,15 +114,15 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
             <div className="p-4 bg-yellow-50 text-yellow-800 rounded-xl border border-yellow-100 flex gap-3">
               <AlertTriangle className="shrink-0" size={20} />
               <p className="text-sm">
-                This process requires OTP verification. The system will <b>automatically generate</b> a new password for the user. Proceed?
+                ขั้นตอนนี้ต้องยืนยันด้วยรหัส OTP ระบบจะ<b>สร้างรหัสผ่านใหม่ให้กับผู้ใช้งานโดยอัตโนมัติ</b> ต้องการดำเนินการต่อหรือไม่?
               </p>
             </div>
             <div className="flex gap-3 mt-2">
               <button onClick={onClose} className="flex-1 h-11 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all">
-                Cancel
+                ยกเลิก
               </button>
               <button onClick={handleRequestOtp} disabled={loading} className="flex-1 h-11 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 flex items-center justify-center gap-2 transition-all">
-                {loading ? <Loader2 size={18} className="animate-spin"/> : 'Request OTP'}
+                {loading ? <Loader2 size={18} className="animate-spin"/> : 'ขอรหัส OTP'}
               </button>
             </div>
           </div>
@@ -135,8 +135,8 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
                  <Mail size={24} />
                </div>
-               <h4 className="text-zinc-900 font-bold">Enter OTP Code</h4>
-               <p className="text-xs text-zinc-500">Enter the 6-digit code sent to verify this action.</p>
+               <h4 className="text-zinc-900 font-bold">กรอกรหัส OTP</h4>
+               <p className="text-xs text-zinc-500">กรุณากรอกรหัส 6 หลักที่ได้รับเพื่อยืนยันการทำรายการ</p>
              </div>
 
              <input 
@@ -151,7 +151,7 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
              />
 
              <button type="submit" className="w-full h-11 bg-zinc-900 text-white font-semibold rounded-xl hover:bg-zinc-800 flex items-center justify-center gap-2 mt-2">
-                Verify OTP <ArrowRight size={18} />
+               ยืนยัน OTP <ArrowRight size={18} />
              </button>
           </form>
         )}
@@ -162,22 +162,22 @@ const AdminResetPasswordModal = ({ isOpen, onClose, user }) => {
              <div className="p-4 bg-red-50 text-red-900 rounded-xl border border-red-100 flex flex-col items-center text-center gap-2">
                <Shield size={32} className="text-red-600"/>
                <div>
-                 <p className="font-bold text-lg">Confirm Reset?</p>
+                 <p className="font-bold text-lg">ยืนยันการรีเซ็ต?</p>
                  <p className="text-sm mt-1 opacity-90">
-                   You are about to reset the password for <b>{user.name}</b>.
+                   คุณกำลังจะรีเซ็ตรหัสผ่านสำหรับ <b>{user.name}</b>
                  </p>
                  <div className="mt-3 bg-white/60 p-2 rounded-lg text-xs font-mono text-red-800 border border-red-200/50">
-                    System will auto-generate a new password.
+                   ระบบจะสร้างรหัสผ่านใหม่โดยอัตโนมัติ
                  </div>
                </div>
              </div>
              
              <div className="flex gap-3 mt-2">
                <button onClick={() => setStep(1)} disabled={loading} className="flex-1 h-11 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all">
-                 Back
+                 ย้อนกลับ
                </button>
                <button onClick={handleFinalSubmit} disabled={loading} className="flex-1 h-11 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-100">
-                 {loading ? <Loader2 size={18} className="animate-spin"/> : 'Confirm & Reset'}
+                 {loading ? <Loader2 size={18} className="animate-spin"/> : 'ยืนยันและรีเซ็ต'}
                </button>
              </div>
            </div>
@@ -244,11 +244,11 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
         })
       });
       
-      showToast("User updated successfully", "success");
+      showToast("อัปเดตข้อมูลผู้ใช้งานสำเร็จ", "success");
       onSuccess();
       onClose();
     } catch (error) {
-      showToast(error.message || "Failed to update user", "error");
+      showToast(error.message || "อัปเดตข้อมูลผู้ใช้งานไม่สำเร็จ", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -261,8 +261,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
         
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-bold text-zinc-900">Edit User Profile</h3>
-            <p className="text-sm text-zinc-500">Update account information.</p>
+            <h3 className="text-lg font-bold text-zinc-900">แก้ไขข้อมูลผู้ใช้งาน</h3>
+            <p className="text-sm text-zinc-500">อัปเดตข้อมูลบัญชี</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-zinc-900 transition-colors">
             <X size={20} />
@@ -278,17 +278,17 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
                  <User size={16} />
                </div>
                <div>
-                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Staff ID</p>
+                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">รหัสพนักงาน</p>
                  <p className="text-sm font-bold text-zinc-700 font-mono">{user?.staffId}</p>
                </div>
              </div>
-             <span className="text-xs font-medium text-zinc-400 bg-zinc-200/50 px-2 py-1 rounded">Read-only</span>
+             <span className="text-xs font-medium text-zinc-400 bg-zinc-200/50 px-2 py-1 rounded">อ่านได้อย่างเดียว</span>
           </div>
 
           {/* Editable Fields */}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Full Name</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ชื่อ - นามสกุล</label>
               <input 
                 required 
                 value={formData.name} 
@@ -298,7 +298,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">อีเมล</label>
               <input 
                 type="email" 
                 required 
@@ -309,12 +309,12 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Role</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">บทบาท</label>
               {/* ✅ เปลี่ยนเป็น Input Text ปกติ */}
               <input 
                 type="text"
                 required 
-                placeholder="Ex. Admin, User, Manager"
+                placeholder="เช่น Admin, User, Manager"
                 value={formData.role} 
                 onChange={e => setFormData({...formData, role: e.target.value})} 
                 className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all"
@@ -327,14 +327,14 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
              <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                 <div className="flex items-center gap-2">
                    <RotateCcw size={16} className={user?.isForceChangePassword ? "text-orange-500" : "text-zinc-400"}/>
-                   <span className="text-sm font-medium text-zinc-500">Force Password Change</span>
+                   <span className="text-sm font-medium text-zinc-500">บังคับเปลี่ยนรหัสผ่าน</span>
                 </div>
                 <label className="relative inline-flex items-center">
                   <input type="checkbox" checked={user?.isForceChangePassword || false} readOnly disabled className="sr-only peer" />
                   <div className="w-9 h-5 bg-zinc-200 rounded-full peer peer-checked:bg-orange-400 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                 </label>
              </div>
-             <p className="text-[10px] text-zinc-400 mt-1 text-center">Authentication settings cannot be changed here.</p>
+             <p className="text-[10px] text-zinc-400 mt-1 text-center">การตั้งค่าการยืนยันตัวตนไม่สามารถเปลี่ยนแปลงได้ที่นี่</p>
           </div>
 
           <button 
@@ -342,7 +342,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
             className="w-full h-11 bg-zinc-900 text-white rounded-xl text-sm font-semibold hover:bg-zinc-800 flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isSubmitting ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} 
-            Save Changes
+            บันทึกการเปลี่ยนแปลง
           </button>
         </form>
       </div>
@@ -352,7 +352,6 @@ const EditUserModal = ({ isOpen, onClose, user, onSuccess }) => {
 };
 
 // --- MAIN PAGE (UserManagement) ---
-// ส่วนนี้เหมือนเดิมครับ
 export default function UserManagement() {
   const { showToast } = useToast();
   const [users, setUsers] = useState([]);
@@ -368,11 +367,11 @@ export default function UserManagement() {
       const data = await request('/api/auth/admin/users');
       setUsers(data || []);
     } catch (error) {
-      showToast("Failed to fetch users", "error");
+      showToast("ดึงข้อมูลผู้ใช้งานไม่สำเร็จ", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -400,15 +399,15 @@ export default function UserManagement() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 tracking-tight flex items-center gap-2">
-            <Users className="text-zinc-900" size={24}/> User Management
+            <Users className="text-zinc-900" size={24}/> จัดการผู้ใช้งาน
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">Manage system accounts and permissions.</p>
+          <p className="text-sm text-zinc-500 mt-1">จัดการบัญชีและสิทธิ์การใช้งานของระบบ</p>
         </div>
         <div className="relative w-full md:w-64">
            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16}/>
            <input 
              type="text" 
-             placeholder="Search user..." 
+             placeholder="ค้นหาผู้ใช้งาน..." 
              value={searchQuery}
              onChange={(e) => setSearchQuery(e.target.value)}
              className="w-full h-10 pl-9 pr-4 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-100"
@@ -421,11 +420,11 @@ export default function UserManagement() {
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-50/50 border-b border-zinc-100 text-xs uppercase text-zinc-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Joined Date</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-6 py-4">ผู้ใช้งาน</th>
+                <th className="px-6 py-4">บทบาท</th>
+                <th className="px-6 py-4">สถานะ</th>
+                <th className="px-6 py-4">วันที่เข้าร่วม</th>
+                <th className="px-6 py-4 text-right">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
@@ -454,11 +453,11 @@ export default function UserManagement() {
                     <td className="px-6 py-4">
                        {user.isForceChangePassword ? (
                          <span className="inline-flex items-center gap-1 text-orange-600 text-xs bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                           <RotateCcw size={10}/> Reset Required
+                           <RotateCcw size={10}/> ต้องรีเซ็ตรหัส
                          </span>
                        ) : (
                          <span className="inline-flex items-center gap-1 text-emerald-600 text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                           <CheckCircle size={10}/> Active
+                           <CheckCircle size={10}/> ใช้งานปกติ
                          </span>
                        )}
                     </td>
@@ -469,13 +468,14 @@ export default function UserManagement() {
                         <button 
                           onClick={() => setResetPwdUser(user)}
                           className="p-2 text-zinc-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all border border-transparent"
-                          title="Reset Password"
+                          title="รีเซ็ตรหัสผ่าน"
                         >
                           <KeyRound size={16}/>
                         </button>
                       <button 
                         onClick={() => setEditingUser(user)}
                         className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-lg transition-all border border-transparent hover:border-zinc-200 hover:shadow-sm"
+                        title="แก้ไขผู้ใช้งาน"
                       >
                         <Edit3 size={16}/>
                       </button>
@@ -483,7 +483,7 @@ export default function UserManagement() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="5" className="p-12 text-center text-zinc-400">No users found.</td></tr>
+                <tr><td colSpan="5" className="p-12 text-center text-zinc-400">ไม่พบผู้ใช้งาน</td></tr>
               )}
             </tbody>
           </table>

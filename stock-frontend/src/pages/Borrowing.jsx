@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Search, ArrowRightLeft, Clock, CheckCircle2, 
-  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, Info, BellRing
+  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, Info, BellRing,
+  ChevronDown, Check // เพิ่มไอคอนสำหรับ Dropdown
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,6 +12,59 @@ import { useToast } from '../context/ToastContext';
 
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
+
+// --- CUSTOM SELECT COMPONENT (NEW) ---
+const CustomFilterSelect = ({ value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => { 
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false); 
+    };
+    document.addEventListener("mousedown", handleClick); 
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative w-full sm:w-48" ref={wrapperRef}>
+      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 z-10 pointer-events-none" size={16} />
+      <button 
+        type="button" 
+        onClick={() => setIsOpen(!isOpen)} 
+        className={cn(
+          "w-full h-11 pl-9 pr-3 bg-white border border-zinc-200 rounded-xl text-sm transition-all shadow-sm flex items-center justify-between",
+          "hover:bg-zinc-50",
+          isOpen ? "ring-2 ring-zinc-100 border-zinc-300" : "",
+          "text-zinc-700 font-medium"
+        )}
+      >
+        <span className="truncate">{selectedOption.label}</span>
+        <ChevronDown size={14} className={cn("transition-transform text-zinc-400", isOpen && "rotate-180")} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          {options.map((opt) => (
+            <div 
+              key={opt.value} 
+              onClick={() => { onChange(opt.value); setIsOpen(false); }} 
+              className={cn(
+                "px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", 
+                value === opt.value ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600"
+              )}
+            >
+              {opt.label} 
+              {value === opt.value && <Check size={14} className="text-zinc-900"/>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- 1. BORROW REQUEST MODAL ---
 const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
@@ -56,9 +110,9 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
         const foundItem = itemsList.find(item => item.itemCode === formData.itemCode);
 
         if (foundItem) setItemName(foundItem.name);
-        else setItemName('Item not found');
+        else setItemName('ไม่พบอุปกรณ์');
       } catch (error) {
-        setItemName('Item not found');
+        setItemName('ไม่พบอุปกรณ์');
       } finally {
         setIsValidating(false);
       }
@@ -70,7 +124,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (itemName === 'Item not found' || !itemName) return; 
+    if (itemName === 'ไม่พบอุปกรณ์' || !itemName) return; 
 
     setIsSubmitting(true);
     try {
@@ -90,10 +144,10 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
         body: JSON.stringify(payload)
       });
 
-      onSuccess("Borrow request submitted successfully", "success");
+      onSuccess("ส่งคำขอยืมอุปกรณ์สำเร็จ", "success");
       onClose();
     } catch (error) {
-      onSuccess(error.message || "Failed to submit borrow request", "error");
+      onSuccess(error.message || "ส่งคำขอยืมอุปกรณ์ไม่สำเร็จ", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,9 +193,9 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
           <div>
             <h2 className="text-lg font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
               <ArrowRightLeft size={20} className="text-zinc-900" />
-              New Borrow Request
+              สร้างคำขอยืมอุปกรณ์
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Fill details to request an equipment loan.</p>
+            <p className="text-xs text-zinc-500 mt-0.5">กรอกรายละเอียดเพื่อขอยืมอุปกรณ์</p>
           </div>
           <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors">
             <X size={20} strokeWidth={1.5} />
@@ -150,19 +204,19 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Item Code</label>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสอุปกรณ์</label>
             <div className="relative">
               <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input 
-                type="text" required placeholder="Ex. 999999999" value={formData.itemCode} 
+                type="text" required placeholder="เช่น 999999999" value={formData.itemCode} 
                 onChange={e => setFormData({...formData, itemCode: e.target.value})} 
                 className="w-full h-11 pl-9 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
               />
             </div>
             <div className="h-5 px-1 flex items-center">
               {isValidating ? (
-                 <span className="flex items-center gap-1.5 text-xs text-zinc-400"><Loader2 size={12} className="animate-spin"/> Validating item...</span>
-              ) : itemName === 'Item not found' ? (
+                 <span className="flex items-center gap-1.5 text-xs text-zinc-400"><Loader2 size={12} className="animate-spin"/> กำลังตรวจสอบอุปกรณ์...</span>
+              ) : itemName === 'ไม่พบอุปกรณ์' ? (
                  <span className="flex items-center gap-1.5 text-xs text-red-500 font-medium"><X size={12}/> {itemName}</span>
               ) : itemName ? (
                  <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium"><CheckCircle2 size={12}/> {itemName}</span>
@@ -172,7 +226,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Quantity</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">จำนวน</label>
               <input 
                 type="number" required min="1" value={formData.quantity} 
                 onChange={e => setFormData({...formData, quantity: e.target.value})} 
@@ -180,7 +234,7 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Job ID</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสงาน (Job ID)</label>
               <input 
                 type="text" required placeholder="ITSERV1" value={formData.jobId} 
                 onChange={e => setFormData({...formData, jobId: e.target.value.toUpperCase()})} 
@@ -189,10 +243,9 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* 📅 ปรับปรุงส่วนเลือกวันที่ และ ข้อความแจ้งเตือน */}
           <div className="space-y-2">
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Expected Due Date</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">วันที่กำหนดคืน</label>
               <div className="relative">
                 <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
                 <input 
@@ -214,10 +267,10 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
           <div className="space-y-1 pt-1">
             <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 flex items-center justify-between">
-              Note <span className="text-zinc-300 font-normal normal-case">(Optional)</span>
+              หมายเหตุ <span className="text-zinc-300 font-normal normal-case">(ไม่บังคับ)</span>
             </label>
             <input 
-              type="text" placeholder="Ex. For emergency server maintenance" value={formData.note} 
+              type="text" placeholder="เช่น สำหรับซ่อมบำรุงเซิร์ฟเวอร์ฉุกเฉิน" value={formData.note} 
               onChange={e => setFormData({...formData, note: e.target.value})} 
               className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
             />
@@ -225,11 +278,11 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
           <div className="pt-4 flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all active:scale-95">
-              Cancel
+              ยกเลิก
             </button>
-            <button type="submit" disabled={isSubmitting || isValidating || itemName === 'Item not found' || !itemName} className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95">
+            <button type="submit" disabled={isSubmitting || isValidating || itemName === 'ไม่พบอุปกรณ์' || !itemName} className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95">
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Submit Request
+              ส่งคำขอ
             </button>
           </div>
         </form>
@@ -275,36 +328,36 @@ const ReturnModal = ({ isOpen, onClose, onConfirm, transaction }) => {
         </div>
         
         <div className="text-center mb-6">
-          <h3 className="text-lg font-bold text-zinc-900">Confirm Return</h3>
-          <p className="text-sm text-zinc-500 mt-1">Please verify the item details before confirming the return.</p>
+          <h3 className="text-lg font-bold text-zinc-900">ยืนยันการคืนอุปกรณ์</h3>
+          <p className="text-sm text-zinc-500 mt-1">โปรดตรวจสอบรายละเอียดอุปกรณ์ก่อนยืนยันการคืน</p>
         </div>
 
         <div className="bg-zinc-50 rounded-xl p-4 space-y-3 mb-6 border border-zinc-100">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-zinc-500">Transaction:</span>
+            <span className="text-zinc-500">รหัสทำรายการ:</span>
             <span className="font-mono font-medium text-zinc-900">{transaction.transactionId}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-zinc-500">Item Code:</span>
+            <span className="text-zinc-500">รหัสอุปกรณ์:</span>
             <span className="font-mono font-medium text-zinc-900">{transaction.itemCode}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-zinc-500">Item Name:</span>
+            <span className="text-zinc-500">ชื่ออุปกรณ์:</span>
             <span className="font-medium text-zinc-900 text-right truncate max-w-[150px]" title={transaction.itemName}>{transaction.itemName}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-zinc-500">Job ID:</span>
+            <span className="text-zinc-500">รหัสงาน:</span>
             <span className="font-medium text-zinc-900">{transaction.jobId || '-'}</span>
           </div>
         </div>
 
         <div className="flex gap-3">
           <button onClick={onClose} disabled={isSubmitting} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all">
-            Cancel
+            ยกเลิก
           </button>
           <button onClick={handleConfirm} disabled={isSubmitting} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            Confirm Return
+            ยืนยันการคืน
           </button>
         </div>
       </div>
@@ -335,7 +388,7 @@ export default function Borrowing() {
       const data = await request('/api/borrow/history');
       setTransactions(data || []);
     } catch (error) {
-      showToast("Failed to fetch borrowing history", "error");
+      showToast("ดึงข้อมูลประวัติการยืมไม่สำเร็จ", "error");
     } finally {
       setLoading(false);
     }
@@ -354,10 +407,10 @@ export default function Borrowing() {
         t.transactionId === transactionId ? { ...t, status: 'Returned' } : t
       ));
       
-      showToast("Item returned successfully", "success");
+      showToast("คืนอุปกรณ์สำเร็จ", "success");
       setReturningTransaction(null);
     } catch (error) {
-      showToast(error.message || "Failed to return item", "error");
+      showToast(error.message || "คืนอุปกรณ์ไม่สำเร็จ", "error");
     }
   };
 
@@ -376,7 +429,7 @@ export default function Borrowing() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return new Intl.DateTimeFormat('en-GB', {
+    return new Intl.DateTimeFormat('th-TH', {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     }).format(new Date(dateString));
@@ -407,10 +460,10 @@ export default function Borrowing() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
             <ArrowRightLeft className="text-zinc-900" size={24}/>
-            Borrowing History
+            ประวัติการยืมอุปกรณ์
           </h1>
           <p className="text-zinc-500 text-sm font-light mt-1">
-            Track equipment loans, returns, and current statuses.
+            ติดตามการยืม คืน และสถานะปัจจุบันของอุปกรณ์
           </p>
         </div>
         
@@ -419,7 +472,7 @@ export default function Borrowing() {
           className="h-11 px-5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm shadow-zinc-200 active:scale-95"
         >
           <Plus size={16} /> 
-          <span>New Borrow Request</span>
+          <span>ขอยืมอุปกรณ์</span>
         </button>
       </div>
 
@@ -429,25 +482,23 @@ export default function Borrowing() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder="Search by Transaction, Item Code, Name or Job ID..." 
+            placeholder="ค้นหาด้วยรหัสทำรายการ, รหัสอุปกรณ์, ชื่อ หรือรหัสงาน..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" 
           />
         </div>
         
-        <div className="relative w-full sm:w-48">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full h-11 pl-9 pr-8 bg-white border border-zinc-200 rounded-xl text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm appearance-none cursor-pointer"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Borrowed">Borrowed</option>
-            <option value="Returned">Returned</option>
-          </select>
-        </div>
+        {/* ✅ CUSTOM DROPDOWN REPLACEMENT */}
+        <CustomFilterSelect 
+          value={statusFilter} 
+          onChange={setStatusFilter} 
+          options={[
+            { value: 'All', label: 'สถานะทั้งหมด' },
+            { value: 'Borrowed', label: 'กำลังยืม' },
+            { value: 'Returned', label: 'คืนแล้ว' }
+          ]}
+        />
       </div>
 
       {/* Table */}
@@ -456,13 +507,13 @@ export default function Borrowing() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50/30">
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">Transaction</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Item Details</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center">Qty</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">Job ID & Recorder</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">Timeline</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">Status</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right whitespace-nowrap">Actions</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">การทำรายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">รายละเอียดอุปกรณ์</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center">จำนวน</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">รหัสงาน & ผู้ทำรายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">ระยะเวลา</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 whitespace-nowrap">สถานะ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right whitespace-nowrap">จัดการ</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -495,19 +546,19 @@ export default function Borrowing() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-zinc-800">{t.jobId || '-'}</span>
-                        <span className="text-xs text-zinc-500 mt-0.5">by {t.recorderName}</span>
+                        <span className="text-xs text-zinc-500 mt-0.5">โดย {t.recorderName}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5 text-xs text-zinc-600">
                           <Calendar size={12} className="text-zinc-400" />
-                          <span className="w-12 text-zinc-400">Borrow:</span>
+                          <span className="w-12 text-zinc-400">ยืม:</span>
                           <span className="font-mono">{formatDate(t.borrowDate)}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-600">
                           <AlertCircle size={12} className="text-zinc-400" />
-                          <span className="w-12 text-zinc-400">Due:</span>
+                          <span className="w-12 text-zinc-400">กำหนดคืน:</span>
                           <span className="font-mono">{formatDate(t.dueDate)}</span>
                         </div>
                       </div>
@@ -515,11 +566,11 @@ export default function Borrowing() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {t.status === 'Borrowed' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200/60 uppercase tracking-wide">
-                          <Clock size={12} strokeWidth={2.5}/> Borrowed
+                          <Clock size={12} strokeWidth={2.5}/> กำลังยืม
                         </span>
                       ) : t.status === 'Returned' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase tracking-wide">
-                          <CheckCircle2 size={12} strokeWidth={2.5}/> Returned
+                          <CheckCircle2 size={12} strokeWidth={2.5}/> คืนแล้ว
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-zinc-100 text-zinc-600 border border-zinc-200/60 uppercase tracking-wide">
@@ -532,10 +583,10 @@ export default function Borrowing() {
                         <button 
                           onClick={() => setReturningTransaction(t)}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 text-zinc-600 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 rounded-lg text-xs font-medium transition-all shadow-sm"
-                          title="Return Item"
+                          title="คืนอุปกรณ์"
                         >
                           <Undo2 size={14} /> 
-                          <span className="hidden sm:inline">Return</span>
+                          <span className="hidden sm:inline">คืน</span>
                         </button>
                       )}
                     </td>
@@ -546,8 +597,8 @@ export default function Borrowing() {
                   <td colSpan="7" className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center justify-center text-zinc-400">
                       <Search size={32} strokeWidth={1} className="mb-2 opacity-50"/>
-                      <p className="text-sm text-zinc-500 font-medium">No records found</p>
-                      <p className="text-xs mt-1">Try adjusting your search or filters.</p>
+                      <p className="text-sm text-zinc-500 font-medium">ไม่พบประวัติการทำรายการ</p>
+                      <p className="text-xs mt-1">ลองปรับการค้นหาหรือตัวกรองของคุณ</p>
                     </div>
                   </td>
                 </tr>

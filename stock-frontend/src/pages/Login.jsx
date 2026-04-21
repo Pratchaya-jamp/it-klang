@@ -55,7 +55,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
     } catch (error) {
       console.error(error);
       setStatus('error');
-      setErrorMessage(error.message || "Email not found or system error.");
+      setErrorMessage(error.message || "ไม่พบอีเมลนี้ในระบบหรือเกิดข้อผิดพลาด");
     }
   };
 
@@ -85,9 +85,9 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
             <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm shadow-emerald-100">
               <CheckCircle2 size={32} />
             </div>
-            <h3 className="text-xl font-bold text-zinc-900">Check your email</h3>
-            <p className="text-zinc-500 mt-2 text-sm leading-relaxed">We have sent a password reset link to <br/><span className="font-medium text-zinc-800">{email}</span></p>
-            <button onClick={onClose} className="mt-6 w-full h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all hover:scale-[1.02] active:scale-[0.98]">Back to Login</button>
+            <h3 className="text-xl font-bold text-zinc-900">ตรวจสอบอีเมลของคุณ</h3>
+            <p className="text-zinc-500 mt-2 text-sm leading-relaxed">เราได้ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปที่ <br/><span className="font-medium text-zinc-800">{email}</span></p>
+            <button onClick={onClose} className="mt-6 w-full h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all hover:scale-[1.02] active:scale-[0.98]">กลับไปหน้าเข้าสู่ระบบ</button>
           </div>
         ) : (
           <>
@@ -95,17 +95,17 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm shadow-blue-100">
                 <Mail size={24} />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900">Forgot password?</h3>
-              <p className="text-zinc-500 text-sm leading-relaxed">Enter your email address and we'll send you a link to reset your password.</p>
+              <h3 className="text-xl font-bold text-zinc-900">ลืมรหัสผ่าน?</h3>
+              <p className="text-zinc-500 text-sm leading-relaxed">กรอกที่อยู่อีเมลของคุณ แล้วเราจะส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปให้</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email Address</label>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ที่อยู่อีเมล</label>
                 <div className="relative group">
                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-zinc-800" size={18} />
                    <input 
-                     type="email" required placeholder="Enter your email" 
+                     type="email" required placeholder="กรอกอีเมลของคุณ" 
                      value={email} onChange={e => setEmail(e.target.value)}
                      className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all duration-200"
                    />
@@ -119,7 +119,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
               )}
 
               <button disabled={status === 'loading'} className="w-full h-11 bg-zinc-900 text-white rounded-xl text-sm font-semibold hover:bg-zinc-800 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:scale-100">
-                {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : "Send Reset Link"}
+                {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : "ส่งลิงก์รีเซ็ตรหัสผ่าน"}
               </button>
             </form>
           </>
@@ -158,18 +158,18 @@ export default function Login() {
 
       // เช็คกรณีต้องเปลี่ยนรหัส
       if (result.requireChangePassword) {
-        showToast("Security Alert: Please change your password.", "info");
+        showToast("แจ้งเตือนความปลอดภัย: กรุณาเปลี่ยนรหัสผ่านของคุณ", "info");
         navigate('/force-changepwd', { state: { staffId: formData.staffId, oldPassword: formData.password }, replace: true });
         return;
       }
 
       // Login สำเร็จ
-      showToast("Welcome back!", "success");
+      showToast("ยินดีต้อนรับกลับ!", "success");
       navigate('/dashboard');
 
     } catch (error) {
       console.error("Login Error:", error);
-      showToast(error.message || "Invalid credentials", "error");
+      showToast(error.message || "รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง", "error");
     } finally {
       setLoading(false);
     }
@@ -186,14 +186,14 @@ export default function Login() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 text-white mb-4 shadow-lg shadow-zinc-200">
               <LayoutDashboard size={20} />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Welcome Back</h1>
-            <p className="text-sm text-zinc-500 mt-2">Sign in to access your inventory.</p>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">ยินดีต้อนรับกลับ</h1>
+            <p className="text-sm text-zinc-500 mt-2">เข้าสู่ระบบเพื่อจัดการคลังอุปกรณ์ของคุณ</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Staff ID</label>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสพนักงาน</label>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
                   <IdCard size={18} />
@@ -202,7 +202,7 @@ export default function Login() {
                   type="text" 
                   name="staffId"
                   required
-                  placeholder="e.g. 901196"
+                  placeholder="เช่น 901196"
                   value={formData.staffId}
                   onChange={handleChange}
                   className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-100 rounded-xl text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all placeholder:text-zinc-400"
@@ -212,8 +212,8 @@ export default function Login() {
 
             <div className="space-y-1.5">
               <div className="flex justify-between items-center px-1">
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Password</label>
-                <button type="button" onClick={() => setIsForgotOpen(true)} className="text-[10px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors">Forgot password?</button>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">รหัสผ่าน</label>
+                <button type="button" onClick={() => setIsForgotOpen(true)} className="text-[10px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors">ลืมรหัสผ่าน?</button>
               </div>
               <div className="relative group">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors">
@@ -239,11 +239,11 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Verifying... {/* เปลี่ยนข้อความให้ดูสมจริงขึ้น */}
+                  กำลังตรวจสอบ... {/* เปลี่ยนข้อความให้ดูสมจริงขึ้น */}
                 </>
               ) : (
                 <>
-                  Sign In
+                  เข้าสู่ระบบ
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -253,9 +253,9 @@ export default function Login() {
           
           <div className="mt-8 text-center">
             <p className="text-sm text-zinc-500">
-              New employee?{' '}
+              พนักงานใหม่?{' '}
               <Link to="/register" className="font-semibold text-zinc-900 hover:text-zinc-700 hover:underline transition-colors">
-                Create account
+                สร้างบัญชีผู้ใช้
               </Link>
             </p>
           </div>

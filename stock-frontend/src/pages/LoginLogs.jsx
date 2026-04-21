@@ -35,7 +35,7 @@ export default function LoginLogs() {
 
       // 3. ตัดสินชี้ขาด ถ้าไม่ใช่ SuperAdmin ถึงจะเตะออก
       if (currentRole !== 'SuperAdmin') {
-        showToast("Access Denied: SuperAdmin privileges required.", "error");
+        showToast("ปฏิเสธการเข้าถึง: ต้องการสิทธิ์ระดับ SuperAdmin เท่านั้น", "error");
         navigate('/dashboard', { replace: true });
       }
     };
@@ -55,7 +55,7 @@ export default function LoginLogs() {
       const data = await request(endpoint);
       setLogs(data || []);
     } catch (error) {
-      showToast(error.message || "Failed to fetch access logs", "error");
+      showToast(error.message || "ดึงข้อมูลประวัติการเข้าสู่ระบบไม่สำเร็จ", "error");
     } finally {
       setLoading(false);
     }
@@ -85,9 +85,9 @@ export default function LoginLogs() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 tracking-tight flex items-center gap-2">
-            <Activity className="text-zinc-900" size={24}/> Access Logs
+            <Activity className="text-zinc-900" size={24}/> ประวัติการเข้าสู่ระบบ
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">Monitor system authentication and login activities.</p>
+          <p className="text-sm text-zinc-500 mt-1">ตรวจสอบการยืนยันตัวตนและกิจกรรมการเข้าสู่ระบบของพนักงาน</p>
         </div>
         
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-auto">
@@ -95,7 +95,7 @@ export default function LoginLogs() {
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16}/>
              <input 
                type="text" 
-               placeholder="Search by Staff ID..." 
+               placeholder="ค้นหาด้วยรหัสพนักงาน..." 
                value={searchStaffId}
                onChange={(e) => setSearchStaffId(e.target.value)}
                className="w-full h-10 pl-9 pr-4 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all"
@@ -105,13 +105,13 @@ export default function LoginLogs() {
              type="submit" 
              className="h-10 px-4 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-800 transition-colors shadow-sm"
            >
-             Search
+             ค้นหา
            </button>
            <button 
              type="button" 
              onClick={handleRefresh}
              className="h-10 w-10 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-xl hover:bg-zinc-50 hover:text-zinc-900 transition-colors shadow-sm"
-             title="Refresh Logs"
+             title="รีเฟรชข้อมูล"
            >
              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
            </button>
@@ -124,11 +124,11 @@ export default function LoginLogs() {
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-50/50 border-b border-zinc-100 text-xs uppercase text-zinc-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">Staff ID</th>
-                <th className="px-6 py-4">Status & Action</th>
-                <th className="px-6 py-4">IP Address</th>
-                <th className="px-6 py-4">Device</th>
-                <th className="px-6 py-4 text-right">Timestamp</th>
+                <th className="px-6 py-4">รหัสพนักงาน</th>
+                <th className="px-6 py-4">สถานะ & กิจกรรม</th>
+                <th className="px-6 py-4">ไอพีแอดเดรส (IP)</th>
+                <th className="px-6 py-4">อุปกรณ์</th>
+                <th className="px-6 py-4 text-right">วันและเวลา</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
@@ -156,7 +156,7 @@ export default function LoginLogs() {
                         <div className="flex items-center gap-1.5">
                           {log.status === 'Success' ? (
                             <span className="inline-flex items-center gap-1 text-emerald-700 text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 uppercase tracking-wider">
-                              <CheckCircle2 size={12}/> Success
+                              <CheckCircle2 size={12}/> สำเร็จ
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-red-700 text-[11px] font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wider">
@@ -203,7 +203,7 @@ export default function LoginLogs() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="5" className="p-12 text-center text-zinc-400">No login records found.</td></tr>
+                <tr><td colSpan="5" className="p-12 text-center text-zinc-400">ไม่พบประวัติการเข้าสู่ระบบ</td></tr>
               )}
             </tbody>
           </table>
