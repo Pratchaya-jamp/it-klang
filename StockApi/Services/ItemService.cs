@@ -49,6 +49,7 @@ namespace StockApi.Services
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
+                JobNo = x.JobNo, // 🔥 เพิ่มบรรทัดนี้ให้หน้า Dashboard เห็นเลข Job
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToListAsync();
@@ -74,6 +75,10 @@ namespace StockApi.Services
                     Name = request.Name,
                     Category = request.Category,
                     Unit = request.Unit,
+
+                    // 🔥 บันทึก JobNo ลงตาราง Items โดยตรง (ถ้าไม่ได้ส่งมามันจะเป็นค่าว่าง ไม่Error)
+                    JobNo = request.JobNo,
+
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -118,6 +123,7 @@ namespace StockApi.Services
                     Name = newItem.Name,
                     Category = newItem.Category,
                     Unit = newItem.Unit,
+                    JobNo = newItem.JobNo,
                     CreatedAt = newItem.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                     UpdatedAt = newItem.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };

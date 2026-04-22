@@ -16,6 +16,8 @@ namespace StockApi.Dtos
         [Required(ErrorMessage = "กรุณาระบุหน่วยนับ")]
         public string Unit { get; set; } = string.Empty;
 
+        public string JobNo { get; set; } = string.Empty;
+
         [Range(0, int.MaxValue, ErrorMessage = "จำนวนต้องไม่ติดลบ")]
         public int Quantity { get; set; } = 0;
     }

@@ -78,5 +78,26 @@ namespace StockApi.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpPost("write-off")]
+        public async Task<IActionResult> WriteOffStock([FromBody] WriteOffRequest request)
+        {
+            await _stockService.WriteOffStockAsync(request);
+            return StatusCode(201, new { message = "ตัดจำหน่ายอุปกรณ์เรียบร้อยแล้ว" });
+        }
+
+        [HttpGet("write-off/summary")]
+        public async Task<IActionResult> GetWriteOffSummary()
+        {
+            try
+            {
+                var result = await _stockService.GetWriteOffSummaryAsync();
+                return Ok(result); // ถ้าคุณมี Response Format แบบ { message, data } ก็ครอบตรงนี้ได้เลย
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }

@@ -18,11 +18,13 @@ namespace StockApi.Entities
 
         [Required]
         [Column("Category")]
-        public string Category {  get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
 
         [Required]
         [Column("Unit")]
         public string Unit { get; set; } = string.Empty;
+
+        public string? JobNo { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
