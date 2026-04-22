@@ -171,20 +171,25 @@ namespace StockApi.Services
             var item = await _repo.GetItemByCodeAsync(itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
-            if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
-            {
-                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เพราะยังมีอุปกรณ์คงเหลือ {item.StockBalance.TotalQuantity} ชิ้น");
-            }
-
-            bool hasMovement = await _context.SystemLogs.AnyAsync(x =>
+            // 🔥 1. เช็คว่าเคยมี Action อื่นๆ ที่ไม่ใช่ CREATE กับ UPDATE หรือไม่ (เช่น STOCK_IN, STOCK_OUT, BORROW, RETURN)
+            bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
                 x.RecordId == itemCode &&
-                (x.Action.Contains("STOCK_IN") || x.Action.Contains("STOCK_OUT"))
+                x.Action != "CREATE" &&
+                x.Action != "UPDATE"
             );
 
-            if (hasMovement)
+            // 🔥 2. เงื่อนไขการลบ
+            if (hasOtherActions)
             {
-                throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากอุปกรณ์นี้เคยมีการ รับเข้า/เบิกออก ไปแล้ว (มี Audit History)");
+                // ถ้า "เคย" มีการทำรายการอื่นๆ ไปแล้ว (ของถูกใช้งานจริง) 
+                // บังคับว่ายอดคงเหลือ (TotalQuantity) ต้องเป็น 0 เท่านั้นถึงจะยอมให้ลบ
+                if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
+                {
+                    throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากเคยมีการทำรายการ (เบิก/รับเข้า) ไปแล้ว หากต้องการลบต้องปรับยอดคงเหลือให้เป็น 0 ก่อน");
+                }
             }
+            // *หมายเหตุ: ถ้า hasOtherActions เป็น false (คือมีแค่ CREATE/UPDATE หรือไม่มี Log เลย)
+            // ระบบจะข้ามเงื่อนไขดักจับด้านบนไป ทำให้ลบได้ทันทีต่อให้ Stock > 0 ก็ตาม
 
             string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
 
