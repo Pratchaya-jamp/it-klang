@@ -4,6 +4,7 @@ using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Repositories;
 using Microsoft.AspNetCore.Http;
+using StockApi.Exceptions;
 
 namespace StockApi.Services
 {
@@ -88,6 +89,7 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
+                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
                     if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
 
@@ -172,6 +174,7 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
+                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
                     var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
                     if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
                     if (stock.Balance < request.Quantity) throw new Exception($"อุปกรณ์ {stock.ItemCode} ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance})");
@@ -215,6 +218,7 @@ namespace StockApi.Services
         // 🔥 3. ฟังก์ชัน Write-Off ตัดจำหน่ายของที่หาคืนไม่ได้
         public async Task WriteOffStockAsync(WriteOffRequest request)
         {
+            if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {

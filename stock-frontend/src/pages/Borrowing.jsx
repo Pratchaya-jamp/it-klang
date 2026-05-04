@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Search, ArrowRightLeft, Clock, CheckCircle2, 
-  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, Info, BellRing,
-  ChevronDown, Check // เพิ่มไอคอนสำหรับ Dropdown
+  Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, BellRing, ChevronDown, Package
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -13,71 +12,130 @@ import { useToast } from '../context/ToastContext';
 // Utility
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// --- CUSTOM SELECT COMPONENT (NEW) ---
-const CustomFilterSelect = ({ value, onChange, options }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef(null);
+// Animation คลาสสำหรับ Modal
+const ANIMATION_CLASSES = "transform transition-all duration-200 ease-out will-change-[transform,opacity]";
+
+// --- 1. ITEM SELECTOR MODAL (สำหรับค้นหาและเลือกอุปกรณ์) ---
+const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const handleClick = (e) => { 
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false); 
-    };
-    document.addEventListener("mousedown", handleClick); 
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+    if (isOpen) {
+      setIsMounted(true);
+      setSearchTerm("");
+      setCategoryFilter("");
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
+    } else {
+      setIsVisible(false);
+      setTimeout(() => setIsMounted(false), 200); 
+    }
+  }, [isOpen]);
 
-  const selectedOption = options.find(opt => opt.value === value) || options[0];
+  const safeData = Array.isArray(data) ? data : [];
+  const filteredData = safeData.filter(item => {
+    const matchesSearch = item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) || item.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter ? item.category === categoryFilter : true;
+    return matchesSearch && matchesCategory;
+  });
 
-  return (
-    <div className="relative w-full sm:w-48" ref={wrapperRef}>
-      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 z-10 pointer-events-none" size={16} />
-      <button 
-        type="button" 
-        onClick={() => setIsOpen(!isOpen)} 
-        className={cn(
-          "w-full h-11 pl-9 pr-3 bg-white border border-zinc-200 rounded-xl text-sm transition-all shadow-sm flex items-center justify-between",
-          "hover:bg-zinc-50",
-          isOpen ? "ring-2 ring-zinc-100 border-zinc-300" : "",
-          "text-zinc-700 font-medium"
-        )}
-      >
-        <span className="truncate">{selectedOption.label}</span>
-        <ChevronDown size={14} className={cn("transition-transform text-zinc-400", isOpen && "rotate-180")} />
-      </button>
-      
-      {isOpen && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-          {options.map((opt) => (
-            <div 
-              key={opt.value} 
-              onClick={() => { onChange(opt.value); setIsOpen(false); }} 
-              className={cn(
-                "px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", 
-                value === opt.value ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600"
-              )}
-            >
-              {opt.label} 
-              {value === opt.value && <Check size={14} className="text-zinc-900"/>}
-            </div>
-          ))}
+  const categories = [...new Set(safeData.map(item => item.category).filter(Boolean))];
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
+      <div className={cn("relative bg-white w-full max-w-3xl h-[80vh] rounded-2xl shadow-2xl border border-zinc-100 flex flex-col", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+        <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/80 rounded-t-2xl">
+          <div><h3 className="text-lg font-semibold text-zinc-900">เลือกอุปกรณ์</h3><p className="text-sm text-zinc-500">ค้นหาและเลือกอุปกรณ์จากคลังเพื่อขอยืม</p></div>
+          <button onClick={onClose} className="p-2 text-zinc-400 hover:bg-zinc-200 rounded-full transition-colors"><X size={20}/></button>
         </div>
-      )}
-    </div>
+        <div className="p-4 border-b border-zinc-100 flex gap-3 bg-white shadow-sm z-10">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+            <input type="text" placeholder="ค้นหาด้วยรหัสหรือชื่ออุปกรณ์..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all" autoFocus />
+          </div>
+          <div className="relative w-48">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full h-11 pl-10 pr-8 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 cursor-pointer appearance-none">
+              <option value="">ทุกหมวดหมู่</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={14} />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-zinc-50/30">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-white text-zinc-500 font-medium uppercase text-xs sticky top-0 z-10 shadow-sm border-b border-zinc-100">
+              <tr><th className="px-6 py-3">รหัส</th><th className="px-6 py-3">ชื่อ</th><th className="px-6 py-3">หมวดหมู่</th><th className="px-6 py-3 text-right">คงเหลือ</th><th className="px-6 py-3 text-center">จัดการ</th></tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {filteredData.length > 0 ? (
+                filteredData.map((item) => {
+                  // ✅ เช็คว่าเป็นสถานะ DRAFT- หรือไม่
+                  const isDraft = item.itemCode?.toUpperCase().startsWith('DRAFT-');
+
+                  return (
+                    <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors bg-white">
+                      <td className="px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td>
+                      <td className="px-6 py-3 text-zinc-900">{item.name}</td>
+                      <td className="px-6 py-3 text-zinc-500">{item.category}</td>
+                      <td className="px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
+                      <td className="px-6 py-3 text-center">
+                        <button 
+                          disabled={isDraft}
+                          onClick={() => { onSelect(item); onClose(); }} 
+                          className={cn(
+                            "px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm",
+                            isDraft 
+                              ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" 
+                              : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95"
+                          )}
+                        >
+                          {isDraft ? 'ไม่อนุญาต' : 'เลือก'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="5" className="h-[45vh] bg-transparent p-0">
+                    <div className="flex flex-col items-center justify-center h-full text-zinc-400 w-full absolute left-0">
+                      <Package size={48} className="opacity-20 mb-3" />
+                      <p className="text-sm font-medium text-zinc-500">ไม่พบอุปกรณ์</p>
+                      <p className="text-xs mt-1 text-zinc-400">ลองปรับการค้นหาหรือตัวกรองหมวดหมู่</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-3 bg-white border-t border-zinc-100 text-xs text-zinc-400 flex justify-between rounded-b-2xl">
+          <span>แสดง {filteredData.length} รายการ</span><span>กด ESC เพื่อปิด</span>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 };
 
-// --- 1. BORROW REQUEST MODAL ---
+// --- 2. BORROW REQUEST MODAL ---
 const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     itemCode: '',
+    itemName: '',
     quantity: 1,
     jobId: '',
     dueDate: '',
     note: ''
   });
 
-  const [itemName, setItemName] = useState('');
-  const [isValidating, setIsValidating] = useState(false);
+  const [inventoryData, setInventoryData] = useState([]);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isMounted, setIsMounted] = useState(false);
@@ -86,8 +144,13 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      setFormData({ itemCode: '', quantity: 1, jobId: '', dueDate: '', note: '' });
-      setItemName('');
+      setFormData({ itemCode: '', itemName: '', quantity: 1, jobId: '', dueDate: '', note: '' });
+      
+      // ดึงข้อมูลอุปกรณ์มาเก็บไว้สำหรับหน้าต่างค้นหา
+      request('/api/stocks/overview').then(res => {
+        setInventoryData(Array.isArray(res) ? res : (res?.data || []));
+      }).catch(err => console.error("Failed to load stock data", err));
+
       setTimeout(() => setIsVisible(true), 10);
     } else {
       setIsVisible(false);
@@ -95,36 +158,17 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
     }
   }, [isOpen]);
 
-  // Real-time Item Code Validation
-  useEffect(() => {
-    const fetchItemName = async () => {
-      if (!formData.itemCode || formData.itemCode.length < 3) {
-        setItemName('');
-        return;
-      }
-      
-      setIsValidating(true);
-      try {
-        const response = await request(`/api/items/dashboard?searchId=${formData.itemCode}`);
-        const itemsList = response?.data || [];
-        const foundItem = itemsList.find(item => item.itemCode === formData.itemCode);
-
-        if (foundItem) setItemName(foundItem.name);
-        else setItemName('ไม่พบอุปกรณ์');
-      } catch (error) {
-        setItemName('ไม่พบอุปกรณ์');
-      } finally {
-        setIsValidating(false);
-      }
-    };
-
-    const debounceTimer = setTimeout(fetchItemName, 500);
-    return () => clearTimeout(debounceTimer);
-  }, [formData.itemCode]);
+  const handleSelectItem = (item) => {
+    setFormData(prev => ({
+      ...prev,
+      itemCode: item.itemCode,
+      itemName: item.name
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (itemName === 'ไม่พบอุปกรณ์' || !itemName) return; 
+    if (!formData.itemCode) return; 
 
     setIsSubmitting(true);
     try {
@@ -155,18 +199,17 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // ✅ ฟังก์ชันคำนวณระยะเวลาและสร้างข้อความแจ้งเตือนอีเมล
   const getEmailAlertMessage = () => {
     if (!formData.dueDate) return "เลือกวันที่คืนเพื่อดูรอบการส่งอีเมลแจ้งเตือน";
     
     const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0); // รีเซ็ตเวลาเป็นเที่ยงคืนเพื่อวัดแค่วันที่
+    currentDate.setHours(0, 0, 0, 0);
     
     const [year, month, day] = formData.dueDate.split('-');
     const dueDate = new Date(year, month - 1, day);
     
     const diffTime = dueDate.getTime() - currentDate.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24)); // แปลงเป็นจำนวนวัน
+    const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24)); 
 
     if (diffDays === 0) {
       return "คืนภายในวัน: อีเมลเตือน 12:30 (หากบันทึกก่อน 12:00) หรือ 15:00 (หากบันทึกหลัง 12:30)";
@@ -184,116 +227,130 @@ const BorrowModal = ({ isOpen, onClose, onSuccess }) => {
   if (!isMounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className={cn("absolute inset-0 bg-zinc-900/40 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-      
-      <div className={cn("relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col transform transition-all duration-300 ease-out", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className={cn("absolute inset-0 bg-zinc-900/40 backdrop-blur-sm transition-opacity duration-300 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
         
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
-              <ArrowRightLeft size={20} className="text-zinc-900" />
-              สร้างคำขอยืมอุปกรณ์
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">กรอกรายละเอียดเพื่อขอยืมอุปกรณ์</p>
-          </div>
-          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors">
-            <X size={20} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสอุปกรณ์</label>
-            <div className="relative">
-              <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input 
-                type="text" required placeholder="เช่น 999999999" value={formData.itemCode} 
-                onChange={e => setFormData({...formData, itemCode: e.target.value})} 
-                className="w-full h-11 pl-9 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
-              />
+        <div className={cn("relative bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col transform transition-all duration-300 ease-out", isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+          
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
+                <ArrowRightLeft size={20} className="text-zinc-900" />
+                สร้างคำขอยืมอุปกรณ์
+              </h2>
+              <p className="text-xs text-zinc-500 mt-0.5">กรอกรายละเอียดเพื่อขอยืมอุปกรณ์</p>
             </div>
-            <div className="h-5 px-1 flex items-center">
-              {isValidating ? (
-                 <span className="flex items-center gap-1.5 text-xs text-zinc-400"><Loader2 size={12} className="animate-spin"/> กำลังตรวจสอบอุปกรณ์...</span>
-              ) : itemName === 'ไม่พบอุปกรณ์' ? (
-                 <span className="flex items-center gap-1.5 text-xs text-red-500 font-medium"><X size={12}/> {itemName}</span>
-              ) : itemName ? (
-                 <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium"><CheckCircle2 size={12}/> {itemName}</span>
-              ) : null}
-            </div>
+            <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-full transition-colors">
+              <X size={20} strokeWidth={1.5} />
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* ✅ อัปเดตช่องรหัสอุปกรณ์ให้สามารถคลิกเพื่อเปิด Modal ได้ */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">จำนวน</label>
-              <input 
-                type="number" required min="1" value={formData.quantity} 
-                onChange={e => setFormData({...formData, quantity: e.target.value})} 
-                className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
-              />
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสอุปกรณ์</label>
+              <div className="relative flex gap-2">
+                <div 
+                  onClick={() => setIsPickerOpen(true)} 
+                  className={cn(
+                    "flex-1 h-11 px-3 border rounded-xl text-sm flex items-center cursor-pointer transition-all bg-zinc-50 hover:border-zinc-400 hover:shadow-sm truncate", 
+                    !formData.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium"
+                  )}
+                >
+                    {formData.itemCode ? `${formData.itemCode} - ${formData.itemName}` : "คลิกเพื่อค้นหาอุปกรณ์..."}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setIsPickerOpen(true)} 
+                  className="h-11 w-11 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-xl transition-colors"
+                >
+                  <Search size={16} />
+                </button>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสงาน (Job ID)</label>
-              <input 
-                type="text" required placeholder="ITSERV1" value={formData.jobId} 
-                onChange={e => setFormData({...formData, jobId: e.target.value.toUpperCase()})} 
-                className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">วันที่กำหนดคืน</label>
-              <div className="relative">
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">จำนวน</label>
                 <input 
-                  type="date" required min={today} value={formData.dueDate} 
-                  onChange={e => setFormData({...formData, dueDate: e.target.value})} 
-                  className="w-full h-11 pl-10 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none cursor-text" 
+                  type="number" required min="1" value={formData.quantity} 
+                  onChange={e => setFormData({...formData, quantity: e.target.value})} 
+                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">รหัสงาน (Job ID)</label>
+                <input 
+                  type="text" required placeholder="ITSERV1" value={formData.jobId} 
+                  onChange={e => setFormData({...formData, jobId: e.target.value.toUpperCase()})} 
+                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
                 />
               </div>
             </div>
-            
-            {/* ✅ กล่องข้อความแจ้งเตือนกติกาอีเมล (Dynamic Helper Text) */}
-            <div className={cn("px-3 py-2.5 rounded-lg text-[11px] leading-relaxed border flex items-start gap-2 transition-colors", 
-              formData.dueDate ? "bg-blue-50 border-blue-100 text-blue-700" : "bg-zinc-50 border-zinc-200 text-zinc-500"
-            )}>
-              <BellRing size={14} className="mt-0.5 shrink-0" />
-              <span className="font-medium">{getEmailAlertMessage()}</span>
+
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">วันที่กำหนดคืน</label>
+                <div className="relative">
+                  <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                  <input 
+                    type="date" required min={today} value={formData.dueDate} 
+                    onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                    className="w-full h-11 pl-10 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none cursor-text" 
+                  />
+                </div>
+              </div>
+              
+              <div className={cn("px-3 py-2.5 rounded-lg text-[11px] leading-relaxed border flex items-start gap-2 transition-colors", 
+                formData.dueDate ? "bg-blue-50 border-blue-100 text-blue-700" : "bg-zinc-50 border-zinc-200 text-zinc-500"
+              )}>
+                <BellRing size={14} className="mt-0.5 shrink-0" />
+                <span className="font-medium">{getEmailAlertMessage()}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1 pt-1">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 flex items-center justify-between">
-              หมายเหตุ <span className="text-zinc-300 font-normal normal-case">(ไม่บังคับ)</span>
-            </label>
-            <input 
-              type="text" placeholder="เช่น สำหรับซ่อมบำรุงเซิร์ฟเวอร์ฉุกเฉิน" value={formData.note} 
-              onChange={e => setFormData({...formData, note: e.target.value})} 
-              className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
-            />
-          </div>
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 flex items-center justify-between">
+                หมายเหตุ <span className="text-zinc-300 font-normal normal-case">(ไม่บังคับ)</span>
+              </label>
+              <input 
+                type="text" placeholder="เช่น สำหรับซ่อมบำรุงเซิร์ฟเวอร์ฉุกเฉิน" value={formData.note} 
+                onChange={e => setFormData({...formData, note: e.target.value})} 
+                className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all outline-none" 
+              />
+            </div>
 
-          <div className="pt-4 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all active:scale-95">
-              ยกเลิก
-            </button>
-            <button type="submit" disabled={isSubmitting || isValidating || itemName === 'ไม่พบอุปกรณ์' || !itemName} className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95">
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              ส่งคำขอ
-            </button>
-          </div>
-        </form>
+            <div className="pt-4 flex gap-3">
+              <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-all active:scale-95">
+                ยกเลิก
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting || !formData.itemCode} 
+                className="flex-1 h-11 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-200 active:scale-95"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                ส่งคำขอ
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>,
+
+      <ItemSelectorModal 
+        isOpen={isPickerOpen} 
+        onClose={() => setIsPickerOpen(false)} 
+        onSelect={handleSelectItem} 
+        data={inventoryData} 
+      />
+    </>,
     document.body
   );
 };
 
-
-// --- 2. RETURN CONFIRM MODAL ---
+// --- 3. RETURN CONFIRM MODAL ---
 const ReturnModal = ({ isOpen, onClose, onConfirm, transaction }) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -367,7 +424,61 @@ const ReturnModal = ({ isOpen, onClose, onConfirm, transaction }) => {
 };
 
 
-// --- 3. MAIN PAGE ---
+// --- CUSTOM SELECT COMPONENT (เหมือนเดิม) ---
+const CustomFilterSelect = ({ value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => { 
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false); 
+    };
+    document.addEventListener("mousedown", handleClick); 
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative w-full sm:w-48" ref={wrapperRef}>
+      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 z-10 pointer-events-none" size={16} />
+      <button 
+        type="button" 
+        onClick={() => setIsOpen(!isOpen)} 
+        className={cn(
+          "w-full h-11 pl-9 pr-3 bg-white border border-zinc-200 rounded-xl text-sm transition-all shadow-sm flex items-center justify-between",
+          "hover:bg-zinc-50",
+          isOpen ? "ring-2 ring-zinc-100 border-zinc-300" : "",
+          "text-zinc-700 font-medium"
+        )}
+      >
+        <span className="truncate">{selectedOption.label}</span>
+        <ChevronDown size={14} className={cn("transition-transform text-zinc-400", isOpen && "rotate-180")} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          {options.map((opt) => (
+            <div 
+              key={opt.value} 
+              onClick={() => { onChange(opt.value); setIsOpen(false); }} 
+              className={cn(
+                "px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", 
+                value === opt.value ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600"
+              )}
+            >
+              {opt.label} 
+              {value === opt.value && <Check size={14} className="text-zinc-900"/>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// --- 4. MAIN PAGE ---
 export default function Borrowing() {
   const { showToast } = useToast();
   
@@ -402,7 +513,6 @@ export default function Borrowing() {
     try {
       await request(`/api/borrow/return/${transactionId}`, { method: 'POST' });
       
-      // Update UI real-time
       setTransactions(prev => prev.map(t => 
         t.transactionId === transactionId ? { ...t, status: 'Returned' } : t
       ));
@@ -489,7 +599,6 @@ export default function Borrowing() {
           />
         </div>
         
-        {/* ✅ CUSTOM DROPDOWN REPLACEMENT */}
         <CustomFilterSelect 
           value={statusFilter} 
           onChange={setStatusFilter} 

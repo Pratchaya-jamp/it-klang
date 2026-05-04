@@ -5,6 +5,7 @@ using StockApi.Dtos;
 using StockApi.Entities;
 using StockApi.Repositories;
 using Hangfire;
+using StockApi.Exceptions;
 
 namespace StockApi.Services
 {
@@ -32,6 +33,7 @@ namespace StockApi.Services
 
         public async Task<BorrowTransaction> BorrowItemAsync(string staffId, string recorderName, string recorderEmail, BorrowRequestDto request)
         {
+            if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"ไม่สามารถทำรายการยืมได้ เนื่องจากอุปกรณ์นี้ ({request.ItemCode}) ยังอยู่ในสถานะแบบร่าง (Draft)");
             var item = await _context.Items
                 .Include(i => i.StockBalance)
                 .FirstOrDefaultAsync(i => i.ItemCode == request.ItemCode);
@@ -130,9 +132,9 @@ namespace StockApi.Services
                 await transaction.CommitAsync();
 
                 await _notiService.SendNotificationAsync(
-                    null, 
-                    "มีรายการยืมอุปกรณ์", 
-                    $"คุณ {recorderName} ได้ทำรายการยืม '{item.Name}' จำนวน {request.Quantity} ชิ้น", 
+                    null,
+                    "มีรายการยืมอุปกรณ์",
+                    $"คุณ {recorderName} ได้ทำรายการยืม '{item.Name}' จำนวน {request.Quantity} ชิ้น",
                     "BORROW");
                 return borrowLog;
             }
@@ -187,9 +189,9 @@ namespace StockApi.Services
                 await transaction.CommitAsync();
 
                 await _notiService.SendNotificationAsync(
-                    null, 
-                    "คืนอุปกรณ์เรียบร้อย", 
-                    $"คุณ {recorderName} ได้ทำรายการคืน '{borrowLog.ItemName}' จำนวน {borrowLog.Quantity} ชิ้น", 
+                    null,
+                    "คืนอุปกรณ์เรียบร้อย",
+                    $"คุณ {recorderName} ได้ทำรายการคืน '{borrowLog.ItemName}' จำนวน {borrowLog.Quantity} ชิ้น",
                     "RETURN");
                 return borrowLog;
             }

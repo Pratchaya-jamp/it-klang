@@ -4,8 +4,9 @@ namespace StockApi.Dtos
 {
     public class CreateItemRequest
     {
-        [Required(ErrorMessage = "กรุณาระบุรหัสสินค้า")]
-        public string ItemCode { get; set; } = string.Empty;
+        //[Required(ErrorMessage = "กรุณาระบุรหัสสินค้า")]
+        //public string ItemCode { get; set; } = string.Empty;
+        public string? ItemCode { get; set; }
 
         [Required(ErrorMessage = "กรุณาระบุชื่อสินค้า")]
         public string Name { get; set; } = string.Empty;

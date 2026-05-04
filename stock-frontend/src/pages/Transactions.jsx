@@ -72,12 +72,33 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {filteredData.length > 0 ? (
-                filteredData.map((item) => (
-                  <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors bg-white">
-                    <td className="px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td><td className="px-6 py-3 text-zinc-900">{item.name}</td><td className="px-6 py-3 text-zinc-500">{item.category}</td><td className="px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
-                    <td className="px-6 py-3 text-center"><button onClick={() => { onSelect(item); onClose(); }} className="px-4 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-lg hover:bg-zinc-700 transition-all shadow-sm active:scale-95">เลือก</button></td>
-                  </tr>
-                ))
+                filteredData.map((item) => {
+                  // ✅ เช็คว่าเป็นสถานะ DRAFT- หรือไม่
+                  const isDraft = item.itemCode?.toUpperCase().startsWith('DRAFT-');
+
+                  return (
+                    <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors bg-white">
+                      <td className="px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td>
+                      <td className="px-6 py-3 text-zinc-900">{item.name}</td>
+                      <td className="px-6 py-3 text-zinc-500">{item.category}</td>
+                      <td className="px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
+                      <td className="px-6 py-3 text-center">
+                        <button 
+                          disabled={isDraft}
+                          onClick={() => { onSelect(item); onClose(); }} 
+                          className={cn(
+                            "px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm",
+                            isDraft 
+                              ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" 
+                              : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95"
+                          )}
+                        >
+                          {isDraft ? 'ไม่อนุญาต' : 'เลือก'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="5" className="h-[45vh] bg-transparent p-0">
@@ -453,7 +474,7 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   );
 };
 
-// --- 4. WRITE-OFF SUMMARY MODAL (ใหม่) ---
+// --- 4. WRITE-OFF SUMMARY MODAL ---
 const WriteOffSummaryModal = ({ isOpen, onClose }) => {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -589,7 +610,7 @@ export default function Transactions() {
 
   const [receivingPendingItem, setReceivingPendingItem] = useState(null); 
   const [transactionType, setTransactionType] = useState(null); 
-  const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false); // ✅ State สำหรับเปิด Modal Write-off
+  const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false); 
 
   const loadData = async () => {
     setLoading(true);
@@ -640,7 +661,6 @@ export default function Transactions() {
         }}
       />
 
-      {/* ✅ เรียกใช้งาน Write-off Summary Modal */}
       <WriteOffSummaryModal 
         isOpen={isWriteOffModalOpen}
         onClose={() => setIsWriteOffModalOpen(false)}
@@ -654,7 +674,6 @@ export default function Transactions() {
           <p className="text-zinc-500 text-sm font-light mt-1">จัดการรายการค้างจ่ายและการเบิกจ่ายอุปกรณ์</p>
         </div>
         <div className="flex gap-2">
-          {/* ✅ ปุ่มสำหรับเปิดดูประวัติการตัดจำหน่าย */}
           <button onClick={() => setIsWriteOffModalOpen(true)} className="h-10 px-4 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm font-medium hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
             <Trash2 size={16} /> <span className="hidden sm:inline">ประวัติตัดจำหน่าย</span>
           </button>
