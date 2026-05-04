@@ -1,33 +1,38 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
-  server: {
-    host: true,
-    port: 5173,
-    allowedHosts: [
-      'pratchaya.tailb94bae.ts.net'
+export default defineConfig(({ mode }) => {
+  // ดึงค่า env ทั้งหมดที่ขึ้นต้นด้วย VITE_
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
+    plugins: [
+      react(),
+      tailwindcss(),
     ],
-    hmr: {
-      clientPort: 443
-    },
-    proxy: {
-      '/api': {
-        target: 'https://pratchaya.tailb94bae.ts.net:8443',
-        changeOrigin: true,
-        secure: false,
+    server: {
+      host: true,
+      // แปลง String จาก env เป็น Number
+      port: Number(env.VITE_PORT) || 5173, 
+      allowedHosts: [
+        env.VITE_HOST_NAME
+      ],
+      hmr: {
+        // สำหรับการใช้งานผ่าน Tunnel/Reverse Proxy
+        clientPort: 443 
       },
-      // ✅ เพิ่มส่วนนี้สำหรับ SignalR
-      '/hubs': {
-        target: 'https://pratchaya.tailb94bae.ts.net:8443', // URL ของ Backend คุณ (เปลี่ยนพอร์ตให้ตรง)
-        changeOrigin: true,
-        ws: true, // 🚨 สำคัญมาก! ต้องเปิด WebSockets (ws: true)
+      proxy: {
+        '/api': {
+          target: env.VITE_BACKEND_URL,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/hubs': {
+          target: env.VITE_BACKEND_URL,
+          changeOrigin: true,
+          ws: true, // สำคัญสำหรับ SignalR
+        }
       }
     }
   }
