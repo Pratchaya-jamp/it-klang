@@ -14,6 +14,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Hangfire;
 using Hangfire.MySql;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -215,9 +218,56 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddMemoryCache();
 
+// 1. ตั้งค่าให้รับ IP จริงจาก Nginx
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// 2. ตั้งค่า Rate Limiter
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // กฏทั่วไป: 100 ครั้ง / 1 นาที / 1 IP
+    options.AddPolicy("GlobalPolicy", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: clientIp,
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            });
+    });
+
+    // กฏสำหรับ Login: 5 ครั้ง / 5 นาที / 1 IP (ป้องกัน Brute Force)
+    options.AddPolicy("LoginPolicy", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: clientIp,
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(5)
+            });
+    });
+});
+// --- จบ: สิ้นสุดการตั้งค่า Rate Limiting ---
+
 var app = builder.Build();
 
 //app.UseHangfireDashboard();
+
+app.UseForwardedHeaders();
 
 // 5. Run Middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -233,6 +283,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -253,7 +305,8 @@ using (var scope = app.Services.CreateScope())
 
 app.UseMiddleware<StockApi.Middlewares.RequestLoggingMiddleware>();
 app.MapHub<StockApi.Hubs.NotificationHub>("/hubs/notification");
-app.MapControllers();
+// app.MapControllers();
+app.MapControllers().RequireRateLimiting("GlobalPolicy");
 
 // สร้าง Scope ชั่วคราวเพื่อเรียกใช้ Database ตอนเริ่มโปรแกรม
 using (var scope = app.Services.CreateScope())

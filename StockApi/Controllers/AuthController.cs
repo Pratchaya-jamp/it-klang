@@ -3,6 +3,7 @@ using StockApi.Dtos;
 using StockApi.Services;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace StockApi.Controllers
 {
@@ -39,6 +40,7 @@ namespace StockApi.Controllers
         // POST: api/auth/login
         [AllowAnonymous]
         [HttpPost("login")]
+        [EnableRateLimiting("LoginPolicy")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             try
