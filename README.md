@@ -1,46 +1,103 @@
-# 📦 Inventory & Equipment Management System
+# 📦 IT-KLANG (IT Equipment Inventory Management)
 
-ระบบจัดการคลังอุปกรณ์ เบิก-จ่าย และติดตามสถานะการยืมคืน พร้อมระบบจัดการผู้ใช้งานและการแจ้งปัญหา (Support Ticket) 
+**IT-KLANG** คือระบบบริหารจัดการคลังอุปกรณ์ไอทีส่วนกลาง (IT Operations Center) ที่ออกแบบมาเพื่อรองรับการเบิก-จ่าย, การยืม-คืน, การตัดจำหน่าย (Write-off) และการติดตามสถานะอุปกรณ์แบบเรียลไทม์ พร้อมทั้งมีระบบ User Management และระบบ Helpdesk (Support Ticket) ในตัว เพื่อให้การทำงานของฝ่าย IT Support เป็นไปอย่างมีประสิทธิภาพและตรวจสอบย้อนหลังได้
+
+---
+
+## 🎓 ข้อมูลโครงงานและการฝึกงาน (Project & Internship Details)
+
+*   **นำเสนอ (Presented to):** อาจารย์ [ระบุชื่อ-นามสกุลอาจารย์ปรึกษา]
+*   **มหาวิทยาลัย (University):** คณะเทคโนโลยีสารสนเทศ (SIT) มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี (KMUTT)
+*   **ภายใต้บริษัท (Company):** [ระบุชื่อบริษัทที่ฝึกงาน/ทำงาน]
+*   **พี่เลี้ยง (Mentor):** [ระบุชื่อ-นามสกุลพี่เลี้ยง] 
+*   **ตำแหน่งพี่เลี้ยง (Mentor Position):** [ระบุตำแหน่งของพี่เลี้ยง]
+*   **ผู้จัดทำ (Developer):** [ชื่อ-นามสกุลของคุณ] (และ Pond - *ถ้ามี*)
+*   **ตำแหน่ง (Position):** [ระบุตำแหน่งของคุณ เช่น Software Developer Intern / Full-Stack Developer]
+
+---
+
+## 🚀 ระบบมีอะไรบ้าง (System Features)
+
+1.  **Dashboard & Inventory Management:** 
+    *   ดูภาพรวมจำนวนอุปกรณ์, หมวดหมู่, และรายการล่าสุด
+    *   เพิ่ม แก้ไข ลบ อุปกรณ์ (รองรับการทำ DRAFT Item ที่ระบบจะห้ามทำรายการจนกว่าจะอัปเดตเป็นตัวจริง)
+2.  **Transaction & Stock Control (ระบบเบิก-จ่าย):**
+    *   **Withdraw:** เบิกอุปกรณ์ออกไปใช้งานโดยผูกกับรหัสงาน (Job No)
+    *   **Receive:** รับอุปกรณ์ที่ค้างจ่ายคืนเข้าสู่คลัง
+    *   **Write-Off:** ตัดจำหน่ายอุปกรณ์ที่ชำรุด สูญหาย หรือเลิกผลิต พร้อมสรุปประวัติ (Write-off Summary)
+3.  **Borrowing System (ระบบยืม-คืน):**
+    *   ทำรายการขอยืม ระบุวันที่กำหนดคืน พร้อมแจ้งเตือนส่งอีเมลตามเงื่อนไขวัน
+    *   บันทึกประวัติการยืมและการคืนอุปกรณ์
+4.  **Support Tickets (ระบบแจ้งปัญหา):**
+    *   ผู้ใช้สามารถสร้าง Ticket แจ้งปัญหาให้ฝ่าย IT ได้
+    *   Admin สามารถตอบกลับ และผู้ใช้สามารถให้คะแนนความพึงพอใจ (Rating) ได้
+5.  **User Management & Security (ระบบผู้ใช้งาน):**
+    *   จัดการสิทธิ์ (Role-based access) เช่น SuperAdmin, User
+    *   ตรวจสอบประวัติการเข้าสู่ระบบ (Login Logs / Audit)
+    *   ระบบรีเซ็ตรหัสผ่านด้วย OTP โดย Admin และการตั้งรหัสผ่านใหม่
+
+---
 
 ## 🛠️ Tech Stack
 
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![.NET 9](https://img.shields.io/badge/.NET_9-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Tailscale](https://img.shields.io/badge/Tailscale-191919?style=for-the-badge&logo=tailscale&logoColor=white)
 
+*   **Frontend:** React (Vite) + Tailwind CSS v4 + Lucide Icons
 *   **Backend:** .NET 9 (ASP.NET Core Web API)
-*   **Database:** MySQL
-*   **Deployment:** Docker & Docker Compose
-*   **Network / Tunneling:** Tailscale Funnel
+*   **Database:** MySQL (ใช้งานร่วมกับ Entity Framework Core)
+*   **Deployment:** Docker & Docker Compose (ใช้ Local Volume สำหรับจัดการไฟล์)
+*   **Tunneling/Proxy:** Tailscale Funnel (สำหรับเปิด API สู่ Public แบบ HTTPS)
 
 ---
 
-## 📋 Prerequisites (สิ่งที่ต้องมี)
+## 📡 API Endpoints 
 
-ก่อนเริ่มต้น รบกวนตรวจสอบให้แน่ใจว่าเครื่องเซิร์ฟเวอร์หรือเครื่องสำหรับพัฒนา (Local) ได้ติดตั้งซอฟต์แวร์เหล่านี้แล้ว:
+### 🔐 Authentication & Users
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/auth/login` | เข้าสู่ระบบ |
+| `GET` | `/api/auth/me` | ดึงข้อมูลผู้ใช้งานปัจจุบัน |
+| `GET` | `/api/auth/admin/users` | ดึงข้อมูลผู้ใช้งานทั้งหมด (สำหรับ Admin) |
+| `PUT` | `/api/auth/admin/users/{staffId}` | อัปเดตข้อมูลและสิทธิ์ผู้ใช้งาน |
+| `POST` | `/api/auth/admin/request-otp` | ร้องขอ OTP เพื่อรีเซ็ตรหัสผ่านให้ผู้ใช้ (Admin) |
+| `POST` | `/api/auth/admin/reset-password` | ยืนยัน OTP และให้ระบบสร้างรหัสผ่านใหม่ (Auto-gen) |
+| `GET` | `/api/audit/login-logs` | ดึงประวัติการเข้าสู่ระบบ (กรองด้วย Staff ID ได้) |
 
-*   [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0)
-*   [Docker Desktop](https://www.docker.com/products/docker-desktop) หรือ Docker Engine
-*   [Tailscale](https://tailscale.com/) (สำหรับการทำ Funnel ออกสู่ภายนอก)
+### 📦 Inventory & Dashboard
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/items/dashboard` | ดึงรายการอุปกรณ์ทั้งหมด (รองรับ Query Params เพื่อ Search/Filter) |
+| `POST` | `/api/items` | เพิ่มอุปกรณ์ใหม่ (รองรับการปล่อยว่างให้ระบบ Auto-gen รหัสได้) |
+| `PUT` | `/api/items/{code}` | แก้ไขข้อมูลอุปกรณ์ |
+| `DELETE`| `/api/items/{code}` | ลบอุปกรณ์ออกจากระบบ |
+| `GET` | `/api/stocks/overview` | ดึงข้อมูลรายการอุปกรณ์ทั้งหมดสำหรับการเลือกทำรายการ |
 
-## ⚙️ Configuration (การตั้งค่าสภาพแวดล้อม)
+### 🔄 Transactions (เบิก/รับ/ตัดจำหน่าย)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/transactions/pending` | ดึงรายการค้างจ่าย (Pending) ทั้งหมด |
+| `POST` | `/api/transactions/withdraw` | ทำรายการเบิกจ่ายอุปกรณ์ออกไปใช้งาน |
+| `POST` | `/api/transactions/receive` | ทำรายการรับอุปกรณ์ค้างจ่ายกลับเข้าสต็อก |
+| `POST` | `/api/transactions/write-off` | ทำรายการตัดจำหน่ายอุปกรณ์ทิ้ง (บังคับกรอก Note) |
+| `GET` | `/api/transactions/write-off/summary`| ดึงประวัติและยอดรวมของการตัดจำหน่ายทั้งหมด |
 
-ระบบจะจัดการ Environment Variables ผ่านไฟล์ `.env` อย่างเข้มงวดเพื่อความปลอดภัย (ห้ามตั้งค่าผ่าน Docker configurations โดยตรง)
+### 🤝 Borrowing (ยืม-คืน)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/borrow/history` | ดึงประวัติการยืม-คืนอุปกรณ์ทั้งหมด |
+| `POST` | `/api/borrow/request` | สร้างคำขอยืมอุปกรณ์ใหม่ (ระบุ Due Date) |
+| `POST` | `/api/borrow/return/{id}` | ทำรายการคืนอุปกรณ์ |
 
-1. สร้างไฟล์ `.env` ไว้ที่ Root Directory ของโปรเจค
-2. คัดลอกและปรับแก้ตัวแปรด้านล่างนี้:
-```env
-# Database Configuration
-DB_HOST=db
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_secure_password
-DB_NAME=inventory_db
-
-# Security & JWT
-JWT_SECRET=your_super_secret_key_change_in_production
-JWT_ISSUER=your_issuer
-
-# Storage Configuration (ใช้ Local Volume)
-STORAGE_PATH=/app/uploads
+### 🎫 Support Tickets (ระบบแจ้งปัญหา)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/support/my-tickets` | ดึงรายการ Ticket ของผู้ใช้งานปัจจุบัน |
+| `GET` | `/api/support/tickets` | ดึงรายการ Ticket ทั้งหมดในระบบ (Admin) |
+| `POST` | `/api/support/ticket` | สร้างรายการแจ้งปัญหาใหม่ |
+| `PUT` | `/api/support/ticket/{ticketNo}/reply`| ตอบกลับการแจ้งปัญหา (Admin) |
+| `POST` | `/api/support/ticket/{ticketNo}/rate` | ผู้ใช้งานให้คะแนนประเมินการแก้ปัญหา (1-5 ดาว) |
