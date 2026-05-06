@@ -6,13 +6,13 @@
 
 ## 🎓 ข้อมูลโครงงานและการฝึกงาน (Project & Internship Details)
 
-*   **นำเสนอ (Presented to):** อาจารย์ [อัจฉรา ธารอุไรกุล]
+*   **นำเสนอ (Presented to):** อาจารย์ อัจฉรา ธารอุไรกุล
 *   **มหาวิทยาลัย (University):** คณะเทคโนโลยีสารสนเทศ (SIT) มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี (KMUTT)
-*   **ภายใต้บริษัท (Company):** [บริษัท คอสโม กรุ๊ป จำกัด]
-*   **พี่เลี้ยง (Mentor):** [นายนพดล รอดยอดสร้อย] 
-*   **ตำแหน่งพี่เลี้ยง (Mentor Position):** [System Administrator]
-*   **ผู้จัดทำ (Developer):** [นายปรัชญา จำปาเทศ] (และ Pond - *ถ้ามี*)
-*   **ตำแหน่ง (Position):** [Internship IT Support]
+*   **ภายใต้บริษัท (Company):** บริษัท คอสโม กรุ๊ป จำกัด
+*   **พี่เลี้ยง (Mentor):** นายนพดล รอดยอดสร้อย 
+*   **ตำแหน่งพี่เลี้ยง (Mentor Position):** System Administrator
+*   **ผู้จัดทำ (Developer):** นายปรัชญา จำปาเทศ
+*   **ตำแหน่ง (Position):** Internship IT Support
 
 ---
 
