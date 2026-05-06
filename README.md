@@ -6,13 +6,13 @@
 
 ## 🎓 ข้อมูลโครงงานและการฝึกงาน (Project & Internship Details)
 
-*   **นำเสนอ (Presented to):** อาจารย์ [ระบุชื่อ-นามสกุลอาจารย์ปรึกษา]
+*   **นำเสนอ (Presented to):** อาจารย์ [อัจฉรา ธารอุไรกุล]
 *   **มหาวิทยาลัย (University):** คณะเทคโนโลยีสารสนเทศ (SIT) มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี (KMUTT)
-*   **ภายใต้บริษัท (Company):** [ระบุชื่อบริษัทที่ฝึกงาน/ทำงาน]
-*   **พี่เลี้ยง (Mentor):** [ระบุชื่อ-นามสกุลพี่เลี้ยง] 
-*   **ตำแหน่งพี่เลี้ยง (Mentor Position):** [ระบุตำแหน่งของพี่เลี้ยง]
-*   **ผู้จัดทำ (Developer):** [ชื่อ-นามสกุลของคุณ] (และ Pond - *ถ้ามี*)
-*   **ตำแหน่ง (Position):** [ระบุตำแหน่งของคุณ เช่น Software Developer Intern / Full-Stack Developer]
+*   **ภายใต้บริษัท (Company):** [บริษัท คอสโม กรุ๊ป จำกัด]
+*   **พี่เลี้ยง (Mentor):** [นายนพดล รอดยอดสร้อย] 
+*   **ตำแหน่งพี่เลี้ยง (Mentor Position):** [System Administrator]
+*   **ผู้จัดทำ (Developer):** [นายปรัชญา จำปาเทศ] (และ Pond - *ถ้ามี*)
+*   **ตำแหน่ง (Position):** [Internship IT Support]
 
 ---
 
@@ -40,18 +40,16 @@
 
 ## 🛠️ Tech Stack
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![.NET 9](https://img.shields.io/badge/.NET_9-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Tailscale](https://img.shields.io/badge/Tailscale-191919?style=for-the-badge&logo=tailscale&logoColor=white)
-
-*   **Frontend:** React (Vite) + Tailwind CSS v4 + Lucide Icons
-*   **Backend:** .NET 9 (ASP.NET Core Web API)
-*   **Database:** MySQL (ใช้งานร่วมกับ Entity Framework Core)
-*   **Deployment:** Docker & Docker Compose (ใช้ Local Volume สำหรับจัดการไฟล์)
-*   **Tunneling/Proxy:** Tailscale Funnel (สำหรับเปิด API สู่ Public แบบ HTTPS)
+* **Frontend:**
+    * [![React][React.js]][React-url]
+    * [![Tailwind CSS][Tailwind.css]][Tailwind-url] (พร้อมใช้ Lucide Icons)
+* **Backend:**
+    * [![.NET][Dotnet]][Dotnet-url] (ASP.NET Core Web API 9.0)
+* **Database:**
+    * [![MySQL][Mysql.db]][Mysql-url] (ใช้งานร่วมกับ Entity Framework Core)
+* **Deployment & Networking:**
+    * [![Docker][Docker.com]][Docker-url] (ใช้ Local Volume สำหรับจัดการไฟล์)
+    * [![Tailscale][Tailscale.com]][Tailscale-url] (Funnel สำหรับเปิด API สู่ Public แบบ HTTPS)
 
 ---
 
@@ -101,3 +99,17 @@
 | `POST` | `/api/support/ticket` | สร้างรายการแจ้งปัญหาใหม่ |
 | `PUT` | `/api/support/ticket/{ticketNo}/reply`| ตอบกลับการแจ้งปัญหา (Admin) |
 | `POST` | `/api/support/ticket/{ticketNo}/rate` | ผู้ใช้งานให้คะแนนประเมินการแก้ปัญหา (1-5 ดาว) |
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
+[React-url]: https://reactjs.org/
+[Tailwind.css]: https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white
+[Tailwind-url]: https://tailwindcss.com/
+[Dotnet]: https://img.shields.io/badge/.NET_9-512BD4?style=for-the-badge&logo=dotnet&logoColor=white
+[Dotnet-url]: https://dotnet.microsoft.com/
+[Mysql.db]: https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white
+[Mysql-url]: https://www.mysql.com/
+[Docker.com]: https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white
+[Docker-url]: https://www.docker.com/
+[Tailscale.com]: https://img.shields.io/badge/Tailscale-191919?style=for-the-badge&logo=tailscale&logoColor=white
+[Tailscale-url]: https://tailscale.com/
