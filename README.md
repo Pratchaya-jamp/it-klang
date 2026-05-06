@@ -4,10 +4,17 @@
 
 ## 🛠️ Tech Stack
 
+![.NET 9](https://img.shields.io/badge/.NET_9-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Tailscale](https://img.shields.io/badge/Tailscale-191919?style=for-the-badge&logo=tailscale&logoColor=white)
+
 *   **Backend:** .NET 9 (ASP.NET Core Web API)
 *   **Database:** MySQL
 *   **Deployment:** Docker & Docker Compose
 *   **Network / Tunneling:** Tailscale Funnel
+
+---
 
 ## 📋 Prerequisites (สิ่งที่ต้องมี)
 
