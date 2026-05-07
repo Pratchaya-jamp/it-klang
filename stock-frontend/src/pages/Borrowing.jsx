@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  Search, ArrowRightLeft, Clock, CheckCircle2, 
+  Search, ArrowRightLeft, Clock, CheckCircle2, Check, 
   Calendar, Hash, Plus, Filter, AlertCircle, X, Loader2, Undo2, BellRing, ChevronDown, Package
 } from 'lucide-react';
 import { clsx } from 'clsx';

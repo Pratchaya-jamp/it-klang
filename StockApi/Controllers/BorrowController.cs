@@ -67,11 +67,18 @@ namespace StockApi.Controllers
         }
 
         [HttpGet("history")]
-        public async Task<IActionResult> History()
+        public async Task<IActionResult> GetAllHistory()
         {
-            var staffId = User.Claims.FirstOrDefault(c => c.Type == "id")?.Value;
-            var history = await _borrowService.GetMyHistoryAsync(staffId!);
-            return Ok(history);
+            try
+            {
+                // 🔥 เรียกใช้ฟังก์ชันใหม่ ไม่ต้องส่งค่า StaffId เข้าไปแล้ว
+                var result = await _borrowService.GetAllHistoryAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

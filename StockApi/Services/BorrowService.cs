@@ -13,7 +13,9 @@ namespace StockApi.Services
     {
         Task<BorrowTransaction> BorrowItemAsync(string staffId, string recorderName, string recorderEmail, BorrowRequestDto request);
         Task<BorrowTransaction> ReturnItemAsync(string staffId, string recorderName, string transactionId);
-        Task<List<BorrowResponseDto>> GetMyHistoryAsync(string staffId);
+
+        // 🔥 1. เปลี่ยนชื่อและเอาพารามิเตอร์ staffId ออก
+        Task<List<BorrowResponseDto>> GetAllHistoryAsync();
     }
 
     public class BorrowService : IBorrowService
@@ -56,15 +58,11 @@ namespace StockApi.Services
             var thaiZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             DateTime bangkokNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, thaiZone);
 
-            // ✅ 1. ประกาศตัวแปรไว้นอก Try เพื่อให้ Catch มองเห็น
             string? hangfireJobId = null;
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // =========================================================
-                // 🔥 2. ย้าย Logic การสร้าง Job มาไว้ตรงนี้ (ก่อนบันทึก DB)
-                // =========================================================
                 if (!string.IsNullOrEmpty(recorderEmail) && parsedDueDate.HasValue)
                 {
                     DateTime scheduleTime;
@@ -85,7 +83,6 @@ namespace StockApi.Services
 
                     if (scheduleOffset > DateTimeOffset.UtcNow)
                     {
-                        // ✅ สร้าง Job และเก็บ ID ใส่ตัวแปร
                         hangfireJobId = BackgroundJob.Schedule<IEmailService>(
                             service => service.SendEmailAsync(
                                 recorderEmail,
@@ -101,17 +98,13 @@ namespace StockApi.Services
                         );
                     }
                 }
-                // =========================================================
 
-                // 3. ตัดสต็อก
                 item.StockBalance.Balance -= request.Quantity;
                 _context.StockBalances.Update(item.StockBalance);
                 await _context.SaveChangesAsync();
 
-                // 4. บันทึก Log
                 await _systemLogRepo.AddLogAsync("BORROW", "StockBalances", item.ItemCode, oldBalance.ToString(), item.StockBalance.Balance.ToString(), recorderName);
 
-                // 5. สร้าง Transaction (ตอนนี้ hangfireJobId มีค่าแล้ว หรือเป็น null ก็ได้)
                 var borrowLog = new BorrowTransaction
                 {
                     TransactionId = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
@@ -125,7 +118,7 @@ namespace StockApi.Services
                     DueDate = parsedDueDate,
                     Status = "Borrowed",
                     Note = request.Note,
-                    HangfireJobId = hangfireJobId // ✅ ใส่ค่าตรงนี้ได้แล้ว ไม่แดง
+                    HangfireJobId = hangfireJobId
                 };
                 await _borrowRepo.AddAsync(borrowLog);
 
@@ -140,7 +133,6 @@ namespace StockApi.Services
             }
             catch
             {
-                // ✅ Catch มองเห็น hangfireJobId แล้ว เพราะประกาศไว้นอก Try
                 if (!string.IsNullOrEmpty(hangfireJobId))
                 {
                     BackgroundJob.Delete(hangfireJobId);
@@ -178,7 +170,6 @@ namespace StockApi.Services
                 borrowLog.Status = "Returned";
                 borrowLog.ReturnDate = bangkokNow;
 
-                // ลบ Job แจ้งเตือนทิ้ง
                 if (!string.IsNullOrEmpty(borrowLog.HangfireJobId))
                 {
                     BackgroundJob.Delete(borrowLog.HangfireJobId);
@@ -202,9 +193,14 @@ namespace StockApi.Services
             }
         }
 
-        public async Task<List<BorrowResponseDto>> GetMyHistoryAsync(string staffId)
+        // 🔥 2. เปลี่ยนฟังก์ชันดึงประวัติมาเป็นตัวนี้
+        public async Task<List<BorrowResponseDto>> GetAllHistoryAsync()
         {
-            var logs = await _borrowRepo.GetByStaffIdAsync(staffId);
+            // ดึงข้อมูลทั้งหมดโดยไม่กรอง StaffId และเรียงลำดับเวลาใหม่สุดขึ้นก่อน
+            var logs = await _context.BorrowTransactions
+                .OrderByDescending(l => l.BorrowDate)
+                .ToListAsync();
+
             return logs.Select(l => new BorrowResponseDto
             {
                 Id = l.Id,
