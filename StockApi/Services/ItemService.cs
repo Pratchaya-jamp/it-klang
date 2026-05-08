@@ -60,25 +60,28 @@ namespace StockApi.Services
         // C: Create Item
         public async Task<ItemDto> CreateItemAsync(CreateItemRequest request)
         {
-            var exists = await _context.Items.AnyAsync(x => x.ItemCode == request.ItemCode);
-            if (exists) throw new BadRequestException($"รหัสอุปกรณ์ '{request.ItemCode}' มีอยู่ในระบบแล้ว");
+            // 🔥 1. เช็คว่ายูสเซอร์กรอกรหัสมาไหม ถ้าไม่กรอกให้ Gen คำว่า DRAFT- อัตโนมัติ
+            bool isDraft = string.IsNullOrWhiteSpace(request.ItemCode);
+            string finalItemCode = isDraft
+                ? $"DRAFT-{Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper()}"
+                : request.ItemCode!;
+
+            var exists = await _context.Items.AnyAsync(x => x.ItemCode == finalItemCode);
+            if (exists) throw new BadRequestException($"รหัสอุปกรณ์ '{finalItemCode}' มีอยู่ในระบบแล้ว");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var now = DateTime.Now;
-                string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
+                string currentUser = GetCurrentUserName();
 
                 var newItem = new Item
                 {
-                    ItemCode = request.ItemCode,
+                    ItemCode = finalItemCode, // ✅ ใช้รหัสที่สกรีนมาแล้ว
                     Name = request.Name,
                     Category = request.Category,
                     Unit = request.Unit,
-
-                    // 🔥 บันทึก JobNo ลงตาราง Items โดยตรง (ถ้าไม่ได้ส่งมามันจะเป็นค่าว่าง ไม่Error)
                     JobNo = request.JobNo,
-
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -87,7 +90,7 @@ namespace StockApi.Services
 
                 var newStock = new StockBalance
                 {
-                    ItemCode = request.ItemCode,
+                    ItemCode = finalItemCode, // ✅ ผูกกับรหัสใหม่
                     Received = request.Quantity,
                     TotalQuantity = request.Quantity,
                     Balance = request.Quantity,
@@ -98,22 +101,16 @@ namespace StockApi.Services
                 _context.StockBalances.Add(newStock);
                 await _context.SaveChangesAsync();
 
-                // ✅ 5. ใช้ currentUser แทน "Admin"
                 await _logRepo.AddLogAsync(
-                    "CREATE",
-                    "Items",
-                    newItem.ItemCode,
-                    "-",
-                    $"Name: {newItem.Name}, Category: {newItem.Category}, InitialStock: {request.Quantity}",
+                    "CREATE", "Items", newItem.ItemCode, "-",
+                    $"Name: {newItem.Name}, Category: {newItem.Category}, InitialStock: {request.Quantity}{(isDraft ? " (DRAFT)" : "")}",
                     currentUser
                 );
 
                 await transaction.CommitAsync();
 
-                // ✅ เพิ่มชื่อคนทำในแจ้งเตือนด้วย
                 await _notiService.SendNotificationAsync(
-                    null,
-                    "เพิ่มอุปกรณ์ใหม่",
+                    null, "เพิ่มอุปกรณ์ใหม่",
                     $"คุณ {currentUser} เพิ่มอุปกรณ์ '{newItem.Name}' ({newItem.ItemCode}) จำนวน {request.Quantity} {newItem.Unit} ลงในระบบ",
                     "ITEM_CREATE");
 
@@ -138,15 +135,57 @@ namespace StockApi.Services
         // U: Update
         public async Task UpdateItemAsync(string itemCode, UpdateItemRequest request)
         {
-            var item = await _repo.GetItemByCodeAsync(itemCode);
+            var item = await _context.Items.Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
-            string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
-
-            string oldValue = $"Name: {item.Name}, Cat: {item.Category}, Unit: {item.Unit}";
+            string currentUser = GetCurrentUserName();
             string oldName = item.Name;
             var now = DateTime.Now;
 
+            // 🔥 2. ดักจับและจัดการการแก้ไข ItemCode
+            if (!string.IsNullOrWhiteSpace(request.ItemCode) && request.ItemCode != item.ItemCode)
+            {
+                // ถ้าของเดิมไม่ใช่ DRAFT ห้ามแก้รหัส!
+                if (!item.ItemCode.StartsWith("DRAFT-"))
+                {
+                    throw new BadRequestException("ไม่สามารถแก้ไขรหัสสินค้าได้ เนื่องจากอุปกรณ์นี้ไม่ได้อยู่ในสถานะร่าง (Draft) แล้ว");
+                }
+
+                // เช็คว่ารหัสใหม่มีคนใช้หรือยัง
+                var exists = await _context.Items.AnyAsync(x => x.ItemCode == request.ItemCode);
+                if (exists) throw new BadRequestException($"รหัสอุปกรณ์ '{request.ItemCode}' มีคนใช้ไปแล้ว");
+
+                // ทริคสลับตารางลูก (ลบยอดเก่า สร้างยอดใหม่ด้วยรหัสใหม่ เพื่อป้องกัน DB Foreign Key Error)
+                var oldStock = item.StockBalance;
+                if (oldStock != null)
+                {
+                    _context.StockBalances.Remove(oldStock);
+                    await _context.SaveChangesAsync();
+                }
+
+                item.ItemCode = request.ItemCode;
+                _context.Items.Update(item);
+                await _context.SaveChangesAsync();
+
+                if (oldStock != null)
+                {
+                    var newStock = new StockBalance
+                    {
+                        ItemCode = request.ItemCode,
+                        TotalQuantity = oldStock.TotalQuantity,
+                        Received = oldStock.Received,
+                        Balance = oldStock.Balance,
+                        TempWithdrawn = oldStock.TempWithdrawn,
+                        CreatedAt = oldStock.CreatedAt,
+                        UpdatedAt = now
+                    };
+                    _context.StockBalances.Add(newStock);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            // อัปเดตฟิลด์อื่นๆ ตามปกติ
+            string oldValue = $"Name: {oldName}, Cat: {item.Category}, Unit: {item.Unit}";
             item.Name = request.Name;
             item.Category = request.Category;
             item.Unit = request.Unit;
@@ -159,15 +198,13 @@ namespace StockApi.Services
 
             string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}";
 
-            // ✅ ใช้ currentUser แทน "Admin"
-            await _logRepo.AddLogAsync("UPDATE", "Items", itemCode, oldValue, newValue, currentUser);
+            await _logRepo.AddLogAsync("UPDATE", "Items", item.ItemCode, oldValue, newValue, currentUser);
 
-            await _repo.UpdateItemAsync(item);
+            // หมายเหตุ: ไม่ต้องเรียก _repo.UpdateItemAsync(item) แล้ว เพราะเรา SaveChanges ไปด้านบนแล้ว
 
             await _notiService.SendNotificationAsync(
-                null,
-                "แก้ไขข้อมูลอุปกรณ์",
-                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' ({itemCode}) เรียบร้อยแล้ว",
+                null, "แก้ไขข้อมูลอุปกรณ์",
+                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' รหัสปัจจุบันคือ ({item.ItemCode}) เรียบร้อยแล้ว",
                 "ITEM_UPDATE");
         }
 
