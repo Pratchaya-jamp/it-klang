@@ -135,76 +135,112 @@ namespace StockApi.Services
         // U: Update
         public async Task UpdateItemAsync(string itemCode, UpdateItemRequest request)
         {
-            var item = await _context.Items.Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
+            // 🔥 ใช้ AsNoTracking เพื่อปลดล็อกให้เราจัดการ ItemCode (Primary Key) ได้
+            var item = await _context.Items.AsNoTracking().Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
             if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
             string currentUser = GetCurrentUserName();
             string oldName = item.Name;
             var now = DateTime.Now;
 
-            // 🔥 2. ดักจับและจัดการการแก้ไข ItemCode
+            // =======================================================
+            // กรณีที่ 1: เปลี่ยนรหัสจาก DRAFT เป็นรหัสจริง
+            // =======================================================
             if (!string.IsNullOrWhiteSpace(request.ItemCode) && request.ItemCode != item.ItemCode)
             {
-                // ถ้าของเดิมไม่ใช่ DRAFT ห้ามแก้รหัส!
                 if (!item.ItemCode.StartsWith("DRAFT-"))
-                {
                     throw new BadRequestException("ไม่สามารถแก้ไขรหัสสินค้าได้ เนื่องจากอุปกรณ์นี้ไม่ได้อยู่ในสถานะร่าง (Draft) แล้ว");
-                }
 
-                // เช็คว่ารหัสใหม่มีคนใช้หรือยัง
                 var exists = await _context.Items.AnyAsync(x => x.ItemCode == request.ItemCode);
                 if (exists) throw new BadRequestException($"รหัสอุปกรณ์ '{request.ItemCode}' มีคนใช้ไปแล้ว");
 
-                // ทริคสลับตารางลูก (ลบยอดเก่า สร้างยอดใหม่ด้วยรหัสใหม่ เพื่อป้องกัน DB Foreign Key Error)
-                var oldStock = item.StockBalance;
-                if (oldStock != null)
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    _context.StockBalances.Remove(oldStock);
-                    await _context.SaveChangesAsync();
-                }
+                    // 1. สั่งลบตารางลูกและตารางแม่ของรหัส Draft ทิ้ง (ลบตรงๆ ที่ระดับ Database เร็วและไม่ติด Tracking)
+                    await _context.StockBalances.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
+                    await _context.Items.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
 
-                item.ItemCode = request.ItemCode;
-                _context.Items.Update(item);
-                await _context.SaveChangesAsync();
-
-                if (oldStock != null)
-                {
-                    var newStock = new StockBalance
+                    // 2. สร้าง Item ใหม่ ด้วยรหัสใหม่เอี่ยม
+                    var newItem = new Item
                     {
                         ItemCode = request.ItemCode,
-                        TotalQuantity = oldStock.TotalQuantity,
-                        Received = oldStock.Received,
-                        Balance = oldStock.Balance,
-                        TempWithdrawn = oldStock.TempWithdrawn,
-                        CreatedAt = oldStock.CreatedAt,
+                        Name = request.Name,
+                        Category = request.Category,
+                        Unit = request.Unit,
+                        JobNo = item.JobNo,
+                        CreatedAt = item.CreatedAt,
                         UpdatedAt = now
                     };
-                    _context.StockBalances.Add(newStock);
+                    _context.Items.Add(newItem);
                     await _context.SaveChangesAsync();
+
+                    // 3. สร้าง StockBalance ใหม่ ผูกกับรหัสใหม่ (ตัวเลขดึงมาจากของเดิมทั้งหมด)
+                    if (item.StockBalance != null)
+                    {
+                        var newStock = new StockBalance
+                        {
+                            ItemCode = request.ItemCode,
+                            TotalQuantity = item.StockBalance.TotalQuantity,
+                            Received = item.StockBalance.Received,
+                            TempWithdrawn = item.StockBalance.TempWithdrawn,
+                            Balance = item.StockBalance.Balance,
+                            LastReceivedDate = item.StockBalance.LastReceivedDate,
+                            CreatedAt = item.StockBalance.CreatedAt,
+                            UpdatedAt = now
+                        };
+                        _context.StockBalances.Add(newStock);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    // 4. อัปเดตประวัติ Log เก่าๆ ที่เคยเป็นชื่อ DRAFT- ให้เปลี่ยนเป็นรหัสใหม่ด้วย 
+                    await _context.SystemLogs
+                        .Where(x => x.RecordId == itemCode)
+                        .ExecuteUpdateAsync(s => s.SetProperty(x => x.RecordId, request.ItemCode));
+
+                    await transaction.CommitAsync();
+
+                    await _logRepo.AddLogAsync("UPDATE_CODE", "Items", request.ItemCode, itemCode, request.ItemCode, currentUser);
+                    
+                    await _notiService.SendNotificationAsync(
+                        null, "ยืนยันรหัสอุปกรณ์",
+                        $"คุณ {currentUser} บันทึกรหัสจริง '{request.ItemCode}' ให้กับอุปกรณ์ '{request.Name}' เรียบร้อยแล้ว",
+                        "ITEM_UPDATE");
+
+                    return; // 💥 จบการทำงานเลย เพราะเปลี่ยนรหัสเสร็จแล้ว
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
                 }
             }
 
-            // อัปเดตฟิลด์อื่นๆ ตามปกติ
-            string oldValue = $"Name: {oldName}, Cat: {item.Category}, Unit: {item.Unit}";
-            item.Name = request.Name;
-            item.Category = request.Category;
-            item.Unit = request.Unit;
-            item.UpdatedAt = now;
+            // =======================================================
+            // กรณีที่ 2: แก้ไขข้อมูลทั่วไปโดยไม่ได้เปลี่ยนรหัส
+            // =======================================================
+            var trackedItem = await _context.Items.Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
+            
+            string oldValue = $"Name: {trackedItem!.Name}, Cat: {trackedItem.Category}, Unit: {trackedItem.Unit}";
+            
+            trackedItem.Name = request.Name;
+            trackedItem.Category = request.Category;
+            trackedItem.Unit = request.Unit;
+            trackedItem.UpdatedAt = now;
 
-            if (item.StockBalance != null)
+            if (trackedItem.StockBalance != null)
             {
-                item.StockBalance.UpdatedAt = now;
+                trackedItem.StockBalance.UpdatedAt = now;
             }
 
             string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}";
+            await _logRepo.AddLogAsync("UPDATE", "Items", trackedItem.ItemCode, oldValue, newValue, currentUser);
 
-            await _logRepo.AddLogAsync("UPDATE", "Items", item.ItemCode, oldValue, newValue, currentUser);
-
-            // หมายเหตุ: ไม่ต้องเรียก _repo.UpdateItemAsync(item) แล้ว เพราะเรา SaveChanges ไปด้านบนแล้ว
+            await _context.SaveChangesAsync();
 
             await _notiService.SendNotificationAsync(
                 null, "แก้ไขข้อมูลอุปกรณ์",
-                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' รหัสปัจจุบันคือ ({item.ItemCode}) เรียบร้อยแล้ว",
+                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' รหัสปัจจุบันคือ ({trackedItem.ItemCode}) เรียบร้อยแล้ว",
                 "ITEM_UPDATE");
         }
 
@@ -218,7 +254,8 @@ namespace StockApi.Services
             bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
                 x.RecordId == itemCode &&
                 x.Action != "CREATE" &&
-                x.Action != "UPDATE"
+                x.Action != "UPDATE" && 
+                x.Action != "UPDATE_CODE" // อนุญาตให้เปลี่ยนรหัสลบได้
             );
 
             // 🔥 2. เงื่อนไขการลบ
@@ -231,8 +268,6 @@ namespace StockApi.Services
                     throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากเคยมีการทำรายการ (เบิก/รับเข้า) ไปแล้ว หากต้องการลบต้องปรับยอดคงเหลือให้เป็น 0 ก่อน");
                 }
             }
-            // *หมายเหตุ: ถ้า hasOtherActions เป็น false (คือมีแค่ CREATE/UPDATE หรือไม่มี Log เลย)
-            // ระบบจะข้ามเงื่อนไขดักจับด้านบนไป ทำให้ลบได้ทันทีต่อให้ Stock > 0 ก็ตาม
 
             string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
 
