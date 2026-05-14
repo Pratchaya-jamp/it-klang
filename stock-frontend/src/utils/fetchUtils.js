@@ -2,11 +2,17 @@
  * Custom Fetch Wrapper for handling HttpOnly Cookies & Global Errors
  */
 export const request = async (endpoint, options = {}) => {
-  // 1. Default Headers
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
+  const headers = { ...options.headers };
+
+  // ✅ เพิ่มเงื่อนไข: ถ้าไม่ใช่ FormData และมีการส่ง body มา ให้แปลงเป็น JSON String
+  if (!(options.body instanceof FormData) && options.body) {
+    headers['Content-Type'] = 'application/json';
+    
+    // สำคัญ: ต้องแปลง Object ให้เป็น String ก่อนส่ง
+    if (typeof options.body !== 'string') {
+      options.body = JSON.stringify(options.body);
+    }
+  }
 
   // 2. Configuration
   const config = {
@@ -44,8 +50,9 @@ export const request = async (endpoint, options = {}) => {
       throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
     }
 
-    // 5. Return JSON
-    return await response.json();
+    // 5. Return JSON (เผื่อกรณี API ส่งค่ากลับมาเป็น String เปล่าๆ ให้ดักไว้จะได้ไม่ Error)
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
 
   } catch (error) {
     throw error;

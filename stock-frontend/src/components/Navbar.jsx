@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User, 
+  LayoutGrid, Package, ArrowRightLeft, Settings, Bell, User, ClipboardList,
   Users, LogOut, ChevronDown, Loader2, Activity, CheckCheck, X, LifeBuoy, Ticket 
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -373,6 +373,14 @@ export default function Navbar() {
                 >
                   <User size={16} />
                   ข้อมูลส่วนตัว
+                </Link>
+                <Link 
+                  to="/todos" 
+                  onClick={() => setIsProfileOpen(false)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors text-left"
+                >
+                  <ClipboardList size={16} />
+                  ใบงานของฉัน
                 </Link>
                   {(user?.role === 'SuperAdmin' || user?.data?.role === 'SuperAdmin' || userData?.role === 'SuperAdmin') && (
                   <>

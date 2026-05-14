@@ -56,7 +56,7 @@ export const ToastProvider = ({ children }) => {
       
       {/* Render Toast Globally */}
       {isMounted && toast && (
-        <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end pointer-events-none">
+        <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
           <div 
             className={cn(
               "pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border min-w-[300px]",

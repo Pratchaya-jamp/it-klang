@@ -30,6 +30,7 @@ const About = lazy(() => import('./pages/About'));
 const ApiDocs = lazy(() => import('./pages/ApiDocs'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const CookiesPolicy = lazy(() => import('./pages/CookiesPolicy'));
+const Todos = lazy(() => import('./pages/MyTodos'));
 
 // --- LAYOUTS ---
 
@@ -147,6 +148,7 @@ function App() {
                   <Route path="/borrowing" element={<Borrowing />} />
                   <Route path="/troubleshoot" element={<Troubleshoot />} />
                   <Route path="/support-tickets" element={<SupportTickets />} />
+                  <Route path="/todos" element={<Todos />} />
                 </Route>
               </Route>
 
