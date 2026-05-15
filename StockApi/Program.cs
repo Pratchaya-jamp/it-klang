@@ -75,6 +75,8 @@ builder.Services.AddScoped<IUserAuditService, UserAuditService>();
 builder.Services.AddScoped<StockApi.Repositories.BorrowRepository>();
 builder.Services.AddScoped<StockApi.Services.IBorrowService, StockApi.Services.BorrowService>();
 builder.Services.AddScoped<ISupportService, SupportService>();
+builder.Services.AddScoped<ITodoRepository, TodoRepository>();
+builder.Services.AddScoped<ITodoService, TodoService>();
 
 
 builder.Services.AddHangfire(config => config
@@ -325,6 +327,15 @@ using (var scope = app.Services.CreateScope())
     {
         Console.WriteLine($"⚠️ Warmup Error: {ex.Message}");
     }
+
+    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+    // ตั้งเวลาให้ทำงานทุกๆ เที่ยงคืน (เวลา Server) แบบอัตโนมัติ
+    recurringJobManager.AddOrUpdate<ITodoService>(
+        "Auto-Cleanup-Todo-Trash",
+        service => service.ClearExpiredTrashJobAsync(),
+        Cron.Daily
+    );
 }
 
 app.Run();

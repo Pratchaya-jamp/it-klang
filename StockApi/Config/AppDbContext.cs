@@ -17,6 +17,7 @@ namespace StockApi.Config
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<NotificationRead> NotificationReads { get; set; }
         public DbSet<SupportTicket> SupportTickets { get; set; }
+        public DbSet<TodoTask> TodoTasks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
