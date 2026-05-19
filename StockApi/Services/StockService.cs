@@ -285,43 +285,60 @@ namespace StockApi.Services
             catch { await transaction.RollbackAsync(); throw; }
         }
 
+        // 🔥 1. ปรับปรุงการดึงสรุปตัดจำหน่าย (แยกตาม Job และระบุคนทำ)
         public async Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync()
         {
-            // 1. ดึงประวัติเฉพาะ Type "WRITE_OFF" แล้วจัดกลุ่มตาม ItemCode เพื่อรวมยอด
             var writeOffStats = await _context.StockTransactions
                 .Where(t => t.Type == "WRITE_OFF")
-                .GroupBy(t => t.ItemCode)
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
                 .Select(g => new
                 {
-                    ItemCode = g.Key,
+                    JobNo = g.Key.JobNo,
+                    ItemCode = g.Key.ItemCode,
                     TotalWriteOff = g.Sum(x => x.Quantity),
-                    LastDate = g.Max(x => x.CreatedAt) // หาวันที่ตัดทิ้งล่าสุด
+                    LastDate = g.Max(x => x.CreatedAt),
+                    // ใครเป็นคนกด WRITE_OFF รายการล่าสุดในกลุ่มนี้
+                    ActionBy = g.OrderByDescending(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault()
                 })
                 .ToListAsync();
 
             if (!writeOffStats.Any()) return new List<WriteOffSummaryDto>();
 
-            // 2. ดึงชื่ออุปกรณ์และหมวดหมู่จากตาราง Items มาผูก
-            var itemCodes = writeOffStats.Select(x => x.ItemCode).ToList();
+            var itemCodes = writeOffStats.Select(x => x.ItemCode).Distinct().ToList();
+            var jobNos = writeOffStats.Select(x => x.JobNo).Distinct().ToList();
+
+            // ไปหาว่า Job นี้ ใครเป็นคน "เบิก (OUT)" ออกไปคนแรก
+            var outTransactions = await _context.StockTransactions
+                .Where(t => t.Type == "OUT" && jobNos.Contains(t.JobNo) && itemCodes.Contains(t.ItemCode))
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
+                .Select(g => new 
+                { 
+                    JobNo = g.Key.JobNo, 
+                    ItemCode = g.Key.ItemCode, 
+                    RecordedBy = g.OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault() 
+                })
+                .ToListAsync();
+
             var itemsDict = await _context.Items
                 .Where(i => itemCodes.Contains(i.ItemCode))
                 .ToDictionaryAsync(i => i.ItemCode, i => new { i.Name, i.Category });
 
-            // 3. ประกอบร่างส่งกลับไปให้หน้าบ้าน
             return writeOffStats.Select(x => new WriteOffSummaryDto
             {
+                JobNo = x.JobNo,
                 ItemCode = x.ItemCode,
                 ItemName = itemsDict.ContainsKey(x.ItemCode) ? itemsDict[x.ItemCode].Name : "Unknown",
                 Category = itemsDict.ContainsKey(x.ItemCode) ? itemsDict[x.ItemCode].Category : "-",
-
                 TotalWriteOff = x.TotalWriteOff,
-                LastWriteOffDate = x.LastDate.ToString("dd/MM/yyyy HH:mm:ss")
+                LastWriteOffDate = x.LastDate.ToString("dd/MM/yyyy HH:mm:ss"),
+                ActionBy = x.ActionBy ?? "-",
+                RecordedBy = outTransactions.FirstOrDefault(o => o.JobNo == x.JobNo && o.ItemCode == x.ItemCode)?.RecordedBy ?? "-"
             })
-            // เรียงลำดับจากรายการที่เพิ่งถูกตัดทิ้งล่าสุดขึ้นก่อน
             .OrderByDescending(x => x.LastWriteOffDate)
             .ToList();
         }
 
+        // 🔥 2. ปรับปรุงรายการค้างรับคืน ให้โชว์คนเบิกของ
         public async Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync()
         {
             var groupedTransactions = await _context.StockTransactions
@@ -332,11 +349,10 @@ namespace StockApi.Services
                     JobNo = g.Key.JobNo,
                     ItemCode = g.Key.ItemCode,
                     Withdrawn = g.Where(x => x.Type == "OUT").Sum(x => x.Quantity),
-
-                    // 🔥 แก้ตรงนี้: ถือว่าการ WRITE_OFF คือการเคลียร์ยอด (Returned) รูปแบบหนึ่ง
                     Returned = g.Where(x => x.Type == "IN" || x.Type == "WRITE_OFF").Sum(x => x.Quantity),
-
-                    LastTransactionDate = g.Max(x => x.CreatedAt)
+                    LastTransactionDate = g.Max(x => x.CreatedAt),
+                    // ดึงชื่อคนที่ทำรายการเบิกออก (OUT) ครั้งแรกของจ็อบนี้
+                    RecordedBy = g.Where(x => x.Type == "OUT").OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault()
                 })
                 .Where(x => (x.Withdrawn - x.Returned) > 0)
                 .ToListAsync();
@@ -347,18 +363,17 @@ namespace StockApi.Services
                 .Where(b => itemCodes.Contains(b.ItemCode))
                 .ToDictionaryAsync(b => b.ItemCode, b => b.Item?.Name ?? "Unknown");
 
-            var pendingList = groupedTransactions.Select(t => new PendingWithdrawalDto
+            return groupedTransactions.Select(t => new PendingWithdrawalDto
             {
                 JobNo = t.JobNo,
                 ItemCode = t.ItemCode,
                 ItemName = itemsDict.ContainsKey(t.ItemCode) ? itemsDict[t.ItemCode] : "Unknown",
                 PendingAmount = t.Withdrawn - t.Returned,
-                LastUpdated = t.LastTransactionDate.ToString("dd/MM/yyyy HH:mm:ss")
+                LastUpdated = t.LastTransactionDate.ToString("dd/MM/yyyy HH:mm:ss"),
+                RecordedBy = t.RecordedBy ?? "-"
             })
             .OrderByDescending(x => x.LastUpdated)
             .ToList();
-
-            return pendingList;
         }
 
         private string GenerateTransactionNo()

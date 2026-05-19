@@ -41,8 +41,12 @@ namespace StockApi.Dtos
         public string ItemCode { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        public string JobNo { get; set; } = string.Empty;
 
         public int TotalWriteOff { get; set; } // จำนวนชิ้นรวมที่ถูกตัดทิ้ง
         public string LastWriteOffDate { get; set; } = string.Empty; // วันที่ตัดทิ้งล่าสุด
+
+        public string RecordedBy { get; set; } = string.Empty; // คนเบิกของ (ใครเป็นคนเอาของออกไป)
+        public string ActionBy { get; set; } = string.Empty;
     }
 }

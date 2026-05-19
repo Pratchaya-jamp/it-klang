@@ -8,5 +8,6 @@ namespace StockApi.Dtos
         [Required] public string Name { get; set; } = string.Empty;
         [Required] public string Category { get; set; } = string.Empty;
         [Required] public string Unit { get; set; } = string.Empty;
+        public int Quantity { get; set; }
     }
 }

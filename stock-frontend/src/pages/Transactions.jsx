@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  ArrowDownToLine, ArrowUpFromLine, Search, Package, 
+  ArrowDownToLine, ArrowUpFromLine, Search, Package, User,
   Hash, Clock, X, Loader2, CheckCircle2, FileText,
   ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon
 } from 'lucide-react';
@@ -511,7 +511,9 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
       const q = searchQuery.toLowerCase();
       return item.itemCode?.toLowerCase().includes(q) || 
              item.itemName?.toLowerCase().includes(q) ||
-             item.category?.toLowerCase().includes(q);
+             item.category?.toLowerCase().includes(q) ||
+             item.recordedBy?.toLowerCase().includes(q) || // ค้นหาด้วยชื่อผู้เบิก
+             item.actionBy?.toLowerCase().includes(q);     // ค้นหาด้วยชื่อผู้ตัด
     });
   }, [summaryData, searchQuery]);
 
@@ -554,6 +556,7 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
                 <th className="px-6 py-3">ชื่ออุปกรณ์</th>
                 <th className="px-6 py-3">หมวดหมู่</th>
                 <th className="px-6 py-3 text-center">ยอดตัดจำหน่ายรวม</th>
+                <th className="px-4 sm:px-6 py-4 whitespace-nowrap">ผู้ทำรายการ (เบิก / ตัด)</th>
                 <th className="px-6 py-3 text-right">ทำรายการล่าสุด</th>
               </tr>
             </thead>
@@ -574,6 +577,18 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
                       <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md bg-red-50 text-red-700 font-bold text-sm border border-red-100">
                         {item.totalWriteOff}
                       </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex flex-col gap-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 text-zinc-600">
+                           <span className="w-10 text-zinc-400 font-medium">ผู้เบิก:</span> 
+                           <span className="font-medium bg-zinc-100 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.recordedBy}>{item.recordedBy || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-red-600">
+                           <span className="w-10 text-red-400 font-medium">ผู้ตัด:</span> 
+                           <span className="font-medium bg-red-50 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.actionBy}>{item.actionBy || '-'}</span>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right text-xs text-zinc-500 font-mono">
                       {item.lastWriteOffDate}
@@ -702,6 +717,7 @@ export default function Transactions() {
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">รายละเอียดอุปกรณ์</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">รหัสงาน</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center">จำนวนที่ค้าง</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">ผู้เบิก</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">อัปเดตล่าสุด</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right">จัดการ</th>
               </tr>
@@ -730,6 +746,12 @@ export default function Transactions() {
                       <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md bg-orange-50 text-orange-700 font-bold text-xs border border-orange-100">
                         {item.pendingAmount}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                       <div className="flex items-center gap-1.5">
+                         <div className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0"><User size={10} /></div>
+                         <span className="text-[11px] font-medium text-zinc-700 truncate">{item.recordedBy || '-'}</span>
+                       </div>
                     </td>
                     <td className="px-6 py-4 text-xs text-zinc-500">
                       {item.lastUpdated}

@@ -217,25 +217,48 @@ namespace StockApi.Services
             }
 
             // =======================================================
-            // กรณีที่ 2: แก้ไขข้อมูลทั่วไปโดยไม่ได้เปลี่ยนรหัส
+            // กรณีที่ 2: แก้ไขข้อมูลทั่วไป (Items) และยอดตั้งต้น (StockBalances)
             // =======================================================
             var trackedItem = await _context.Items.Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
-            
-            string oldValue = $"Name: {trackedItem!.Name}, Cat: {trackedItem.Category}, Unit: {trackedItem.Unit}";
-            
+            if (trackedItem == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
+
+            //string oldName = trackedItem.Name; // เก็บไว้ใช้ตอนส่ง Noti
+            int oldQuantity = trackedItem.StockBalance?.TotalQuantity ?? 0;
+            string oldValue = $"Name: {trackedItem.Name}, Cat: {trackedItem.Category}, Unit: {trackedItem.Unit}, Qty: {oldQuantity}";
+
+            // 📦 1. จัดการอัปเดตตาราง Items (ข้อมูลทั่วไป)
             trackedItem.Name = request.Name;
             trackedItem.Category = request.Category;
             trackedItem.Unit = request.Unit;
             trackedItem.UpdatedAt = now;
 
-            if (trackedItem.StockBalance != null)
+            // 📊 2. จัดการอัปเดตตาราง StockBalances (ถ้ายูสเซอร์แก้ตัวเลข)
+            if (trackedItem.StockBalance != null && request.Quantity != oldQuantity)
             {
+                // เช็คว่าเคยมีประวัติการเบิก/รับเข้า หรือทำ Action อื่นๆ ไปหรือยัง?
+                bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
+                    x.RecordId == itemCode &&
+                    x.Action != "CREATE" &&
+                    x.Action != "UPDATE" &&
+                    x.Action != "UPDATE_CODE"
+                );
+
+                if (hasOtherActions)
+                {
+                    throw new BadRequestException($"ไม่สามารถแก้ไขยอดเริ่มต้นของ '{trackedItem.Name}' ได้โดยตรง เนื่องจากมีการเคลื่อนไหวสต๊อกไปแล้ว กรุณาใช้เมนู 'ปรับปรุงยอด (Stock Adjust)'");
+                }
+
+                // ถ้าผ่านเงื่อนไข (แปลว่าเพิ่งสร้าง) ให้แก้ยอดในตาราง Stock ได้เลย
+                trackedItem.StockBalance.TotalQuantity = request.Quantity;
+                trackedItem.StockBalance.Balance = request.Quantity;
+                trackedItem.StockBalance.Received = request.Quantity;
                 trackedItem.StockBalance.UpdatedAt = now;
             }
 
-            string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}";
+            string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}, Qty: {request.Quantity}";
             await _logRepo.AddLogAsync("UPDATE", "Items", trackedItem.ItemCode, oldValue, newValue, currentUser);
 
+            // 🔥 สั่ง SaveChanges ครั้งเดียว EF Core จะไปแยก Update 2 ตารางให้เองแบบอัตโนมัติ
             await _context.SaveChangesAsync();
 
             await _notiService.SendNotificationAsync(

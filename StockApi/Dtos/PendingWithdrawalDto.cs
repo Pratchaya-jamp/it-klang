@@ -7,5 +7,6 @@
         public string JobNo { get; set; } = string.Empty;
         public int PendingAmount { get; set; } // จำนวนที่ต้องรับคืน (TempWithdrawn)
 		public string LastUpdated { get; set; } = string.Empty;
-	}
+		public string RecordedBy { get; set; } = string.Empty;
+    }
 }
