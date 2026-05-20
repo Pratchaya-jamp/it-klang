@@ -21,6 +21,8 @@ namespace StockApi.Services
         Task<List<PendingWithdrawalDto>> GetPurchaseRequestsAsync();
         Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync();
         Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync();
+        Task<List<PurchaseHistoryDto>> GetPurchaseHistoryAsync(); // 🔥 เพิ่มสำหรับประวัติจัดซื้อ
+        Task<List<WithdrawHistoryDto>> GetWithdrawHistoryAsync(); // 🔥 เพิ่มสำหรับประวัติเบิกจ่าย
     }
 
     public class StockService : IStockService
@@ -395,6 +397,84 @@ namespace StockApi.Services
                 LastWriteOffDate = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 ActionBy = t.CreatedBy ?? "-", // 🔥 [แก้ไขแล้ว] คนทำรายการตัดใบคำขอ ณ ตอนนั้น
                 RecordedBy = originalPRs.ContainsKey($"{t.JobNo}_{t.ItemCode}") ? originalPRs[$"{t.JobNo}_{t.ItemCode}"] : "-" // คนยื่นขอซื้อคนแรก
+            }).ToList();
+        }
+
+        // 📋 ดึงประวัติการขอซื้อทั้งหมด พร้อมระบุผู้กดรับของ
+        public async Task<List<PurchaseHistoryDto>> GetPurchaseHistoryAsync()
+        {
+            var prTransactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "PR")
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            var jobNos = prTransactions.Select(t => t.JobNo).Distinct().ToList();
+            var itemCodes = prTransactions.Select(t => t.ItemCode).Distinct().ToList();
+
+            // 🔍 ไปค้นหาว่าบิลรับเข้า (IN) ของคู่ Job + Item นี้ ใครเป็นคนกดเซฟ (CreatedBy)
+            var receiversDict = await _context.StockTransactions
+                .Where(t => t.Type == "IN" && jobNos.Contains(t.JobNo) && itemCodes.Contains(t.ItemCode))
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
+                .ToDictionaryAsync(
+                    g => $"{g.Key.JobNo}_{g.Key.ItemCode}",
+                    g => g.OrderByDescending(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault() ?? "-"
+                );
+
+            return prTransactions.Select(t => new PurchaseHistoryDto
+            {
+                TransactionNo = t.TransactionNo,
+                ItemCode = t.ItemCode,
+                ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                JobNo = t.JobNo ?? "-",
+                Quantity = t.Quantity,
+                Note = t.Note ?? "",
+                CreatedBy = t.CreatedBy ?? "System",
+                ReceivedBy = receiversDict.ContainsKey($"{t.JobNo}_{t.ItemCode}") ? receiversDict[$"{t.JobNo}_{t.ItemCode}"] : "-", // 🔥 ดึงชื่อคนกดรับของจากตาราง IN มาโชว์
+                CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+            }).ToList();
+        }
+
+        // 📋 ดึงประวัติการเบิกออกทั้งหมด พร้อมระบุผู้อนุมัติจ่ายของ
+        public async Task<List<WithdrawHistoryDto>> GetWithdrawHistoryAsync()
+        {
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "REQ_OUT" || t.Type == "OUT")
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return transactions.Select(t => {
+                string approvedBy = "-";
+
+                // 🔍 ถ้ารายการอนุมัติแล้ว (Type == "OUT") ให้ทำการแกะ String ชื่อผู้อนุมัติออกจากช่อง Note
+                if (t.Type == "OUT" && !string.IsNullOrEmpty(t.Note) && t.Note.Contains("[อนุมัติโดย "))
+                {
+                    try
+                    {
+                        int start = t.Note.IndexOf("[อนุมัติโดย ") + "[อนุมัติโดย ".Length;
+                        int end = t.Note.IndexOf("]", start);
+                        if (end > start)
+                        {
+                            approvedBy = t.Note.Substring(start, end - start);
+                        }
+                    }
+                    catch { approvedBy = "Unknown"; }
+                }
+
+                return new WithdrawHistoryDto
+                {
+                    TransactionNo = t.TransactionNo,
+                    ItemCode = t.ItemCode,
+                    ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                    JobNo = t.JobNo ?? "-",
+                    Quantity = t.Quantity,
+                    Status = t.Type == "OUT" ? "จ่ายของแล้ว" : "รออนุมัติ",
+                    Note = t.Note ?? "",
+                    CreatedBy = t.CreatedBy ?? "System",
+                    ApprovedBy = approvedBy, // 🔥 ส่งชื่อผู้อนุมัติกลับไปแสดงที่ตารางประวัติบนหน้าเว็บ
+                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                };
             }).ToList();
         }
     }

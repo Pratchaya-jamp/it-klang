@@ -67,4 +67,32 @@ namespace StockApi.Dtos
         // 🔥 เติม ActionBy เพื่อเก็บชื่อคนตัดรายการ
         public string ActionBy { get; set; } = string.Empty;
     }
+
+    public class PurchaseHistoryDto
+    {
+        public string TransactionNo { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string JobNo { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string Note { get; set; } = string.Empty;
+        public string CreatedBy { get; set; } = string.Empty; // คนส่งใบขอซื้อ
+        public string ReceivedBy { get; set; } = string.Empty;  // 🔥 เพิ่ม: ใครคือผู้กดรับของเข้าคลัง
+        public string CreatedAt { get; set; } = string.Empty;
+    }
+
+    // ประวัติการเบิกออกย้อนหลัง
+    public class WithdrawHistoryDto
+    {
+        public string TransactionNo { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string JobNo { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
+        public string CreatedBy { get; set; } = string.Empty;  // คนทำเรื่องขอเบิก
+        public string ApprovedBy { get; set; } = string.Empty;   // 🔥 เพิ่ม: ใครคือผู้อนุมัติ/จ่ายของ
+        public string CreatedAt { get; set; } = string.Empty;
+    }
 }

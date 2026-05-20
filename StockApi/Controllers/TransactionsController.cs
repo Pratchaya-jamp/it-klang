@@ -130,5 +130,35 @@ namespace StockApi.Controllers
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
+
+        // 📋 GET: api/transactions/purchase/history
+        [HttpGet("purchase/history")]
+        public async Task<IActionResult> GetPurchaseHistory()
+        {
+            try
+            {
+                var result = await _stockService.GetPurchaseHistoryAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        // 📋 GET: api/transactions/withdraw/history
+        [HttpGet("withdraw/history")]
+        public async Task<IActionResult> GetWithdrawHistory()
+        {
+            try
+            {
+                var result = await _stockService.GetWithdrawHistoryAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }
