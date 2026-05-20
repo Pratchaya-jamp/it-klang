@@ -23,6 +23,10 @@ namespace StockApi.Services
         Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync();
         Task<List<PurchaseHistoryDto>> GetPurchaseHistoryAsync(); // 🔥 เพิ่มสำหรับประวัติจัดซื้อ
         Task<List<WithdrawHistoryDto>> GetWithdrawHistoryAsync(); // 🔥 เพิ่มสำหรับประวัติเบิกจ่าย
+        Task CancelPurchaseRequestAsync(CancelRequestDto request); // 🔥 เพิ่มสำหรับยกเลิกใบขอซื้อ
+        Task CancelWithdrawRequestAsync(CancelRequestDto request); // 🔥 เพิ่มสำหรับยกเลิกใบขอเบิก
+        Task<List<PurchaseHistoryDto>> GetCanceledPurchaseRequestsAsync(); // 🔥 เพิ่ม GET ประวัติยกเลิกซื้อ
+        Task<List<WithdrawHistoryDto>> GetCanceledWithdrawRequestsAsync(); // 🔥 เพิ่ม GET ประวัติยกเลิกเบิก
     }
 
     public class StockService : IStockService
@@ -473,6 +477,160 @@ namespace StockApi.Services
                     Note = t.Note ?? "",
                     CreatedBy = t.CreatedBy ?? "System",
                     ApprovedBy = approvedBy, // 🔥 ส่งชื่อผู้อนุมัติกลับไปแสดงที่ตารางประวัติบนหน้าเว็บ
+                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                };
+            }).ToList();
+        }
+
+        // ❌ ยกเลิกใบขอซื้อ (ดักตรวจสอบการรับของแล้ว)
+        public async Task CancelPurchaseRequestAsync(CancelRequestDto request)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                string currentUser = GetCurrentUserName();
+
+                var prTx = await _context.StockTransactions
+                    .FirstOrDefaultAsync(t => t.TransactionNo == request.TransactionNo && t.Type == "PR");
+
+                if (prTx == null) throw new NotFoundException("ไม่พบรายการขอซื้อนี้ หรือรายการถูกยกเลิกไปแล้ว");
+
+                // 🚨 กำแพงเหล็ก: ตรวจสอบว่ามีการกดรับของ (IN) หรือกดตัดรายการ (WRITE_OFF) ไปบ้างหรือยัง
+                var actedQty = await _context.StockTransactions
+                    .Where(t => t.JobNo == prTx.JobNo && t.ItemCode == prTx.ItemCode && (t.Type == "IN" || t.Type == "WRITE_OFF"))
+                    .SumAsync(t => t.Quantity);
+
+                if (actedQty > 0)
+                {
+                    // ถ้ามีการทำรายการไปแล้วแม้แต่ชิ้นเดียว ดีดออกทันที!
+                    throw new BadRequestException("ไม่สามารถยกเลิกได้! เนื่องจากใบขอซื้อนี้มีการรับของเข้าคลัง หรือถูกตัดรายการไปแล้วบางส่วน");
+                }
+
+                // 🎯 ถ้ารอดมาได้ ค่อยบันทึกสถานะยกเลิก
+                prTx.Type = "CANCEL_PR";
+                string cancelNote = $"[ยกเลิกโดย {currentUser}] เหตุผล: {request.Note}";
+
+                if (string.IsNullOrEmpty(prTx.Note)) prTx.Note = cancelNote;
+                else prTx.Note += $" | {cancelNote}";
+
+                await _logRepo.AddLogAsync("CANCEL_PR", "StockTransactions", prTx.ItemCode, "Type: PR", $"ยกเลิกใบขอซื้อ Job: {prTx.JobNo} โดย {currentUser}", currentUser);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                await _notiService.SendNotificationAsync(null, "ยกเลิกใบขอสั่งซื้อ", $"ใบขอสั่งซื้อเลขที่ '{request.TransactionNo}' ถูกยกเลิกโดยคุณ {currentUser}", "STOCK_PR");
+            }
+            catch { await transaction.RollbackAsync(); throw; }
+        }
+
+        // ❌ ยกเลิกใบขอเบิก (เปลี่ยน Type จาก REQ_OUT -> CANCEL_OUT)
+        public async Task CancelWithdrawRequestAsync(CancelRequestDto request)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                string currentUser = GetCurrentUserName();
+
+                // ค้นหาใบขอเบิกที่ค้างรออนุมัติอยู่
+                var pendingTx = await _context.StockTransactions
+                    .FirstOrDefaultAsync(t => t.TransactionNo == request.TransactionNo && t.Type == "REQ_OUT");
+
+                if (pendingTx == null) throw new NotFoundException("ไม่พบรายการขอเบิกนี้ หรือรายการถูกอนุมัติ/ยกเลิกไปแล้ว");
+
+                // 🎯 บันทึกสถานะใหม่เป็นยกเลิกคำขอ (ไม่ต้องคืนยอดสต๊อก เพราะตอนขอเบิกเรายังไม่ได้หักออก)
+                pendingTx.Type = "CANCEL_OUT";
+                string cancelNote = $"[ยกเลิกโดย {currentUser}] เหตุผล: {request.Note}";
+
+                if (string.IsNullOrEmpty(pendingTx.Note)) pendingTx.Note = cancelNote;
+                else pendingTx.Note += $" | {cancelNote}";
+
+                // บันทึกระบบ Log ประวัติระบบ
+                await _logRepo.AddLogAsync("CANCEL_OUT", "StockTransactions", pendingTx.ItemCode, "Type: REQ_OUT", $"ยกเลิกใบขอเบิก Job: {pendingTx.JobNo} โดย {currentUser}", currentUser);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                await _notiService.SendNotificationAsync(null, "ยกเลิกใบขอเบิกอุปกรณ์", $"ใบขอเบิกเลขที่ '{request.TransactionNo}' ถูกยกเลิกโดยคุณ {currentUser}", "STOCK_OUT");
+            }
+            catch { await transaction.RollbackAsync(); throw; }
+        }
+
+        // 📋 GET: ดึงรายการใบขอซื้อที่ถูกยกเลิก (พร้อมระบุคนยกเลิก)
+        public async Task<List<PurchaseHistoryDto>> GetCanceledPurchaseRequestsAsync()
+        {
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "CANCEL_PR")
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return transactions.Select(t => {
+                string canceledBy = "-";
+
+                // 🔍 แกะชื่อผู้ยกเลิกออกจาก Note
+                if (!string.IsNullOrEmpty(t.Note) && t.Note.Contains("[ยกเลิกโดย "))
+                {
+                    try
+                    {
+                        int start = t.Note.IndexOf("[ยกเลิกโดย ") + "[ยกเลิกโดย ".Length;
+                        int end = t.Note.IndexOf("]", start);
+                        if (end > start) canceledBy = t.Note.Substring(start, end - start);
+                    }
+                    catch { canceledBy = "Unknown"; }
+                }
+
+                return new PurchaseHistoryDto
+                {
+                    TransactionNo = t.TransactionNo,
+                    ItemCode = t.ItemCode,
+                    ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                    JobNo = t.JobNo ?? "-",
+                    Quantity = t.Quantity,
+                    Note = t.Note ?? "",
+                    CreatedBy = t.CreatedBy ?? "System", // คนขอซื้อคนแรก
+                    ReceivedBy = "-",
+                    CanceledBy = canceledBy, // 🔥 ส่งชื่อคนยกเลิกกลับไป
+                    CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                };
+            }).ToList();
+        }
+
+        // 📋 GET: ดึงรายการใบขอเบิกที่ถูกยกเลิก (พร้อมระบุคนยกเลิก)
+        public async Task<List<WithdrawHistoryDto>> GetCanceledWithdrawRequestsAsync()
+        {
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "CANCEL_OUT")
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return transactions.Select(t => {
+                string canceledBy = "-";
+
+                // 🔍 แกะชื่อผู้ยกเลิกออกจาก Note
+                if (!string.IsNullOrEmpty(t.Note) && t.Note.Contains("[ยกเลิกโดย "))
+                {
+                    try
+                    {
+                        int start = t.Note.IndexOf("[ยกเลิกโดย ") + "[ยกเลิกโดย ".Length;
+                        int end = t.Note.IndexOf("]", start);
+                        if (end > start) canceledBy = t.Note.Substring(start, end - start);
+                    }
+                    catch { canceledBy = "Unknown"; }
+                }
+
+                return new WithdrawHistoryDto
+                {
+                    TransactionNo = t.TransactionNo,
+                    ItemCode = t.ItemCode,
+                    ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                    JobNo = t.JobNo ?? "-",
+                    Quantity = t.Quantity,
+                    Status = "ยกเลิกคำขอ",
+                    Note = t.Note ?? "",
+                    CreatedBy = t.CreatedBy ?? "System", // คนส่งเรื่องขอเบิกคนแรก
+                    ApprovedBy = "-",
+                    CanceledBy = canceledBy, // 🔥 ส่งชื่อคนยกเลิกกลับไป
                     CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
             }).ToList();

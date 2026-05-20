@@ -160,5 +160,63 @@ namespace StockApi.Controllers
                 return StatusCode(500, new { message = ex.Message });
             }
         }
+
+        // ❌ POST: api/transactions/purchase/cancel
+        [HttpPost("purchase/cancel")]
+        public async Task<IActionResult> CancelPurchaseRequest([FromBody] CancelRequestDto request)
+        {
+            try
+            {
+                await _stockService.CancelPurchaseRequestAsync(request);
+                return Ok(new { message = "ยกเลิกใบขอสั่งซื้อเรียบร้อยแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                string actualError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return BadRequest(new { message = actualError });
+            }
+        }
+
+        // ❌ POST: api/transactions/withdraw/cancel
+        [HttpPost("withdraw/cancel")]
+        public async Task<IActionResult> CancelWithdrawRequest([FromBody] CancelRequestDto request)
+        {
+            try
+            {
+                await _stockService.CancelWithdrawRequestAsync(request);
+                return Ok(new { message = "ยกเลิกใบขอเบิกอุปกรณ์เรียบร้อยแล้ว" });
+            }
+            catch (Exception ex)
+            {
+                string actualError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return BadRequest(new { message = actualError });
+            }
+        }
+
+        // 📋 GET: api/transactions/purchase/cancel
+        // ดึงประวัติใบขอซื้อที่ถูกยกเลิกทั้งหมด
+        [HttpGet("purchase/cancel")]
+        public async Task<IActionResult> GetCanceledPurchaseRequests()
+        {
+            try
+            {
+                var result = await _stockService.GetCanceledPurchaseRequestsAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // 📋 GET: api/transactions/withdraw/cancel
+        // ดึงประวัติใบขอเบิกที่ถูกยกเลิกทั้งหมด
+        [HttpGet("withdraw/cancel")]
+        public async Task<IActionResult> GetCanceledWithdrawRequests()
+        {
+            try
+            {
+                var result = await _stockService.GetCanceledWithdrawRequestsAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
     }
 }

@@ -68,6 +68,7 @@ namespace StockApi.Dtos
         public string ActionBy { get; set; } = string.Empty;
     }
 
+    // ประวัติการขอซื้อ
     public class PurchaseHistoryDto
     {
         public string TransactionNo { get; set; } = string.Empty;
@@ -76,12 +77,13 @@ namespace StockApi.Dtos
         public string JobNo { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public string Note { get; set; } = string.Empty;
-        public string CreatedBy { get; set; } = string.Empty; // คนส่งใบขอซื้อ
-        public string ReceivedBy { get; set; } = string.Empty;  // 🔥 เพิ่ม: ใครคือผู้กดรับของเข้าคลัง
+        public string CreatedBy { get; set; } = string.Empty;
+        public string ReceivedBy { get; set; } = string.Empty;
+        public string CanceledBy { get; set; } = string.Empty; // 🔥 เพิ่มฟิลด์ผู้ยกเลิก
         public string CreatedAt { get; set; } = string.Empty;
     }
 
-    // ประวัติการเบิกออกย้อนหลัง
+    // ประวัติการเบิกออก
     public class WithdrawHistoryDto
     {
         public string TransactionNo { get; set; } = string.Empty;
@@ -91,8 +93,18 @@ namespace StockApi.Dtos
         public int Quantity { get; set; }
         public string Status { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;
-        public string CreatedBy { get; set; } = string.Empty;  // คนทำเรื่องขอเบิก
-        public string ApprovedBy { get; set; } = string.Empty;   // 🔥 เพิ่ม: ใครคือผู้อนุมัติ/จ่ายของ
+        public string CreatedBy { get; set; } = string.Empty;
+        public string ApprovedBy { get; set; } = string.Empty;
+        public string CanceledBy { get; set; } = string.Empty; // 🔥 เพิ่มฟิลด์ผู้ยกเลิก
         public string CreatedAt { get; set; } = string.Empty;
+    }
+
+    public class CancelRequestDto
+    {
+        [Required(ErrorMessage = "กรุณาระบุหมายเลข Transaction (TransactionNo)")]
+        public string TransactionNo { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "กรุณาระบุเหตุผลในการยกเลิกคำขอ")]
+        public string Note { get; set; } = string.Empty;
     }
 }
