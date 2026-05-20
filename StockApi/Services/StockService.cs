@@ -12,14 +12,15 @@ namespace StockApi.Services
     {
         Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword, string? variant);
 
-        Task ReceiveStockAsync(List<TransactionRequest> requests);
-        Task WithdrawStockAsync(List<TransactionRequest> requests);
+        Task RequestPurchaseAsync(List<PurchaseRequestDto> requests); // 1. ขอซื้อ
+        Task ReceiveStockAsync(List<ReceiveRequest> requests);        // 2. รับเข้า
+        Task RequestWithdrawAsync(List<WithdrawRequest> requests);    // 3. ทำเรื่องเบิก
+        Task ApproveWithdrawAsync(ApproveWithdrawRequest request);    // 4. อนุมัติเบิก
+        Task WriteOffStockAsync(WriteOffRequest request);             // 5. ตัดทิ้ง
 
-        // 🔥 เพิ่ม Interface สำหรับ Write-Off
-        Task WriteOffStockAsync(WriteOffRequest request);
-        Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync();
-
+        Task<List<PendingWithdrawalDto>> GetPurchaseRequestsAsync();
         Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync();
+        Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync();
     }
 
     public class StockService : IStockService
@@ -41,6 +42,7 @@ namespace StockApi.Services
             _notiService = notiService;
         }
 
+        // ... (GetStockOverviewAsync เหมือนเดิม 100% ก๊อปของเดิมมาแปะได้เลย ผมขอข้ามเพื่อความกระชับ) ...
         public async Task<List<StockBalanceDto>> GetStockOverviewAsync(string? searchId, string? category, string? keyword, string? variant)
         {
             var data = await _repo.GetStockBalancesAsync(searchId, category, keyword, variant);
@@ -50,11 +52,7 @@ namespace StockApi.Services
             var borrowedData = await _context.BorrowTransactions
                 .Where(b => itemCodes.Contains(b.ItemCode) && b.Status == "Borrowed")
                 .GroupBy(b => b.ItemCode)
-                .Select(g => new
-                {
-                    ItemCode = g.Key,
-                    TotalBorrowed = g.Sum(x => x.Quantity)
-                })
+                .Select(g => new { ItemCode = g.Key, TotalBorrowed = g.Sum(x => x.Quantity) })
                 .ToDictionaryAsync(k => k.ItemCode, v => v.TotalBorrowed);
 
             return data.Select(x => new StockBalanceDto
@@ -75,11 +73,16 @@ namespace StockApi.Services
 
         private string GetCurrentUserName()
         {
-            var name = _httpContextAccessor.HttpContext?.User?.FindFirst("name")?.Value;
-            return name ?? "System";
+            return _httpContextAccessor.HttpContext?.User?.FindFirst("name")?.Value ?? "System";
         }
 
-        public async Task ReceiveStockAsync(List<TransactionRequest> requests)
+        private string GenerateTransactionNo()
+        {
+            return $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}";
+        }
+
+        // 📝 1. ขอซื้อ (PR) - ไม่กระทบสต๊อก
+        public async Task RequestPurchaseAsync(List<PurchaseRequestDto> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -89,49 +92,59 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
-                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
-                    var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                    var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                    if (stock == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
+
+                    await _txRepo.AddTransactionAsync(new StockTransaction
+                    {
+                        TransactionNo = GenerateTransactionNo(),
+                        ItemCode = request.ItemCode,
+                        Type = "PR",
+                        Quantity = request.Quantity,
+                        BalanceAfter = stock.Balance,
+                        JobNo = request.JobNo,
+                        Note = $"[ขอซื้อ] {request.Note}",
+                        CreatedBy = currentUser,
+                        CreatedAt = DateTime.Now
+                    });
+
+                    notiMessages.Add($"- 🛒 ขอซื้อ {stock.Item?.Name ?? request.ItemCode} จำนวน {request.Quantity} ชิ้น [Job: {request.JobNo}]");
+                }
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                if (notiMessages.Any()) await _notiService.SendNotificationAsync(null, "แจ้งขอสั่งซื้ออุปกรณ์", $"คุณ {currentUser} ทำเรื่องขอสั่งซื้อ:\n" + string.Join("\n", notiMessages), "STOCK_PR");
+            }
+            catch { await transaction.RollbackAsync(); throw; }
+        }
+
+        // 📥 2. รับของเข้าคลัง (IN) - เพิ่ม Stock และนำยอดไปหักล้างใบขอซื้อ (PR) ของ Job นั้นๆ
+        public async Task ReceiveStockAsync(List<ReceiveRequest> requests)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                string currentUser = GetCurrentUserName();
+                var notiMessages = new List<string>();
+
+                foreach (var request in requests)
+                {
+                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์ ({request.ItemCode}) ยังไม่มีรหัสจริง รับเข้าไม่ได้");
+                    var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
                     if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
 
                     int oldBalance = stock.Balance;
-
                     var today = DateTime.Now.Date;
                     if (stock.LastReceivedDate.Date < today) stock.Received = request.Quantity;
                     else stock.Received += request.Quantity;
                     stock.LastReceivedDate = DateTime.Now;
 
+                    // ✅ ของเพิ่มเข้าคลังปกติ
                     stock.Balance += request.Quantity;
-
-                    int amountToFillHole = 0;
-                    int amountExpansion = 0;
-
-                    var jobOut = await _context.StockTransactions
-                        .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && t.Type == "OUT")
-                        .SumAsync(t => t.Quantity);
-
-                    // 🔥 ต้องนับยอด WRITE_OFF รวมเข้าไปว่าเป็น "การคืน" รูปแบบนึงด้วย หนี้จะได้ลด
-                    var jobIn = await _context.StockTransactions
-                        .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && (t.Type == "IN" || t.Type == "WRITE_OFF"))
-                        .SumAsync(t => t.Quantity);
-
-                    int jobDeficit = jobOut - jobIn;
-
-                    if (jobDeficit > 0)
-                    {
-                        amountToFillHole = Math.Min(jobDeficit, request.Quantity);
-                        if (stock.TempWithdrawn < amountToFillHole) amountToFillHole = stock.TempWithdrawn;
-
-                        stock.TempWithdrawn -= amountToFillHole;
-                        amountExpansion = request.Quantity - amountToFillHole;
-                    }
-                    else
-                    {
-                        amountExpansion = request.Quantity;
-                    }
-
-                    stock.TotalQuantity += amountExpansion;
+                    stock.TotalQuantity += request.Quantity;
                     stock.UpdatedAt = DateTime.Now;
 
+                    // บันทึกบิลการรับเข้า โดยผูกกับ JobNo เพื่อเอาไปคำนวณหักล้างยอดค้างในใบขอซื้อ
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
                         TransactionNo = GenerateTransactionNo(),
@@ -139,32 +152,25 @@ namespace StockApi.Services
                         Type = "IN",
                         Quantity = request.Quantity,
                         BalanceAfter = stock.Balance,
-                        JobNo = request.JobNo,
+                        JobNo = request.JobNo, // ผูก Job เคลียร์ยอดคำขอซื้อ
                         Note = request.Note,
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });
 
-                    string packData = $"Balance: {stock.Balance}|Withdraw:+0|Receive:+{request.Quantity}";
-                    await _logRepo.AddLogAsync(
-                        $"STOCK_IN (+{request.Quantity}) [Job: {request.JobNo}]",
-                        "StockBalances", request.ItemCode, $"Balance: {oldBalance}", packData, currentUser);
-
+                    await _logRepo.AddLogAsync($"STOCK_IN (+{request.Quantity})", "StockBalances", request.ItemCode, $"Balance: {oldBalance}", $"Balance: {stock.Balance}", currentUser);
                     notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (+{request.Quantity}) [Job: {request.JobNo}]");
                 }
-
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                if (notiMessages.Any())
-                {
-                    await _notiService.SendNotificationAsync(null, "รับของเข้าคลัง", $"คุณ {currentUser} รับของเข้าคลัง:\n" + string.Join("\n", notiMessages), "STOCK_IN");
-                }
+                if (notiMessages.Any()) await _notiService.SendNotificationAsync(null, "รับของเข้าคลัง", $"คุณ {currentUser} รับของเข้า:\n" + string.Join("\n", notiMessages), "STOCK_IN");
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
 
-        public async Task WithdrawStockAsync(List<TransactionRequest> requests)
+        // 📤 3. ขอเบิก (REQ_OUT) - แค่สร้างใบขอเบิก ยังไม่หัก Stock ใดๆ ทั้งสิ้น
+        public async Task RequestWithdrawAsync(List<WithdrawRequest> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -174,211 +180,222 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
-                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
-                    var stock = await _context.StockBalances.FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์ ({request.ItemCode}) ยังไม่มีรหัสจริง เบิกไม่ได้");
+                    var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
                     if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
-                    if (stock.Balance < request.Quantity) throw new Exception($"อุปกรณ์ {stock.ItemCode} ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance})");
 
-                    int oldBalance = stock.Balance;
+                    // เช็คแค่ว่า "ณ ตอนที่ทำเรื่อง" มีของพอไหม (แต่ไม่ได้ตัดยอดนะ)
+                    if (stock.Balance < request.Quantity)
+                        throw new BadRequestException($"อุปกรณ์ '{stock.Item?.Name ?? stock.ItemCode}' ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance}) กรุณาทำเรื่อง 'ขอสั่งซื้อ (PR)' แทน");
 
-                    stock.Balance -= request.Quantity;
-                    stock.TempWithdrawn += request.Quantity;
-                    stock.UpdatedAt = DateTime.Now;
+                    // 🔥 ไม่มีการหัก stock.Balance หรือบวก stock.TempWithdrawn ตรงนี้แล้ว! 
+                    // บันทึกแค่ใบ Transaction ไว้เป็นหลักฐานรออนุมัติ
 
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
                         TransactionNo = GenerateTransactionNo(),
                         ItemCode = request.ItemCode,
-                        Type = "OUT",
+                        Type = "REQ_OUT",
                         Quantity = request.Quantity,
-                        BalanceAfter = stock.Balance,
+                        BalanceAfter = stock.Balance, // ยอดคงเหลือยังเท่าเดิม
                         JobNo = request.JobNo,
                         Note = request.Note,
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });
 
-                    string packData = $"Balance: {stock.Balance}|Withdraw:-{request.Quantity}|Receive:+0";
-                    await _logRepo.AddLogAsync($"STOCK_OUT (-{request.Quantity}) [Job: {request.JobNo}]", "StockBalances", request.ItemCode, $"Balance: {oldBalance}", packData, currentUser);
-
-                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (-{request.Quantity}) [Job: {request.JobNo}]");
+                    notiMessages.Add($"- {stock.Item?.Name ?? request.ItemCode} (ขอเบิก: {request.Quantity}) [Job: {request.JobNo}]");
                 }
-
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                if (notiMessages.Any())
-                {
-                    await _notiService.SendNotificationAsync(null, "เบิกของออก", $"คุณ {currentUser} เบิกของออก:\n" + string.Join("\n", notiMessages), "STOCK_OUT");
-                }
+                if (notiMessages.Any()) await _notiService.SendNotificationAsync(null, "ทำเรื่องเบิก (รออนุมัติ)", $"คุณ {currentUser} ทำเรื่องเบิก:\n" + string.Join("\n", notiMessages), "STOCK_OUT");
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
 
-        // 🔥 3. ฟังก์ชัน Write-Off ตัดจำหน่ายของที่หาคืนไม่ได้
-        public async Task WriteOffStockAsync(WriteOffRequest request)
+        // ✅ 4. อนุมัติเบิก (APPROVE) - หัก Balance (ในตู้) และ TotalQuantity (สมบัติรวม) ณ ตอนนี้เลย
+        public async Task ApproveWithdrawAsync(ApproveWithdrawRequest request)
         {
-            if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์รายการนี้ ({request.ItemCode}) ยังไม่ได้ระบุรหัสสินค้าจริง ไม่สามารถรับเข้าคลังได้");
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 string currentUser = GetCurrentUserName();
 
-                var stock = await _context.StockBalances
-                    .Include(s => s.Item)
-                    .FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                var pendingTx = await _context.StockTransactions
+                    .FirstOrDefaultAsync(t => t.TransactionNo == request.TransactionNo && t.Type == "REQ_OUT");
 
-                if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
+                if (pendingTx == null) throw new NotFoundException("ไม่พบรายการขอเบิกนี้ หรือถูกอนุมัติ/ยกเลิกไปแล้ว");
 
+                var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == pendingTx.ItemCode);
+                if (stock == null) throw new Exception("ไม่พบข้อมูลอุปกรณ์ในคลัง");
+
+                // 🚨 เช็ค Stock ก๊อก 2 ณ วินาทีที่กด Approve! เพราะเราไม่ได้จองของไว้ก่อนหน้านี้
+                if (stock.Balance < pendingTx.Quantity)
+                    throw new BadRequestException($"ไม่สามารถอนุมัติได้! อุปกรณ์ '{stock.Item?.Name}' เหลือในคลังไม่พอให้จ่าย (ต้องการ {pendingTx.Quantity} แต่มีแค่ {stock.Balance})");
+
+                int oldBalance = stock.Balance;
                 int oldTotal = stock.TotalQuantity;
-                int oldTemp = stock.TempWithdrawn;
 
-                var jobOut = await _context.StockTransactions
-                    .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && t.Type == "OUT")
-                    .SumAsync(t => t.Quantity);
-
-                var jobIn = await _context.StockTransactions
-                    .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && (t.Type == "IN" || t.Type == "WRITE_OFF"))
-                    .SumAsync(t => t.Quantity);
-
-                int jobDeficit = jobOut - jobIn;
-
-                if (request.Quantity > jobDeficit)
-                    throw new Exception($"ไม่สามารถตัดจำหน่ายได้เกินกว่ายอดที่ค้างอยู่ (Job นี้ค้างอยู่: {jobDeficit} ชิ้น)");
-
-                if (request.Quantity > stock.TempWithdrawn)
-                    throw new Exception("ยอดเบิกชั่วคราว (TempWithdrawn) ในระบบไม่เพียงพอให้ตัดยอด");
-
-                // ลดยอดเบิก (ล้างหนี้) และ ลด TotalQuantity (ของหายไปจากคลัง) ส่วน Balance เท่าเดิม
-                stock.TempWithdrawn -= request.Quantity;
-                stock.TotalQuantity -= request.Quantity;
+                // 🔥 หัก Stock ถาวร ทั้งของในตู้และของทั้งหมดตรงนี้เลย!
+                stock.Balance -= pendingTx.Quantity;
+                stock.TotalQuantity -= pendingTx.Quantity;
                 stock.UpdatedAt = DateTime.Now;
 
-                _context.StockBalances.Update(stock);
+                // เปลี่ยนสถานะบิล
+                pendingTx.Type = "OUT";
+                pendingTx.BalanceAfter = stock.Balance; // อัปเดตตัวเลขในบิลให้ตรงกับยอดที่ถูกตัดจริงๆ
 
-                await _txRepo.AddTransactionAsync(new StockTransaction
-                {
-                    TransactionNo = GenerateTransactionNo(),
-                    ItemCode = request.ItemCode,
-                    Type = "WRITE_OFF",
-                    Quantity = request.Quantity,
-                    BalanceAfter = stock.Balance,
-                    JobNo = request.JobNo,
-                    Note = $"[ตัดจำหน่าย] {request.Note}",
-                    CreatedBy = currentUser,
-                    CreatedAt = DateTime.Now
-                });
+                string approveNote = $"[อนุมัติโดย {currentUser}]";
+                if (!string.IsNullOrEmpty(request.Note)) approveNote += $" {request.Note}";
 
-                string logDetail = $"TotalQty: {oldTotal} -> {stock.TotalQuantity} | TempWithdrawn: {oldTemp} -> {stock.TempWithdrawn} | Job: {request.JobNo} | Reason: {request.Note}";
-                await _logRepo.AddLogAsync("WRITE_OFF", "StockBalances", request.ItemCode, $"TotalQty: {oldTotal}", logDetail, currentUser);
+                if (string.IsNullOrEmpty(pendingTx.Note)) pendingTx.Note = approveNote;
+                else pendingTx.Note += $" | {approveNote}";
+
+                await _logRepo.AddLogAsync("APPROVE_OUT", "StockBalances", stock.ItemCode, $"Bal: {oldBalance}, Tot: {oldTotal}", $"Bal: {stock.Balance}, Tot: {stock.TotalQuantity}", currentUser);
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                await _notiService.SendNotificationAsync(
-                    null,
-                    "ตัดจำหน่ายอุปกรณ์ (Write-Off)",
-                    $"คุณ {currentUser} ตัดจำหน่าย '{stock.Item?.Name ?? request.ItemCode}' จำนวน {request.Quantity} ชิ้น (Job: {request.JobNo})\nเหตุผล: {request.Note}",
-                    "STOCK_WRITEOFF"
-                );
+                await _notiService.SendNotificationAsync(null, "อนุมัติและจ่ายอุปกรณ์", $"อนุมัติจ่าย '{stock.Item?.Name ?? stock.ItemCode}' จำนวน {pendingTx.Quantity} ชิ้น ให้ Job: {pendingTx.JobNo} แล้ว", "STOCK_OUT");
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
 
-        // 🔥 1. ปรับปรุงการดึงสรุปตัดจำหน่าย (แยกตาม Job และระบุคนทำ)
-        public async Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync()
+        // 🗑️ 5. ตัดรายการใบคำขอซื้อ (WRITE_OFF) - ยกเลิกใบขอซื้อตัวที่หาไม่ได้ ไม่ยุ่งกับยอด Stock ในคลังเด็ดขาด!
+        public async Task WriteOffStockAsync(WriteOffRequest request)
         {
-            var writeOffStats = await _context.StockTransactions
-                .Where(t => t.Type == "WRITE_OFF")
-                .GroupBy(t => new { t.JobNo, t.ItemCode })
-                .Select(g => new
-                {
-                    JobNo = g.Key.JobNo,
-                    ItemCode = g.Key.ItemCode,
-                    TotalWriteOff = g.Sum(x => x.Quantity),
-                    LastDate = g.Max(x => x.CreatedAt),
-                    // ใครเป็นคนกด WRITE_OFF รายการล่าสุดในกลุ่มนี้
-                    ActionBy = g.OrderByDescending(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault()
-                })
-                .ToListAsync();
-
-            if (!writeOffStats.Any()) return new List<WriteOffSummaryDto>();
-
-            var itemCodes = writeOffStats.Select(x => x.ItemCode).Distinct().ToList();
-            var jobNos = writeOffStats.Select(x => x.JobNo).Distinct().ToList();
-
-            // ไปหาว่า Job นี้ ใครเป็นคน "เบิก (OUT)" ออกไปคนแรก
-            var outTransactions = await _context.StockTransactions
-                .Where(t => t.Type == "OUT" && jobNos.Contains(t.JobNo) && itemCodes.Contains(t.ItemCode))
-                .GroupBy(t => new { t.JobNo, t.ItemCode })
-                .Select(g => new 
-                { 
-                    JobNo = g.Key.JobNo, 
-                    ItemCode = g.Key.ItemCode, 
-                    RecordedBy = g.OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault() 
-                })
-                .ToListAsync();
-
-            var itemsDict = await _context.Items
-                .Where(i => itemCodes.Contains(i.ItemCode))
-                .ToDictionaryAsync(i => i.ItemCode, i => new { i.Name, i.Category });
-
-            return writeOffStats.Select(x => new WriteOffSummaryDto
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                JobNo = x.JobNo,
-                ItemCode = x.ItemCode,
-                ItemName = itemsDict.ContainsKey(x.ItemCode) ? itemsDict[x.ItemCode].Name : "Unknown",
-                Category = itemsDict.ContainsKey(x.ItemCode) ? itemsDict[x.ItemCode].Category : "-",
-                TotalWriteOff = x.TotalWriteOff,
-                LastWriteOffDate = x.LastDate.ToString("dd/MM/yyyy HH:mm:ss"),
-                ActionBy = x.ActionBy ?? "-",
-                RecordedBy = outTransactions.FirstOrDefault(o => o.JobNo == x.JobNo && o.ItemCode == x.ItemCode)?.RecordedBy ?? "-"
-            })
-            .OrderByDescending(x => x.LastWriteOffDate)
-            .ToList();
+                string currentUser = GetCurrentUserName();
+                var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
+                if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
+
+                // 🎯 เช็คยอดคำขอซื้อของเก่าที่มีอยู่จริงก่อนตัด
+                var prQty = await _context.StockTransactions
+                    .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && t.Type == "PR")
+                    .SumAsync(t => t.Quantity);
+
+                var alreadyFilled = await _context.StockTransactions
+                    .Where(t => t.JobNo == request.JobNo && t.ItemCode == request.ItemCode && (t.Type == "IN" || t.Type == "WRITE_OFF"))
+                    .SumAsync(t => t.Quantity);
+
+                int prDeficit = prQty - alreadyFilled;
+
+                if (request.Quantity > prDeficit)
+                    throw new BadRequestException($"ไม่สามารถตัดรายการได้เกินยอดใบขอซื้อที่ค้างอยู่ (Job นี้ค้างใบขอซื้ออยู่: {prDeficit} ชิ้น)");
+
+                // 💡 [แก้ไขแล้ว] บันทึกบิลยกเลิกใบคำขอซื้อเท่านั้น ไม่มีการลดยอด stock.Balance หรือ stock.TotalQuantity ทั้งสิ้น!
+                await _txRepo.AddTransactionAsync(new StockTransaction
+                {
+                    TransactionNo = GenerateTransactionNo(),
+                    ItemCode = request.ItemCode,
+                    Type = "WRITE_OFF", // บันทึกสิทธิ์การยกเลิกคำขอซื้อ
+                    Quantity = request.Quantity,
+                    BalanceAfter = stock.Balance, // ยอดในตู้เท่าเดิมเป๊ะ
+                    JobNo = request.JobNo,
+                    Note = $"[ตัดใบคำขอซื้อ - ซื้อตามตลาดไม่ได้] {request.Note}",
+                    CreatedBy = currentUser, // เก็บชื่อผู้ทำรายการตัด ณ ตอนนี้
+                    CreatedAt = DateTime.Now
+                });
+
+                await _logRepo.AddLogAsync("CANCEL_PR", "StockBalances", request.ItemCode, $"Stock มั่นคงเท่าเดิม", $"ตัดใบขอซื้อ Job: {request.JobNo} จำนวน {request.Quantity} ชิ้น", currentUser);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch { await transaction.RollbackAsync(); throw; }
         }
 
-        // 🔥 2. ปรับปรุงรายการค้างรับคืน ให้โชว์คนเบิกของ
+        // 📋 6.1 ดึงข้อมูลรายการรอสั่งซื้อ (PR) - คำนวณหักลบสะสม (จะหายไปเมื่อกด Receive หรือ Write-off ครบจำนวน)
+        public async Task<List<PendingWithdrawalDto>> GetPurchaseRequestsAsync()
+        {
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => !string.IsNullOrEmpty(t.JobNo) && (t.Type == "PR" || t.Type == "IN" || t.Type == "WRITE_OFF"))
+                .ToListAsync();
+
+            // จัดกลุ่มคำนวณหา Net Remaining ของใบขอซื้อ
+            var grouped = transactions
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
+                .Select(g => {
+                    int requested = g.Where(x => x.Type == "PR").Sum(x => x.Quantity);
+                    int received = g.Where(x => x.Type == "IN").Sum(x => x.Quantity);
+                    int writtenOff = g.Where(x => x.Type == "WRITE_OFF").Sum(x => x.Quantity);
+                    int netPending = requested - received - writtenOff; // 🎯 ยอดคำขอซื้อที่ยังค้างจริง
+
+                    return new PendingWithdrawalDto
+                    {
+                        TransactionNo = g.Where(x => x.Type == "PR").Select(x => x.TransactionNo).FirstOrDefault() ?? "-",
+                        ItemCode = g.Key.ItemCode,
+                        ItemName = g.First().Item?.Name ?? "Unknown",
+                        JobNo = g.Key.JobNo,
+                        Type = "PR",
+                        PendingAmount = netPending,
+                        LastUpdated = g.Max(x => x.CreatedAt).ToString("dd/MM/yyyy HH:mm:ss"),
+                        RecordedBy = g.Where(x => x.Type == "PR").OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault() ?? "-"
+                    };
+                })
+                .Where(x => x.PendingAmount > 0) // 🔥 ถ้าได้ของครบ หรือโดนตัดทิ้งจนเหลือ 0 รายการจะหายไปจากลิสต์ทันที!
+                .OrderByDescending(x => x.LastUpdated)
+                .ToList();
+
+            return grouped;
+        }
+
+        // 📋 6.2 ดึงข้อมูลรายการรออนุมัติเบิก (REQ_OUT) - แสดงผลแบบ 1 คำขอ 1 บรรทัด (หายไปเมื่อกด Approve จ่ายของ)
         public async Task<List<PendingWithdrawalDto>> GetPendingWithdrawalsAsync()
         {
-            var groupedTransactions = await _context.StockTransactions
-                .Where(t => !string.IsNullOrEmpty(t.JobNo))
-                .GroupBy(t => new { t.JobNo, t.ItemCode })
-                .Select(g => new
-                {
-                    JobNo = g.Key.JobNo,
-                    ItemCode = g.Key.ItemCode,
-                    Withdrawn = g.Where(x => x.Type == "OUT").Sum(x => x.Quantity),
-                    Returned = g.Where(x => x.Type == "IN" || x.Type == "WRITE_OFF").Sum(x => x.Quantity),
-                    LastTransactionDate = g.Max(x => x.CreatedAt),
-                    // ดึงชื่อคนที่ทำรายการเบิกออก (OUT) ครั้งแรกของจ็อบนี้
-                    RecordedBy = g.Where(x => x.Type == "OUT").OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault()
-                })
-                .Where(x => (x.Withdrawn - x.Returned) > 0)
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "REQ_OUT") // รออนุมัติ
+                .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
-            var itemCodes = groupedTransactions.Select(t => t.ItemCode).Distinct().ToList();
-            var itemsDict = await _context.StockBalances
-                .Include(b => b.Item)
-                .Where(b => itemCodes.Contains(b.ItemCode))
-                .ToDictionaryAsync(b => b.ItemCode, b => b.Item?.Name ?? "Unknown");
-
-            return groupedTransactions.Select(t => new PendingWithdrawalDto
+            return transactions.Select(t => new PendingWithdrawalDto
             {
-                JobNo = t.JobNo,
+                TransactionNo = t.TransactionNo,
                 ItemCode = t.ItemCode,
-                ItemName = itemsDict.ContainsKey(t.ItemCode) ? itemsDict[t.ItemCode] : "Unknown",
-                PendingAmount = t.Withdrawn - t.Returned,
-                LastUpdated = t.LastTransactionDate.ToString("dd/MM/yyyy HH:mm:ss"),
-                RecordedBy = t.RecordedBy ?? "-"
-            })
-            .OrderByDescending(x => x.LastUpdated)
-            .ToList();
+                ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                JobNo = t.JobNo ?? "-",
+                Type = "REQ_OUT",
+                PendingAmount = t.Quantity,
+                LastUpdated = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                RecordedBy = t.CreatedBy ?? "-"
+            }).ToList();
         }
 
-        private string GenerateTransactionNo()
+        // 📋 7. ดึงข้อมูลประวัติตัดจำหน่ายคำขอซื้อ (Write-off Summary) - แสดงชื่อคนตัดรายการชัดเจน
+        public async Task<List<WriteOffSummaryDto>> GetWriteOffSummaryAsync()
         {
-            return $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}";
+            var transactions = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "WRITE_OFF")
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            var jobNos = transactions.Select(t => t.JobNo).Distinct().ToList();
+            var itemCodes = transactions.Select(t => t.ItemCode).Distinct().ToList();
+
+            // ค้นหาว่าใครเป็นคนส่งใบขอซื้อ (PR) คนแรกของกลุ่ม Job นี้นำมาเป็นคนขอเบิกต้นทาง
+            var originalPRs = await _context.StockTransactions
+                .Where(t => t.Type == "PR" && jobNos.Contains(t.JobNo) && itemCodes.Contains(t.ItemCode))
+                .GroupBy(t => new { t.JobNo, t.ItemCode })
+                .Select(g => new { Key = g.Key.JobNo + "_" + g.Key.ItemCode, User = g.OrderBy(x => x.CreatedAt).Select(x => x.CreatedBy).FirstOrDefault() })
+                .ToDictionaryAsync(x => x.Key, x => x.User ?? "-");
+
+            return transactions.Select(t => new WriteOffSummaryDto
+            {
+                TransactionNo = t.TransactionNo,
+                ItemCode = t.ItemCode,
+                ItemName = t.Item != null ? t.Item.Name : "Unknown",
+                Category = t.Item != null ? t.Item.Category : "-",
+                JobNo = t.JobNo ?? "-",
+                TotalWriteOff = t.Quantity,
+                LastWriteOffDate = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
+                ActionBy = t.CreatedBy ?? "-", // 🔥 [แก้ไขแล้ว] คนทำรายการตัดใบคำขอ ณ ตอนนั้น
+                RecordedBy = originalPRs.ContainsKey($"{t.JobNo}_{t.ItemCode}") ? originalPRs[$"{t.JobNo}_{t.ItemCode}"] : "-" // คนยื่นขอซื้อคนแรก
+            }).ToList();
         }
     }
 }

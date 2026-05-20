@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   ArrowDownToLine, ArrowUpFromLine, Search, Package, User,
   Hash, Clock, X, Loader2, CheckCircle2, FileText,
-  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon
+  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon, ShoppingCart, ClipboardCheck
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -13,6 +13,46 @@ import { useToast } from '../context/ToastContext';
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
 const ANIMATION_CLASSES = "transform transition-all duration-200 ease-out will-change-[transform,opacity]";
+
+// --- COMPONENT: CUSTOM FILTER DROPDOWN ---
+const CustomFilterDropdown = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full sm:w-56 shrink-0" ref={ref}>
+      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 z-10 pointer-events-none" size={16} />
+      <div 
+        onClick={() => setIsOpen(!isOpen)} 
+        className={cn(
+          "w-full h-11 pl-10 pr-8 rounded-xl text-sm flex items-center cursor-pointer transition-all border", 
+          isOpen ? "bg-white border-zinc-300 ring-2 ring-zinc-900/10" : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
+        )}
+      >
+        <span className={cn("truncate font-medium", value ? "text-zinc-900" : "text-zinc-600")}>{value || placeholder}</span>
+        <ChevronDown className={cn("absolute right-3 text-zinc-400 transition-transform pointer-events-none", isOpen && "rotate-180")} size={14}/>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-100 py-1">
+          <div onClick={() => {onChange(""); setIsOpen(false)}} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors", !value ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-600")}>
+            {placeholder} {!value && <Check size={14} className="text-zinc-900"/>}
+          </div>
+          {options.map(opt => (
+            <div key={opt} onClick={() => {onChange(opt); setIsOpen(false)}} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors", value === opt ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-600")}>
+              {opt} {value === opt && <Check size={14} className="text-zinc-900"/>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- 1. ITEM SELECTOR MODAL ---
 const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
@@ -40,59 +80,44 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = [...new Set(safeData.map(item => item.category).filter(Boolean))];
+  const categories = [...new Set(safeData.map(item => item.category).filter(Boolean))].sort();
 
   if (!isMounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
       <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
       <div className={cn("relative bg-white w-full max-w-3xl h-[80vh] rounded-2xl shadow-2xl border border-zinc-100 flex flex-col", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-        <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/80 rounded-t-2xl">
+        <div className="px-4 sm:px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/80 rounded-t-2xl">
           <div><h3 className="text-lg font-semibold text-zinc-900">เลือกอุปกรณ์</h3><p className="text-sm text-zinc-500">ค้นหาและเลือกอุปกรณ์จากคลัง</p></div>
-          <button onClick={onClose} className="p-2 text-zinc-400 hover:bg-zinc-200 rounded-full transition-colors"><X size={20}/></button>
+          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-900 rounded-full transition-colors"><X size={20}/></button>
         </div>
-        <div className="p-4 border-b border-zinc-100 flex gap-3 bg-white shadow-sm z-10">
+        
+        <div className="p-4 border-b border-zinc-100 flex flex-col sm:flex-row gap-3 bg-white shadow-sm z-10 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
             <input type="text" placeholder="ค้นหาด้วยรหัสหรือชื่ออุปกรณ์..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all" autoFocus />
           </div>
-          <div className="relative w-48">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full h-11 pl-10 pr-8 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 cursor-pointer appearance-none">
-              <option value="">ทุกหมวดหมู่</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={14} />
-          </div>
+          <CustomFilterDropdown value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder="ทุกหมวดหมู่" />
         </div>
-        <div className="flex-1 overflow-y-auto bg-zinc-50/30">
-          <table className="w-full text-left text-sm border-collapse">
+
+        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar bg-zinc-50/30">
+          <table className="w-full text-left text-sm border-collapse min-w-[500px]">
             <thead className="bg-white text-zinc-500 font-medium uppercase text-xs sticky top-0 z-10 shadow-sm border-b border-zinc-100">
-              <tr><th className="px-6 py-3">รหัส</th><th className="px-6 py-3">ชื่อ</th><th className="px-6 py-3">หมวดหมู่</th><th className="px-6 py-3 text-right">คงเหลือ</th><th className="px-6 py-3 text-center">จัดการ</th></tr>
+              <tr><th className="px-4 sm:px-6 py-3 whitespace-nowrap">รหัส</th><th className="px-4 sm:px-6 py-3 whitespace-nowrap">ชื่อ</th><th className="px-4 sm:px-6 py-3 whitespace-nowrap">หมวดหมู่</th><th className="px-4 sm:px-6 py-3 text-right whitespace-nowrap">คงเหลือ</th><th className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">จัดการ</th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {filteredData.length > 0 ? (
                 filteredData.map((item) => {
-                  // ✅ เช็คว่าเป็นสถานะ DRAFT- หรือไม่
                   const isDraft = item.itemCode?.toUpperCase().startsWith('DRAFT-');
-
                   return (
                     <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors bg-white">
-                      <td className="px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td>
-                      <td className="px-6 py-3 text-zinc-900">{item.name}</td>
-                      <td className="px-6 py-3 text-zinc-500">{item.category}</td>
-                      <td className="px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
-                      <td className="px-6 py-3 text-center">
-                        <button 
-                          disabled={isDraft}
-                          onClick={() => { onSelect(item); onClose(); }} 
-                          className={cn(
-                            "px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm",
-                            isDraft 
-                              ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" 
-                              : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95"
-                          )}
-                        >
+                      <td className="px-4 sm:px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td>
+                      <td className="px-4 sm:px-6 py-3 text-zinc-900 min-w-[120px]">{item.name}</td>
+                      <td className="px-4 sm:px-6 py-3 text-zinc-500">{item.category}</td>
+                      <td className="px-4 sm:px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
+                      <td className="px-4 sm:px-6 py-3 text-center">
+                        <button disabled={isDraft} onClick={() => { onSelect(item); onClose(); }} className={cn("px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm whitespace-nowrap", isDraft ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95")}>
                           {isDraft ? 'ไม่อนุญาต' : 'เลือก'}
                         </button>
                       </td>
@@ -113,8 +138,8 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-3 bg-white border-t border-zinc-100 text-xs text-zinc-400 flex justify-between rounded-b-2xl">
-          <span>แสดง {filteredData.length} รายการ</span><span>กด ESC เพื่อปิด</span>
+        <div className="px-4 sm:px-6 py-3 bg-white border-t border-zinc-100 text-xs text-zinc-400 flex justify-between rounded-b-2xl shrink-0">
+          <span>แสดง {filteredData.length} รายการ</span><span className="hidden sm:inline">กด ESC เพื่อปิด</span>
         </div>
       </div>
     </div>,
@@ -122,9 +147,9 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   );
 };
 
-// --- 2. GENERAL TRANSACTION MODAL (เบิกจ่ายปกติ) ---
+// --- 2. CREATE REQUEST MODAL (ใช้สร้าง PR และ Withdraw) ---
 const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
-  const [activeType, setActiveType] = useState(type);
+  const [activeType, setActiveType] = useState(type); // 'PR' | 'WITHDRAW'
   const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
   const [inventoryData, setInventoryData] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,7 +211,10 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
     if (!isValid) return;
     setIsSubmitting(true);
     try {
-      const endpoint = '/api/transactions/withdraw'; 
+      const endpoint = activeType === 'PR' 
+        ? '/api/transactions/purchase/request' 
+        : '/api/transactions/withdraw/request';
+        
       const payload = items.map(item => ({ 
         itemCode: item.itemCode, 
         jobNo: item.jobNo.trim(), 
@@ -195,7 +223,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
       }));
       
       await request(endpoint, { method: 'POST', body: JSON.stringify(payload) });
-      onSuccess(`บันทึกการเบิกจ่ายสำเร็จ`, "success");
+      onSuccess(`สร้างรายการ${activeType === 'PR' ? 'ขอซื้อ' : 'ขอเบิก'}สำเร็จ`, "success");
       onClose();
     } catch (error) {
       onSuccess(`ทำรายการไม่สำเร็จ`, "error");
@@ -208,61 +236,74 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
         <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-        <div className={cn("relative bg-white w-full max-w-3xl p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col overflow-hidden", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-          <div className="px-6 py-4 flex items-center justify-between border-b transition-colors duration-200 bg-amber-50/50 border-amber-100">
+        <div className={cn("relative bg-white w-full max-w-3xl p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col overflow-hidden max-h-[90vh]", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+          <div className={cn(
+            "px-4 sm:px-6 py-4 flex items-center justify-between border-b shrink-0",
+            activeType === 'PR' ? "bg-emerald-50/50 border-emerald-100" : "bg-amber-50/50 border-amber-100"
+          )}>
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl transition-colors duration-200 bg-amber-100 text-amber-700"><ArrowUpRight size={24} /></div>
-              <div><h2 className="text-lg font-semibold transition-colors duration-200 text-amber-900">เบิกจ่ายอุปกรณ์</h2><p className="text-sm text-zinc-500">ตัดจำนวนอุปกรณ์ออกจากสต็อกหลัก</p></div>
+              <div className={cn("p-2.5 rounded-xl hidden sm:block", activeType === 'PR' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                {activeType === 'PR' ? <ShoppingCart size={24} /> : <ArrowUpRight size={24} />}
+              </div>
+              <div>
+                <h2 className={cn("text-lg font-semibold", activeType === 'PR' ? "text-emerald-900" : "text-amber-900")}>
+                  {activeType === 'PR' ? 'สร้างใบคำขอซื้อ (PR)' : 'สร้างใบคำขอเบิกอุปกรณ์'}
+                </h2>
+                <p className="text-xs sm:text-sm text-zinc-500">
+                  {activeType === 'PR' ? 'ทำรายการขอจัดซื้ออุปกรณ์เข้าคลัง' : 'ทำรายการขอเบิกอุปกรณ์ออกจากคลัง'}
+                </p>
+              </div>
             </div>
             <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
           </div>
-          <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+          
+          <div className="p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-zinc-50/30 flex-1">
             <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>วันที่: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString('th-TH')}</span></span></div>
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={index} className="flex flex-col gap-3 p-4 bg-zinc-50 rounded-xl border border-zinc-100 group transition-all hover:border-zinc-300">
-                  
+                <div key={index} className="flex flex-col gap-3 p-4 bg-white rounded-xl border border-zinc-200 shadow-sm group transition-all hover:border-zinc-300">
                   <div className="flex items-start gap-3 w-full">
                     <div className="flex-1 space-y-1">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">รหัสอุปกรณ์</label>
                       <div className="relative flex gap-2">
-                        <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all bg-white hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed" : "text-zinc-900 border-zinc-300 font-medium")}>
+                        <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed bg-zinc-50" : "text-zinc-900 border-zinc-300 font-medium bg-white")}>
                             {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "คลิกเพื่อค้นหาอุปกรณ์..."}
                         </div>
-                        <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-200 hover:bg-zinc-300 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
+                        <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
                       </div>
-                      {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1">คงเหลือปัจจุบัน: <span className="font-medium text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
+                      {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1 flex items-center gap-1.5">คงเหลือปัจจุบัน: <span className="font-bold text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
                     </div>
                     <div className="w-10 pt-5">
                       <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
                     </div>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full mt-1">
                     <div className="w-full sm:w-1/3 space-y-1">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">รหัสงาน <span className="text-red-400">*</span></label>
-                      <input type="text" required placeholder="เช่น JOB-001" value={item.jobNo} onChange={(e) => handleFieldChange(index, 'jobNo', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all" />
+                      <input type="text" required placeholder="เช่น JOB-001" value={item.jobNo} onChange={(e) => handleFieldChange(index, 'jobNo', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 transition-all", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
                     </div>
                     <div className="w-full sm:w-1/4 space-y-1">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">จำนวน <span className="text-red-400">*</span></label>
-                      <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 text-center transition-all" />
+                      <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center outline-none focus:ring-2 transition-all", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">หมายเหตุ</label>
-                      <input type="text" placeholder="ระบุเหตุผลเพิ่มเติม..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className="w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 placeholder:text-zinc-300 transition-all" />
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">หมายเหตุ <span className="text-zinc-300 normal-case font-normal">(ไม่บังคับ)</span></label>
+                      <input type="text" placeholder="ระบุเหตุผลเพิ่มเติม..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 transition-all placeholder:text-zinc-300", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
                     </div>
                   </div>
-
                 </div>
               ))}
             </div>
-            <button onClick={handleAddItem} className="w-full py-3 border border-dashed border-zinc-300 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 transition-all flex items-center justify-center gap-2 text-sm font-medium"><Plus size={16} /> เพิ่มรายการอุปกรณ์</button>
+            <button onClick={handleAddItem} className="w-full py-3 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-white transition-all flex items-center justify-center gap-2 text-sm font-bold bg-zinc-50"><Plus size={16} /> เพิ่มรายการอุปกรณ์</button>
           </div>
-          <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3">
-            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white transition-all">ยกเลิก</button>
-            <button onClick={handleSubmit} disabled={!isValid || isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-medium transition-all shadow-md flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>{isSubmitting && <RefreshCcw size={16} className="animate-spin" />} ยืนยันการเบิกจ่าย</button>
+          <div className="p-4 sm:p-6 border-t border-zinc-100 bg-white flex gap-3 shrink-0">
+            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition-all">ยกเลิก</button>
+            <button onClick={handleSubmit} disabled={!isValid || isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2", activeType === 'PR' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (activeType === 'PR' ? <ShoppingCart size={16} /> : <ArrowUpRight size={16} />)}
+              ส่งคำขอ
+            </button>
           </div>
         </div>
       </div>
@@ -272,20 +313,121 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   );
 };
 
-// --- 3. PENDING RECEIVE MODAL (รับของจากค้างจ่าย + Write-off) ---
+// --- 3. APPROVE WITHDRAW MODAL (อนุมัติเบิก) ---
+const ApproveWithdrawModal = ({ isOpen, onClose, onSuccess, approveItem }) => {
+  const [note, setNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && approveItem) {
+      setIsMounted(true);
+      setNote('');
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
+    } else {
+      setIsVisible(false);
+      setTimeout(() => setIsMounted(false), 200);
+    }
+  }, [isOpen, approveItem]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await request('/api/transactions/withdraw/approve', { 
+        method: 'POST', 
+        body: JSON.stringify({ 
+          transactionNo: approveItem.transactionNo,
+          note: note 
+        }) 
+      });
+      onSuccess("อนุมัติการเบิกจ่ายสำเร็จ", "success");
+      onClose();
+    } catch (error) {
+      onSuccess(error.message || `อนุมัติไม่สำเร็จ`, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isMounted || !approveItem) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
+      <div className={cn("relative bg-white w-full max-w-lg p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col overflow-hidden", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8")}>
+        <div className="px-6 py-4 flex items-center justify-between border-b bg-amber-50/50 border-amber-100">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2 text-amber-900">
+              <ClipboardCheck size={20} className="text-amber-600" />
+              อนุมัติการเบิกจ่าย
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">ยืนยันการอนุมัติคำขอเบิกอุปกรณ์</p>
+          </div>
+          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} strokeWidth={1.5} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col">
+          <div className="p-6 space-y-4">
+            <div className="bg-zinc-50 border border-zinc-100 p-4 rounded-xl space-y-3">
+              <div className="flex justify-between items-center pb-2 border-b border-zinc-200/60">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">เลขที่รายการ</span>
+                <span className="font-mono text-zinc-900 font-bold">{approveItem.transactionNo}</span>
+              </div>
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">อุปกรณ์</span>
+                  <span className="font-mono text-zinc-700 font-bold mt-1">{approveItem.itemCode}</span>
+                  <span className="text-sm text-zinc-900 font-medium">{approveItem.itemName}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">จำนวน</span>
+                  <div className="text-lg font-extrabold text-amber-600 mt-1">{approveItem.pendingAmount}</div>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-zinc-200/60 flex items-center justify-between text-xs">
+                <span className="text-zinc-500">รหัสงาน: <span className="font-bold text-zinc-700">{approveItem.jobNo || '-'}</span></span>
+                <span className="text-zinc-500 flex items-center gap-1"><User size={12}/> ผู้เบิก: <span className="font-bold text-zinc-700">{approveItem.recordedBy || '-'}</span></span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">หมายเหตุอนุมัติ (ถ้ามี)</label>
+              <input 
+                type="text" 
+                placeholder="ระบุข้อความเพิ่มเติม..." 
+                value={note} 
+                onChange={e => setNote(e.target.value)} 
+                className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none transition-all focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400" 
+              />
+            </div>
+          </div>
+          <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-white transition-all">ยกเลิก</button>
+            <button type="submit" disabled={isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 shadow-amber-100", isSubmitting && "opacity-50 cursor-not-allowed shadow-none")}>
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              ยืนยันอนุมัติ
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// --- 4. PENDING RECEIVE MODAL (รับของจากค้างจ่าย + Write-off) ---
 const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   const [receiveList, setReceiveList] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  
-  const [mode, setMode] = useState('RECEIVE'); // 'RECEIVE' | 'WRITEOFF'
+  const [mode, setMode] = useState('RECEIVE'); 
 
   useEffect(() => {
     if (isOpen && pendingItem) {
       setIsMounted(true);
       setMode('RECEIVE'); 
-      
       setReceiveList([{
         itemCode: pendingItem.itemCode,
         itemName: pendingItem.itemName,
@@ -294,7 +436,6 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
         receiveQty: pendingItem.pendingAmount,
         note: ''
       }]);
-
       requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
     } else {
       setIsVisible(false);
@@ -312,14 +453,12 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
       const item = receiveList[0]; 
-
       if (mode === 'RECEIVE') {
+        // ✅ Payload: ส่ง JobNo ไปด้วยตามที่ร้องขอ
         const payload = [{
           itemCode: item.itemCode,
-          jobNo: item.jobNo,
+          jobNo: item.jobNo === '-' ? '' : item.jobNo,
           quantity: Number(item.receiveQty),
           note: item.note
         }];
@@ -336,7 +475,6 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
         await request('/api/transactions/write-off', { method: 'POST', body: JSON.stringify(payload) });
         onSuccess("ตัดจำหน่ายอุปกรณ์สำเร็จ", "success");
       }
-
       onClose();
     } catch (error) {
       onSuccess(error.message || `ทำรายการไม่สำเร็จ`, "error");
@@ -345,124 +483,80 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     }
   };
 
-  const isFormInvalid = receiveList.some(i => 
-    !i.receiveQty || Number(i.receiveQty) <= 0 || !i.jobNo || (mode === 'WRITEOFF' && !i.note.trim())
-  );
-
+  const isFormInvalid = receiveList.some(i => !i.receiveQty || Number(i.receiveQty) <= 0 || (mode === 'WRITEOFF' && !i.note.trim()));
+  
   if (!isMounted || !pendingItem) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
       <div className={cn("relative bg-white w-full max-w-2xl p-0 rounded-2xl shadow-2xl border border-zinc-100 flex flex-col max-h-[90vh] overflow-hidden", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8")}>
-        
-        <div className={cn("px-6 py-4 flex items-center justify-between border-b transition-colors duration-300", mode === 'RECEIVE' ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100")}>
+        <div className={cn("px-4 sm:px-6 py-4 flex items-center justify-between border-b transition-colors duration-300 shrink-0", mode === 'RECEIVE' ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100")}>
           <div>
             <h2 className={cn("text-lg font-semibold tracking-tight flex items-center gap-2", mode === 'RECEIVE' ? "text-emerald-900" : "text-red-900")}>
               {mode === 'RECEIVE' ? <ArrowDownToLine size={20} className="text-emerald-600" /> : <Trash2 size={20} className="text-red-600" />}
-              {mode === 'RECEIVE' ? 'รับเข้าอุปกรณ์ที่ค้างจ่าย' : 'ตัดจำหน่ายอุปกรณ์ (Write-off)'}
+              {mode === 'RECEIVE' ? 'รับเข้าอุปกรณ์' : 'ตัดจำหน่ายอุปกรณ์ (Write-off)'}
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {mode === 'RECEIVE' ? 'ยืนยันการรับเข้าอุปกรณ์ที่ถูกเบิกไปก่อนหน้า' : 'ตัดอุปกรณ์นี้ออกจากรายการค้างจ่ายโดยไม่ต้องรับคืน'}
+            <p className="text-xs text-zinc-500 mt-0.5 hidden sm:block">
+              {mode === 'RECEIVE' ? 'ยืนยันการรับเข้าอุปกรณ์' : 'ตัดอุปกรณ์นี้ออกจากรายการโดยไม่ต้องรับคืน'}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors">
-            <X size={20} strokeWidth={1.5} />
-          </button>
+          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} strokeWidth={1.5} /></button>
         </div>
-
-        <div className="px-6 pt-4 flex gap-2 border-b border-zinc-100 bg-zinc-50/30">
-          <button 
-            type="button"
-            onClick={() => setMode('RECEIVE')}
-            className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-all", mode === 'RECEIVE' ? "border-emerald-600 text-emerald-700" : "border-transparent text-zinc-500 hover:text-zinc-700")}
-          >
-            รับเข้าปกติ
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode('WRITEOFF')}
-            className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-all", mode === 'WRITEOFF' ? "border-red-600 text-red-700" : "border-transparent text-zinc-500 hover:text-zinc-700")}
-          >
-            ตัดจำหน่าย
-          </button>
+        <div className="px-4 sm:px-6 pt-4 flex gap-2 border-b border-zinc-100 bg-zinc-50/30 shrink-0">
+          <button type="button" onClick={() => setMode('RECEIVE')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-all", mode === 'RECEIVE' ? "border-emerald-600 text-emerald-700" : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300")}>รับเข้าปกติ</button>
+          <button type="button" onClick={() => setMode('WRITEOFF')} className={cn("px-4 py-2 text-sm font-bold border-b-2 transition-all", mode === 'WRITEOFF' ? "border-red-600 text-red-700" : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300")}>ตัดจำหน่าย</button>
         </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
-          <div className="space-y-3 overflow-y-auto p-6">
-            
+        <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden flex-1">
+          <div className="space-y-4 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-zinc-50/30">
             {mode === 'WRITEOFF' && (
-               <div className="p-3 bg-red-50 text-red-700 rounded-xl border border-red-100 flex items-start gap-3 text-xs leading-relaxed mb-2">
+               <div className="p-3 bg-red-50 text-red-700 rounded-xl border border-red-100 flex items-start gap-3 text-xs leading-relaxed">
                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                 <p><b>การตัดจำหน่าย (Write-off):</b> ใช้ในกรณีที่อุปกรณ์ชำรุด สูญหาย หรือไม่มีการผลิตแล้ว โดยจะทำการตัดออกจากรายการค้างจ่าย <b>กรุณาระบุหมายเหตุให้ชัดเจน</b></p>
+                 <p><b>การตัดจำหน่าย (Write-off):</b> ใช้ในกรณีที่อุปกรณ์ชำรุด สูญหาย หรือไม่มีการผลิตแล้ว โดยจะทำการตัดออกจากรายการ <b>กรุณาระบุหมายเหตุให้ชัดเจน</b></p>
                </div>
             )}
-
             {receiveList.map((item, index) => (
-              <div key={index} className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                <div className="flex justify-between items-center border-b border-zinc-100 pb-3 mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-zinc-900">{item.itemCode}</span>
-                    <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
+              <div key={index} className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 flex flex-col gap-4 shadow-sm">
+                <div className="flex justify-between items-start border-b border-zinc-100 pb-3">
+                  <div>
+                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                       <span className="font-mono font-extrabold text-zinc-900 text-base">{item.itemCode}</span>
+                       <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md inline-flex w-fit">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
+                     </div>
+                     {pendingItem?.recordedBy && (
+                       <div className="flex items-center gap-1.5 mt-2 text-[11px] text-zinc-500">
+                         <User size={12} className="text-zinc-400" /><span>ผู้บันทึก: <span className="font-medium text-zinc-700">{pendingItem.recordedBy}</span></span>
+                       </div>
+                     )}
                   </div>
-                  <div className="text-xs font-medium text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-100">
-                    ยอดค้างรับ: {item.withdrawnQty}
+                  <div className="text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-100 shrink-0 text-center">
+                    ยอดค้าง<br className="sm:hidden"/><span className="hidden sm:inline">รับ</span>: {item.withdrawnQty}
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-4">
                   <div className="w-full sm:w-1/3">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">รหัสงาน</label>
-                    <input 
-                      type="text" 
-                      readOnly 
-                      value={item.jobNo} 
-                      className="w-full h-10 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-500 cursor-not-allowed outline-none" 
-                    />
+                    <input type="text" readOnly value={item.jobNo} className="w-full h-10 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-500 cursor-not-allowed outline-none font-medium" />
                   </div>
                   <div className="w-full sm:w-1/4">
                     <label className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1.5", mode === 'RECEIVE' ? "text-emerald-600" : "text-red-600")}>
                       จำนวนที่{mode === 'RECEIVE' ? 'รับ' : 'ตัด'} <span className="text-red-400">*</span>
                     </label>
-                    <input 
-                      type="number" 
-                      required 
-                      min="1" 
-                      value={item.receiveQty} 
-                      onChange={e => updateField(index, 'receiveQty', e.target.value)} 
-                      className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center outline-none transition-all focus:ring-2", mode === 'RECEIVE' ? "focus:ring-emerald-500/20 focus:border-emerald-500" : "focus:ring-red-500/20 focus:border-red-500 text-red-600 font-medium")} 
-                    />
+                    <input type="number" required min="1" value={item.receiveQty} onChange={e => updateField(index, 'receiveQty', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center outline-none transition-all focus:ring-2", mode === 'RECEIVE' ? "focus:ring-emerald-500/20 focus:border-emerald-500 font-bold text-emerald-700" : "focus:ring-red-500/20 focus:border-red-500 text-red-600 font-bold")} />
                   </div>
                   <div className="flex-1">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
-                      หมายเหตุ {mode === 'WRITEOFF' ? <span className="text-red-500 normal-case">(บังคับกรอก)</span> : <span className="text-zinc-300 normal-case">(ไม่บังคับ)</span>}
+                      หมายเหตุ {mode === 'WRITEOFF' ? <span className="text-red-500 normal-case">(บังคับ)</span> : <span className="text-zinc-300 normal-case">(ไม่บังคับ)</span>}
                     </label>
-                    <input 
-                      type="text" 
-                      required={mode === 'WRITEOFF'}
-                      placeholder={mode === 'WRITEOFF' ? "ระบุสาเหตุการตัดจำหน่าย..." : "ระบุรายละเอียดสภาพอุปกรณ์..."} 
-                      value={item.note} 
-                      onChange={e => updateField(index, 'note', e.target.value)} 
-                      className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none transition-all focus:ring-2", mode === 'RECEIVE' ? "focus:ring-emerald-500/20 focus:border-emerald-500" : "focus:ring-red-500/20 focus:border-red-500")} 
-                    />
+                    <input type="text" required={mode === 'WRITEOFF'} placeholder={mode === 'WRITEOFF' ? "ระบุสาเหตุการตัดจำหน่าย..." : "ระบุรายละเอียดสภาพอุปกรณ์..."} value={item.note} onChange={e => updateField(index, 'note', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none transition-all focus:ring-2", mode === 'RECEIVE' ? "focus:ring-emerald-500/20 focus:border-emerald-500" : "focus:ring-red-500/20 focus:border-red-500")} />
                   </div>
                 </div>
-
               </div>
             ))}
           </div>
-
-          <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3 shrink-0">
-            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white transition-all">ยกเลิก</button>
-            <button 
-              type="submit" 
-              disabled={isSubmitting || isFormInvalid} 
-              className={cn(
-                "flex-1 h-11 text-white rounded-xl text-sm font-medium transition-all shadow-md flex items-center justify-center gap-2", 
-                mode === 'RECEIVE' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-red-600 hover:bg-red-700 shadow-red-100", 
-                (!isFormInvalid && !isSubmitting) ? "active:scale-95" : "opacity-50 cursor-not-allowed shadow-none"
-              )}
-            >
+          <div className="p-4 sm:p-6 border-t border-zinc-100 bg-white flex gap-3 shrink-0">
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition-all">ยกเลิก</button>
+            <button type="submit" disabled={isSubmitting || isFormInvalid} className={cn("flex-[2] sm:flex-1 h-11 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2", mode === 'RECEIVE' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-red-600 hover:bg-red-700 shadow-red-100", (!isFormInvalid && !isSubmitting) ? "active:scale-95" : "opacity-50 cursor-not-allowed shadow-none")}>
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (mode === 'RECEIVE' ? <CheckCircle2 size={16} /> : <Trash2 size={16} />)}
               {mode === 'RECEIVE' ? 'ยืนยันการรับเข้า' : 'ยืนยันการตัดจำหน่าย'}
             </button>
@@ -474,7 +568,7 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   );
 };
 
-// --- 4. WRITE-OFF SUMMARY MODAL ---
+// --- 5. WRITE-OFF SUMMARY MODAL ---
 const WriteOffSummaryModal = ({ isOpen, onClose }) => {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -509,101 +603,65 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
   const filteredData = useMemo(() => {
     return summaryData.filter(item => {
       const q = searchQuery.toLowerCase();
-      return item.itemCode?.toLowerCase().includes(q) || 
-             item.itemName?.toLowerCase().includes(q) ||
-             item.category?.toLowerCase().includes(q) ||
-             item.recordedBy?.toLowerCase().includes(q) || // ค้นหาด้วยชื่อผู้เบิก
-             item.actionBy?.toLowerCase().includes(q);     // ค้นหาด้วยชื่อผู้ตัด
+      return item.itemCode?.toLowerCase().includes(q) || item.itemName?.toLowerCase().includes(q) || item.category?.toLowerCase().includes(q) || item.recordedBy?.toLowerCase().includes(q) || item.actionBy?.toLowerCase().includes(q);     
     });
   }, [summaryData, searchQuery]);
 
   if (!isMounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 sm:p-6">
       <div className={cn("fixed inset-0 bg-zinc-900/50 backdrop-blur-sm transition-opacity duration-200 ease-out", isVisible ? "opacity-100" : "opacity-0")} onClick={onClose} />
-      <div className={cn("relative bg-white w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl border border-zinc-100 flex flex-col overflow-hidden", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
-        
-        <div className="px-6 py-4 flex items-center justify-between border-b bg-red-50/30 border-red-100">
+      <div className={cn("relative bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl border border-zinc-100 flex flex-col overflow-hidden", ANIMATION_CLASSES, isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4")}>
+        <div className="px-4 sm:px-6 py-4 flex items-center justify-between border-b bg-red-50/50 border-red-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-red-100 text-red-700"><AlertOctagon size={24} /></div>
-            <div>
-              <h2 className="text-lg font-semibold text-red-900">ประวัติการตัดจำหน่าย</h2>
-              <p className="text-sm text-zinc-500">สรุปยอดอุปกรณ์ที่ถูกตัดจำหน่ายออกจากระบบ</p>
-            </div>
+            <div className="p-2.5 rounded-xl bg-red-100 text-red-700 hidden sm:block"><AlertOctagon size={24} /></div>
+            <div><h2 className="text-lg font-bold text-red-900">ประวัติการตัดจำหน่าย (Write-off)</h2><p className="text-xs sm:text-sm text-zinc-500">สรุปยอดอุปกรณ์ที่ชำรุด สูญหาย หรือถูกนำออกจากระบบถาวร</p></div>
           </div>
-          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
+          <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:bg-white hover:text-zinc-900 rounded-full transition-colors"><X size={20} /></button>
         </div>
-
-        <div className="p-4 border-b border-zinc-100 bg-white">
+        <div className="p-4 border-b border-zinc-100 bg-white shrink-0">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="ค้นหาด้วยรหัส ชื่อ หรือหมวดหมู่..." 
-              value={searchQuery} 
-              onChange={e => setSearchQuery(e.target.value)} 
-              className="w-full h-10 pl-9 pr-4 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-900/10 focus:border-red-300 transition-all" 
-            />
+            <input type="text" placeholder="ค้นหารหัส, ชื่อ, หมวดหมู่ หรือผู้ทำรายการ..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full h-10 pl-9 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-900/10 focus:border-red-300 transition-all focus:bg-white" />
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto bg-zinc-50/30">
-          <table className="w-full text-left text-sm border-collapse">
+        <div className="flex-1 overflow-x-auto custom-scrollbar bg-zinc-50/30">
+          <table className="w-full text-left text-sm border-collapse min-w-[900px]">
             <thead className="bg-white text-zinc-500 font-medium uppercase text-[11px] tracking-wider sticky top-0 z-10 shadow-sm border-b border-zinc-100">
-              <tr>
-                <th className="px-6 py-3">รหัสอุปกรณ์</th>
-                <th className="px-6 py-3">ชื่ออุปกรณ์</th>
-                <th className="px-6 py-3">หมวดหมู่</th>
-                <th className="px-6 py-3 text-center">ยอดตัดจำหน่ายรวม</th>
-                <th className="px-4 sm:px-6 py-4 whitespace-nowrap">ผู้ทำรายการ (เบิก / ตัด)</th>
-                <th className="px-6 py-3 text-right">ทำรายการล่าสุด</th>
-              </tr>
+              <tr><th className="px-4 sm:px-6 py-4 whitespace-nowrap">รายละเอียดอุปกรณ์</th><th className="px-4 sm:px-6 py-4 text-center whitespace-nowrap">ยอดรวมที่ตัด</th><th className="px-4 sm:px-6 py-4 whitespace-nowrap">ผู้ทำรายการ (เบิก / ตัด)</th><th className="px-4 sm:px-6 py-4 text-right whitespace-nowrap">ตัดล่าสุดเมื่อ</th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {loading ? (
-                [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="5" className="px-6 py-4"><div className="h-6 bg-zinc-100 rounded w-full"></div></td></tr>)
+                [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="4" className="px-6 py-4"><div className="h-10 bg-zinc-100 rounded-lg w-full"></div></td></tr>)
               ) : filteredData.length > 0 ? (
                 filteredData.map((item, index) => (
-                  <tr key={index} className="hover:bg-red-50/30 transition-colors bg-white">
-                    <td className="px-6 py-4 font-mono text-zinc-700 font-medium">{item.itemCode}</td>
-                    <td className="px-6 py-4 text-zinc-900">{item.itemName}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 border border-zinc-200/50">
-                        {item.category}
-                      </span>
+                  <tr key={index} className="hover:bg-red-50/30 transition-colors bg-white group">
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                           <span className="font-mono text-zinc-700 font-bold">{item.itemCode}</span>
+                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 border border-zinc-200/50">
+                             {item.category}
+                           </span>
+                        </div>
+                        <span className="text-zinc-900 text-sm font-medium">{item.itemName}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md bg-red-50 text-red-700 font-bold text-sm border border-red-100">
-                        {item.totalWriteOff}
-                      </span>
+                    <td className="px-4 sm:px-6 py-4 text-center">
+                      <span className="inline-flex items-center justify-center min-w-[32px] h-8 px-2.5 rounded-lg bg-red-50 text-red-700 font-extrabold text-sm border border-red-100 shadow-sm">{item.totalWriteOff}</span>
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-col gap-1.5 text-xs">
-                        <div className="flex items-center gap-1.5 text-zinc-600">
-                           <span className="w-10 text-zinc-400 font-medium">ผู้เบิก:</span> 
-                           <span className="font-medium bg-zinc-100 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.recordedBy}>{item.recordedBy || '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-red-600">
-                           <span className="w-10 text-red-400 font-medium">ผู้ตัด:</span> 
-                           <span className="font-medium bg-red-50 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.actionBy}>{item.actionBy || '-'}</span>
-                        </div>
+                        <div className="flex items-center gap-1.5 text-zinc-600"><span className="w-10 text-zinc-400 font-medium">ผู้เบิก:</span><span className="font-medium bg-zinc-100 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.recordedBy}>{item.recordedBy || '-'}</span></div>
+                        <div className="flex items-center gap-1.5 text-red-600"><span className="w-10 text-red-400 font-medium">ผู้ตัด:</span><span className="font-medium bg-red-50 px-2 py-0.5 rounded truncate max-w-[120px]" title={item.actionBy}>{item.actionBy || '-'}</span></div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-xs text-zinc-500 font-mono">
-                      {item.lastWriteOffDate}
-                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-right"><span className="text-xs text-zinc-500 font-mono bg-zinc-50 px-2 py-1 rounded border border-zinc-100">{item.lastWriteOffDate}</span></td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan="5" className="h-[40vh] bg-transparent p-0">
-                    <div className="flex flex-col items-center justify-center h-full text-zinc-400 w-full absolute left-0">
-                      <Trash2 size={40} className="opacity-20 mb-3" />
-                      <p className="text-sm font-medium text-zinc-500">ไม่พบประวัติการตัดจำหน่าย</p>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan="4" className="h-[40vh] bg-transparent p-0"><div className="flex flex-col items-center justify-center h-full text-zinc-400 w-full absolute left-0"><Trash2 size={40} className="opacity-20 mb-3" /><p className="text-sm font-medium text-zinc-500">ไม่พบประวัติการตัดจำหน่าย</p></div></td></tr>
               )}
             </tbody>
           </table>
@@ -615,160 +673,191 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
 };
 
 
-// --- 5. MAIN TRANSACTIONS PAGE ---
+// --- MAIN TRANSACTIONS PAGE ---
 export default function Transactions() {
   const { showToast } = useToast();
   
-  const [pendingItems, setPendingItems] = useState([]);
+  const [activeTab, setActiveTab] = useState('PR'); // 'PR' | 'WITHDRAW'
+  const [requestData, setRequestData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [receivingPendingItem, setReceivingPendingItem] = useState(null); 
-  const [transactionType, setTransactionType] = useState(null); 
+  const [approveItem, setApproveItem] = useState(null); // สำหรับเปิด Modal อนุมัติเบิก
+  const [transactionType, setTransactionType] = useState(null); // 'PR' | 'WITHDRAW'
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false); 
 
-  const loadData = async () => {
+  const loadData = async (tab) => {
     setLoading(true);
     try {
-      const pendingRes = await request('/api/transactions/pending');
-      const pData = Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || []);
-      setPendingItems(pData);
+      const endpoint = tab === 'PR' ? '/api/transactions/purchase/request' : '/api/transactions/withdraw/request';
+      const res = await request(endpoint);
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setRequestData(data);
     } catch (error) {
-      showToast("ดึงข้อมูลรายการค้างจ่ายไม่สำเร็จ", "error");
-      setPendingItems([]);
+      showToast(`ดึงข้อมูลรายการ${tab === 'PR' ? 'ขอซื้อ' : 'ขอเบิก'}ไม่สำเร็จ`, "error");
+      setRequestData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData(activeTab);
+    setSearchQuery(''); 
+  }, [activeTab]);
 
   const filteredItems = useMemo(() => {
-    if (!Array.isArray(pendingItems)) return [];
-    return pendingItems.filter(item => {
+    if (!Array.isArray(requestData)) return [];
+    return requestData.filter(item => {
       const searchTxt = searchQuery.toLowerCase();
-      return item.itemCode?.toLowerCase().includes(searchTxt) || 
+      return item.transactionNo?.toLowerCase().includes(searchTxt) ||
+             item.itemCode?.toLowerCase().includes(searchTxt) || 
              item.itemName?.toLowerCase().includes(searchTxt) ||
-             item.jobNo?.toLowerCase().includes(searchTxt); 
+             item.jobNo?.toLowerCase().includes(searchTxt) ||
+             item.recordedBy?.toLowerCase().includes(searchTxt); 
     });
-  }, [pendingItems, searchQuery]);
+  }, [requestData, searchQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 sm:space-y-8 pb-10 animate-in fade-in duration-500">
       
-      <PendingReceiveModal 
-        isOpen={!!receivingPendingItem}
-        onClose={() => setReceivingPendingItem(null)}
-        pendingItem={receivingPendingItem}
-        onSuccess={(msg, type) => {
-          showToast(msg, type);
-          if (type === 'success') loadData();
-        }}
-      />
+      {/* ใช้งาน Modals */}
+      <PendingReceiveModal isOpen={!!receivingPendingItem} onClose={() => setReceivingPendingItem(null)} pendingItem={receivingPendingItem} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
+      <TransactionModal isOpen={!!transactionType} type={transactionType} onClose={() => setTransactionType(null)} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
+      <ApproveWithdrawModal isOpen={!!approveItem} approveItem={approveItem} onClose={() => setApproveItem(null)} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
+      <WriteOffSummaryModal isOpen={isWriteOffModalOpen} onClose={() => setIsWriteOffModalOpen(false)} />
 
-      <TransactionModal 
-        isOpen={!!transactionType} 
-        type={transactionType} 
-        onClose={() => setTransactionType(null)} 
-        onSuccess={(msg, type) => {
-          showToast(msg, type);
-          if (type === 'success') loadData();
-        }}
-      />
-
-      <WriteOffSummaryModal 
-        isOpen={isWriteOffModalOpen}
-        onClose={() => setIsWriteOffModalOpen(false)}
-      />
-
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-6">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
-            <FileText className="text-zinc-900" size={24}/> ประวัติการทำรายการ
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 flex items-center justify-center sm:justify-start gap-2 text-center sm:text-left">
+            <FileText className="text-zinc-900 hidden sm:block" size={28}/> จัดการคำขอ (Requests)
           </h1>
-          <p className="text-zinc-500 text-sm font-light mt-1">จัดการรายการค้างจ่ายและการเบิกจ่ายอุปกรณ์</p>
+          <p className="text-zinc-500 text-sm font-medium mt-1 text-center sm:text-left">จัดการรายการขอซื้อเข้าคลัง และอนุมัติการเบิกจ่ายอุปกรณ์</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setIsWriteOffModalOpen(true)} className="h-10 px-4 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm font-medium hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
-            <Trash2 size={16} /> <span className="hidden sm:inline">ประวัติตัดจำหน่าย</span>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          <button onClick={() => setTransactionType('PR')} className="h-10 px-5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+            <ShoppingCart size={16} strokeWidth={2.5} /> <span>สร้างใบขอซื้อ (PR)</span>
           </button>
-          
-          <button onClick={() => setTransactionType('OUT')} className="h-10 px-4 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl text-sm font-medium hover:bg-amber-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
-            <ArrowUpRight size={16} /> <span className="hidden sm:inline">เบิกจ่าย</span>
+          <button onClick={() => setTransactionType('WITHDRAW')} className="h-10 px-5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+            <ArrowUpRight size={16} strokeWidth={2.5} /> <span>สร้างใบเบิกอุปกรณ์</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-zinc-100 bg-zinc-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
-            <Clock size={16} className="text-orange-500"/> รายการเบิกจ่ายที่รอดำเนินการคืน (ค้างจ่าย)
-          </h3>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <input type="text" placeholder="ค้นหาด้วยรหัส, ชื่อ หรือรหัสงาน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 pl-9 pr-3 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all" />
+      {/* REQUESTS TABLE SECTION */}
+      <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
+        
+        {/* TOGGLE TABS & SEARCH */}
+        <div className="p-4 border-b border-zinc-100 bg-zinc-50/50 flex flex-col lg:flex-row justify-between items-center gap-4">
+          <div className="flex p-1 bg-zinc-200/60 rounded-xl w-full lg:w-auto shrink-0">
+            <button onClick={() => setActiveTab('PR')} className={cn("flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200", activeTab === 'PR' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50")}>
+              <ShoppingCart size={16} /> รายการขอซื้อ (PR)
+            </button>
+            <button onClick={() => setActiveTab('WITHDRAW')} className={cn("flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200", activeTab === 'WITHDRAW' ? "bg-white text-amber-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50")}>
+              <ArrowUpRight size={16} /> รายการขอเบิก (Withdraw)
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <button onClick={() => setIsWriteOffModalOpen(true)} className="h-10 px-3 bg-white text-red-600 border border-zinc-200 rounded-lg text-sm font-bold hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center shadow-sm" title="ประวัติตัดจำหน่าย">
+              <Trash2 size={16} />
+            </button>
+            <div className="relative w-full lg:w-72 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={16} />
+              <input type="text" placeholder="ค้นหาเลขที่, รหัส, รหัสงาน หรือผู้บันทึก..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-10 pl-9 pr-4 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-300 transition-all shadow-sm" />
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse min-w-[900px] table-fixed">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">รายละเอียดอุปกรณ์</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">รหัสงาน</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center">จำนวนที่ค้าง</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">ผู้เบิก</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500">อัปเดตล่าสุด</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right">จัดการ</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">เลขที่รายการ</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[30%]">รายละเอียดอุปกรณ์</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[10%]">รหัสงาน</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center w-[10%]">จำนวน</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">ผู้ทำรายการ</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[10%]">วันที่รายการ</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right w-[10%]">จัดการ</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-zinc-50">
               {loading ? (
-                [...Array(3)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="5" className="px-6 py-4"><div className="h-10 bg-zinc-100 rounded-lg w-full"></div></td></tr>)
+                [...Array(4)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-4 py-3"><div className="h-8 bg-zinc-100 rounded-lg w-full"></div></td></tr>)
               ) : filteredItems.length > 0 ? (
                 filteredItems.map((item, index) => (
-                  <tr key={index} className="group hover:bg-zinc-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-medium">
-                          <Hash size={12} className="text-zinc-400" /> {item.itemCode}
-                        </div>
-                        <span className="text-xs text-zinc-500 mt-0.5">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-xs font-bold text-zinc-700">
-                        <Briefcase size={12} className="text-zinc-500"/>
-                        {item.jobNo || '-'}
+                  <tr key={index} className="group hover:bg-zinc-50/50 transition-colors">
+                    
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-mono font-bold text-zinc-700 bg-zinc-100 px-2 py-1 rounded border border-zinc-200 truncate block">
+                        {item.transactionNo}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md bg-orange-50 text-orange-700 font-bold text-xs border border-orange-100">
+
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-bold text-xs">
+                          <Hash size={12} className="text-zinc-400" /> {item.itemCode}
+                        </div>
+                        <span className="text-[11px] font-medium text-zinc-600 truncate max-w-[200px]">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[80px]">
+                        <Briefcase size={10} className="text-zinc-500 shrink-0"/>
+                        <span className="truncate">{item.jobNo || '-'}</span>
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-md font-extrabold text-xs border shadow-sm",
+                        activeTab === 'PR' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"
+                      )}>
                         {item.pendingAmount}
                       </span>
                     </td>
+
                     <td className="px-4 py-3">
                        <div className="flex items-center gap-1.5">
                          <div className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0"><User size={10} /></div>
                          <span className="text-[11px] font-medium text-zinc-700 truncate">{item.recordedBy || '-'}</span>
                        </div>
                     </td>
-                    <td className="px-6 py-4 text-xs text-zinc-500">
-                      {item.lastUpdated}
+
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-mono text-zinc-500 bg-white border border-zinc-200 px-1.5 py-0.5 rounded truncate block w-fit">
+                         {item.lastUpdated}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600">
-                        <ArrowDownToLine size={14} strokeWidth={2.5}/> จัดการ
-                      </button>
+
+                    <td className="px-4 py-3 text-right">
+                      {/* ✅ Action Dynamic ตามแท็บ */}
+                      {activeTab === 'PR' ? (
+                        <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95 whitespace-nowrap">
+                          <ArrowDownToLine size={14} strokeWidth={2.5}/> รับของ
+                        </button>
+                      ) : (
+                        <button onClick={() => setApproveItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-amber-200 hover:border-amber-600 active:scale-95 whitespace-nowrap">
+                          <CheckCircle2 size={14} strokeWidth={2.5}/> อนุมัติ
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-16 text-center">
+                  <td colSpan="7" className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-zinc-400">
-                      <Package size={32} strokeWidth={1} className="mb-2 opacity-50"/>
-                      <p className="text-sm text-zinc-500 font-medium">ไม่มีรายการค้างจ่าย</p>
+                      {activeTab === 'PR' 
+                        ? <ShoppingCart size={32} strokeWidth={1.5} className="mb-2 opacity-30 text-emerald-600"/>
+                        : <ArrowUpRight size={32} strokeWidth={1.5} className="mb-2 opacity-30 text-amber-600"/>
+                      }
+                      <p className="text-sm text-zinc-500 font-bold">ไม่มีรายการคำขอในขณะนี้</p>
                     </div>
                   </td>
                 </tr>

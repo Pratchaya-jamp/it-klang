@@ -17,7 +17,57 @@ namespace StockApi.Controllers
             _stockService = stockService;
         }
 
-        [HttpGet("pending")]
+        //[HttpGet("pending")]
+        //public async Task<IActionResult> GetPendingWithdrawals()
+        //{
+        //    try
+        //    {
+        //        var result = await _stockService.GetPendingWithdrawalsAsync();
+        //        return Ok(new { data = result, count = result.Count });
+        //    }
+        //    catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        //}
+
+        // 📋 1. ดึงรายการขอสั่งซื้อที่ค้างอยู่ (PR)
+        [HttpGet("purchase/request")]
+        public async Task<IActionResult> GetPurchaseRequests()
+        {
+            try
+            {
+                var result = await _stockService.GetPurchaseRequestsAsync();
+                return Ok(new { data = result, count = result.Count });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // 🔥 1. ขอซื้อ (PR)
+        [HttpPost("purchase/request")]
+        public async Task<IActionResult> RequestPurchase([FromBody] List<PurchaseRequestDto> requests)
+        {
+            try
+            {
+                if (requests == null || !requests.Any()) return BadRequest(new { message = "ไม่พบรายการ" });
+                await _stockService.RequestPurchaseAsync(requests);
+                return StatusCode(201, new { message = $"ส่งเรื่องขอสั่งซื้อ {requests.Count} รายการเรียบร้อย" });
+            }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        // 📥 2. รับของเข้า (IN)
+        [HttpPost("receive")]
+        public async Task<IActionResult> ReceiveStock([FromBody] List<ReceiveRequest> requests)
+        {
+            try
+            {
+                if (requests == null || !requests.Any()) return BadRequest(new { message = "ไม่พบรายการ" });
+                await _stockService.ReceiveStockAsync(requests);
+                return StatusCode(201, new { message = $"รับสินค้า {requests.Count} รายการเรียบร้อย" });
+            }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        // 📋 2. ดึงรายการขอเบิกที่รออนุมัติ (PENDING_OUT)
+        [HttpGet("withdraw/request")]
         public async Task<IActionResult> GetPendingWithdrawals()
         {
             try
@@ -25,65 +75,49 @@ namespace StockApi.Controllers
                 var result = await _stockService.GetPendingWithdrawalsAsync();
                 return Ok(new { data = result, count = result.Count });
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // POST: api/transactions/receive
-        [HttpPost("receive")]
-        public async Task<IActionResult> Receive([FromBody] List<TransactionRequest> requests)
+        // 📤 3. ขอเบิก (PENDING_OUT)
+        [HttpPost("withdraw/request")]
+        public async Task<IActionResult> RequestWithdraw([FromBody] List<WithdrawRequest> requests)
         {
             try
             {
-                if (requests == null || !requests.Any())
-                    return BadRequest(new { message = "ไม่พบรายการสินค้า" }); // 400 Bad Request
-
-                await _stockService.ReceiveStockAsync(requests);
-
-                // 201 Created (สร้าง Transaction สำเร็จ)
-                return StatusCode(201, new { message = $"รับสินค้า {requests.Count} รายการเรียบร้อย" });
+                if (requests == null || !requests.Any()) return BadRequest(new { message = "ไม่พบรายการ" });
+                await _stockService.RequestWithdrawAsync(requests);
+                return StatusCode(201, new { message = $"ทำเรื่องขอเบิก {requests.Count} รายการเรียบร้อย (รอการอนุมัติ)" });
             }
             catch (Exception ex)
             {
-                // ถ้า Error ว่าหาของไม่เจอ ให้ส่ง 404
-                if (ex.Message.Contains("ไม่พบ")) return NotFound(new { message = ex.Message });
-
-                // Error อื่นๆ (เช่น Validation) ให้ส่ง 400
-                return BadRequest(new { message = ex.Message });
+                // 🔥 ล้วงเอา InnerException (ไส้ในที่แท้จริงของ Database) ออกมาโชว์
+                string actualError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return BadRequest(new { message = actualError });
             }
         }
 
-        // POST: api/transactions/withdraw
-        [HttpPost("withdraw")]
-        public async Task<IActionResult> Withdraw([FromBody] List<TransactionRequest> requests)
+        // ✅ 4. อนุมัติเบิก (APPROVE -> OUT)
+        [HttpPost("withdraw/approve")]
+        public async Task<IActionResult> ApproveWithdraw([FromBody] ApproveWithdrawRequest request)
         {
             try
             {
-                if (requests == null || !requests.Any())
-                    return BadRequest(new { message = "ไม่พบรายการสินค้า" }); // 400 Bad Request
-
-                await _stockService.WithdrawStockAsync(requests);
-
-                // 201 Created (สร้าง Transaction สำเร็จ)
-                return StatusCode(201, new { message = $"เบิกสินค้า {requests.Count} รายการเรียบร้อย" });
+                await _stockService.ApproveWithdrawAsync(request);
+                return Ok(new { message = "อนุมัติและจ่ายอุปกรณ์เรียบร้อยแล้ว" });
             }
-            catch (Exception ex)
-            {
-                // ถ้า Error ว่าหาของไม่เจอ ให้ส่ง 404
-                if (ex.Message.Contains("ไม่พบ")) return NotFound(new { message = ex.Message });
-
-                // Error อื่นๆ (เช่น ของไม่พอ) ให้ส่ง 400
-                return BadRequest(new { message = ex.Message });
-            }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
+        // 🗑️ 5. ตัดจำหน่าย (WRITE_OFF)
         [HttpPost("write-off")]
         public async Task<IActionResult> WriteOffStock([FromBody] WriteOffRequest request)
         {
-            await _stockService.WriteOffStockAsync(request);
-            return StatusCode(201, new { message = "ตัดจำหน่ายอุปกรณ์เรียบร้อยแล้ว" });
+            try
+            {
+                await _stockService.WriteOffStockAsync(request);
+                return StatusCode(201, new { message = "ตัดจำหน่ายอุปกรณ์เรียบร้อยแล้ว" });
+            }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
         [HttpGet("write-off/summary")]
@@ -92,12 +126,9 @@ namespace StockApi.Controllers
             try
             {
                 var result = await _stockService.GetWriteOffSummaryAsync();
-                return Ok(result); // ถ้าคุณมี Response Format แบบ { message, data } ก็ครอบตรงนี้ได้เลย
+                return Ok(result);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
     }
 }
