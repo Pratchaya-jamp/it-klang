@@ -147,7 +147,7 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
   );
 };
 
-// --- 2. CREATE REQUEST MODAL (ใช้สร้าง PR และ Withdraw) ---
+// --- 2. CREATE REQUEST MODAL ---
 const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const [activeType, setActiveType] = useState(type); // 'PR' | 'WITHDRAW'
   const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
@@ -313,7 +313,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   );
 };
 
-// --- 3. APPROVE WITHDRAW MODAL (อนุมัติเบิก) ---
+// --- 3. APPROVE WITHDRAW MODAL ---
 const ApproveWithdrawModal = ({ isOpen, onClose, onSuccess, approveItem }) => {
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -416,7 +416,7 @@ const ApproveWithdrawModal = ({ isOpen, onClose, onSuccess, approveItem }) => {
   );
 };
 
-// --- 4. PENDING RECEIVE MODAL (รับของจากค้างจ่าย + Write-off) ---
+// --- 4. PENDING RECEIVE MODAL ---
 const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
   const [receiveList, setReceiveList] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -455,7 +455,6 @@ const PendingReceiveModal = ({ isOpen, onClose, onSuccess, pendingItem }) => {
     try {
       const item = receiveList[0]; 
       if (mode === 'RECEIVE') {
-        // ✅ Payload: ส่ง JobNo ไปด้วยตามที่ร้องขอ
         const payload = [{
           itemCode: item.itemCode,
           jobNo: item.jobNo === '-' ? '' : item.jobNo,
@@ -704,7 +703,7 @@ export default function Transactions() {
 
   useEffect(() => {
     loadData(activeTab);
-    setSearchQuery(''); 
+    searchQuery && setSearchQuery(''); 
   }, [activeTab]);
 
   const filteredItems = useMemo(() => {
@@ -720,7 +719,7 @@ export default function Transactions() {
   }, [requestData, searchQuery]);
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-10 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-8 relative animate-in fade-in duration-500">
       
       {/* ใช้งาน Modals */}
       <PendingReceiveModal isOpen={!!receivingPendingItem} onClose={() => setReceivingPendingItem(null)} pendingItem={receivingPendingItem} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
@@ -729,25 +728,25 @@ export default function Transactions() {
       <WriteOffSummaryModal isOpen={isWriteOffModalOpen} onClose={() => setIsWriteOffModalOpen(false)} />
 
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 flex items-center justify-center sm:justify-start gap-2 text-center sm:text-left">
-            <FileText className="text-zinc-900 hidden sm:block" size={28}/> จัดการคำขอ (Requests)
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
+            จัดการคำขอ (Requests)
           </h1>
-          <p className="text-zinc-500 text-sm font-medium mt-1 text-center sm:text-left">จัดการรายการขอซื้อเข้าคลัง และอนุมัติการเบิกจ่ายอุปกรณ์</p>
+          <p className="text-zinc-500 text-sm font-light mt-1">จัดการรายการขอซื้อเข้าคลัง และอนุมัติการเบิกจ่ายอุปกรณ์</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-          <button onClick={() => setTransactionType('PR')} className="h-10 px-5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
-            <ShoppingCart size={16} strokeWidth={2.5} /> <span>สร้างใบขอซื้อ (PR)</span>
+        <div className="flex flex-row items-center gap-3 w-full md:w-auto">
+          <button onClick={() => setTransactionType('PR')} className="h-10 px-4 bg-white border border-zinc-200 text-emerald-700 rounded-xl text-sm font-medium hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+            <ShoppingCart size={16} /> <span className="hidden sm:inline">สร้างใบขอซื้อ (PR)</span>
           </button>
-          <button onClick={() => setTransactionType('WITHDRAW')} className="h-10 px-5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
-            <ArrowUpRight size={16} strokeWidth={2.5} /> <span>สร้างใบเบิกอุปกรณ์</span>
+          <button onClick={() => setTransactionType('WITHDRAW')} className="h-10 px-4 bg-zinc-900 border border-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
+            <ArrowUpRight size={16} /> <span className="hidden sm:inline">สร้างใบเบิกอุปกรณ์</span>
           </button>
         </div>
       </div>
 
       {/* REQUESTS TABLE SECTION */}
-      <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4">
         
         {/* TOGGLE TABS & SEARCH */}
         <div className="p-4 border-b border-zinc-100 bg-zinc-50/50 flex flex-col lg:flex-row justify-between items-center gap-4">
@@ -775,29 +774,29 @@ export default function Transactions() {
           <table className="w-full text-left border-collapse min-w-[900px] table-fixed">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">เลขที่รายการ</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[30%]">รายละเอียดอุปกรณ์</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[10%]">รหัสงาน</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-center w-[10%]">จำนวน</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[15%]">ผู้ทำรายการ</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 w-[10%]">วันที่รายการ</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-zinc-500 text-right w-[10%]">จัดการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[15%]">เลขที่รายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[30%]">รายละเอียดอุปกรณ์</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[10%]">รหัสงาน</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center w-[10%]">จำนวน</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[15%]">ผู้ทำรายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[10%]">วันที่รายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right w-[10%]">จัดการ</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-zinc-50">
               {loading ? (
-                [...Array(4)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-4 py-3"><div className="h-8 bg-zinc-100 rounded-lg w-full"></div></td></tr>)
+                [...Array(4)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-6 py-4"><div className="h-8 bg-zinc-100 rounded-lg w-full"></div></td></tr>)
               ) : filteredItems.length > 0 ? (
                 filteredItems.map((item, index) => (
                   <tr key={index} className="group hover:bg-zinc-50/50 transition-colors">
                     
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4">
                       <span className="text-[10px] font-mono font-bold text-zinc-700 bg-zinc-100 px-2 py-1 rounded border border-zinc-200 truncate block">
                         {item.transactionNo}
                       </span>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-bold text-xs">
                           <Hash size={12} className="text-zinc-400" /> {item.itemCode}
@@ -806,14 +805,14 @@ export default function Transactions() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[80px]">
                         <Briefcase size={10} className="text-zinc-500 shrink-0"/>
                         <span className="truncate">{item.jobNo || '-'}</span>
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       <span className={cn(
                         "inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-md font-extrabold text-xs border shadow-sm",
                         activeTab === 'PR' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"
@@ -822,21 +821,20 @@ export default function Transactions() {
                       </span>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4">
                        <div className="flex items-center gap-1.5">
                          <div className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0"><User size={10} /></div>
                          <span className="text-[11px] font-medium text-zinc-700 truncate">{item.recordedBy || '-'}</span>
                        </div>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4">
                       <span className="text-[10px] font-mono text-zinc-500 bg-white border border-zinc-200 px-1.5 py-0.5 rounded truncate block w-fit">
                          {item.lastUpdated}
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 text-right">
-                      {/* ✅ Action Dynamic ตามแท็บ */}
+                    <td className="px-6 py-4 text-right">
                       {activeTab === 'PR' ? (
                         <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95 whitespace-nowrap">
                           <ArrowDownToLine size={14} strokeWidth={2.5}/> รับของ
@@ -851,7 +849,7 @@ export default function Transactions() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-4 py-16 text-center">
+                  <td colSpan="7" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-zinc-400">
                       {activeTab === 'PR' 
                         ? <ShoppingCart size={32} strokeWidth={1.5} className="mb-2 opacity-30 text-emerald-600"/>

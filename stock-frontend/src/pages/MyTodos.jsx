@@ -44,19 +44,23 @@ const CustomFilterSelect = ({ value, onChange, options }) => {
   }, []);
   const selectedOption = options.find(opt => opt.value === value) || options[0];
   return (
-    <div className="relative w-full sm:w-48" ref={wrapperRef}>
+    <div className="relative w-full sm:w-56 shrink-0" ref={wrapperRef}>
       <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 z-10 pointer-events-none" size={16} />
       <button 
         type="button" onClick={() => setIsOpen(!isOpen)} 
-        className={cn("w-full h-11 pl-9 pr-3 bg-white border border-zinc-200 rounded-xl text-sm transition-all shadow-sm flex items-center justify-between hover:bg-zinc-50", isOpen ? "ring-2 ring-zinc-100 border-zinc-300" : "", "text-zinc-700 font-medium")}
+        className={cn(
+          "w-full h-11 pl-9 pr-8 bg-white border border-zinc-200 rounded-xl text-sm transition-all shadow-sm flex items-center justify-between hover:bg-zinc-50", 
+          isOpen ? "ring-2 ring-zinc-900/10 border-zinc-300" : "", 
+          "text-zinc-700 font-medium"
+        )}
       >
         <span className="truncate">{selectedOption.label}</span>
-        <ChevronDown size={14} className={cn("transition-transform text-zinc-400", isOpen && "rotate-180")} />
+        <ChevronDown size={14} className={cn("absolute right-3 transition-transform text-zinc-400", isOpen && "rotate-180")} />
       </button>
       {isOpen && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-20 w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 py-1">
           {options.map((opt) => (
-            <div key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", value === opt.value ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600")}>
+            <div key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", value === opt.value ? "bg-zinc-50 font-bold text-zinc-900" : "text-zinc-600")}>
               {opt.label} {value === opt.value && <Check size={14} className="text-zinc-900"/>}
             </div>
           ))}
@@ -81,10 +85,10 @@ const CustomFormSelect = ({ value, onChange, options, placeholder }) => {
         <ChevronDown size={16} className={cn("transition-transform text-zinc-400 shrink-0", isOpen && "rotate-180")} />
       </button>
       {isOpen && (
-        <div className="absolute z-[60] w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-[60] w-full mt-1 bg-white border border-zinc-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 py-1">
           <div className="max-h-48 overflow-y-auto custom-scrollbar">
             {options.map((opt) => (
-              <div key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", value === opt ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-600")}>
+              <div key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 transition-colors flex items-center justify-between", value === opt ? "bg-zinc-50 font-bold text-zinc-900" : "text-zinc-600")}>
                 {opt} {value === opt && <Check size={14} className="text-zinc-900"/>}
               </div>
             ))}
@@ -178,7 +182,7 @@ const CreateTodoModal = ({ isOpen, onClose, onSuccess }) => {
             <input type="file" ref={fileInputRef} onChange={handleImageChange} accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" className="hidden" />
           </div>
         </form>
-        <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3"><button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white">ยกเลิก</button><button onClick={handleSubmit} disabled={!isValid || isSubmitting} className="flex-1 h-11 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50">{isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} บันทึก</button></div>
+        <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3"><button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-white transition-all">ยกเลิก</button><button onClick={handleSubmit} disabled={!isValid || isSubmitting} className="flex-1 h-11 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 transition-all shadow-sm">{isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} บันทึก</button></div>
       </div>
     </div>, document.body
   );
@@ -228,19 +232,19 @@ const EditTodoModal = ({ isOpen, onClose, onSuccess, todoData }) => {
         </div>
         <form className="p-6 overflow-y-auto flex-1 space-y-4 max-h-[60vh] custom-scrollbar">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">รหัสงาน</label><input type="text" value={formData.jobCode} onChange={(e) => setFormData({...formData, jobCode: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm" /></div>
+            <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">รหัสงาน</label><input type="text" value={formData.jobCode} onChange={(e) => setFormData({...formData, jobCode: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all" /></div>
             <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">หมวดหมู่</label><CustomFormSelect value={formData.category} onChange={(val) => setFormData({...formData, category: val})} options={categories} /></div>
           </div>
-          <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">ชื่อเครื่อง/อุปกรณ์</label><input type="text" value={formData.pcName} onChange={(e) => setFormData({...formData, pcName: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm" /></div>
-          <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">รายละเอียดงาน</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full h-24 p-3 bg-zinc-50 border border-transparent rounded-xl text-sm resize-none" /></div>
+          <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">ชื่อเครื่อง/อุปกรณ์</label><input type="text" value={formData.pcName} onChange={(e) => setFormData({...formData, pcName: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all" /></div>
+          <div className="space-y-1"><label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">รายละเอียดงาน</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full h-24 p-3 bg-zinc-50 border border-transparent rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 transition-all" /></div>
         </form>
-        <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3"><button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-white">ยกเลิก</button><button onClick={handleSubmit} disabled={!isValid || !isChanged || isSubmitting} className="flex-1 h-11 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50">{isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {isChanged ? "บันทึกการแก้ไข" : "ไม่มีการเปลี่ยนแปลง"}</button></div>
+        <div className="p-6 border-t border-zinc-100 bg-zinc-50/50 flex gap-3"><button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-white transition-all">ยกเลิก</button><button onClick={handleSubmit} disabled={!isValid || !isChanged || isSubmitting} className="flex-1 h-11 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm shadow-blue-100">{isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {isChanged ? "บันทึกการแก้ไข" : "ไม่มีการเปลี่ยนแปลง"}</button></div>
       </div>
     </div>, document.body
   );
 };
 
-// --- 4. TODO DETAIL MODAL (✅ เพิ่มปุ่มแอคชันอัปเดตสถานะ) ---
+// --- 4. TODO DETAIL MODAL ---
 const TodoDetailModal = ({ isOpen, onClose, todoId, onRefresh }) => {
   const [detail, setDetail] = useState(null); 
   const [loading, setLoading] = useState(false);
@@ -268,7 +272,6 @@ const TodoDetailModal = ({ isOpen, onClose, todoId, onRefresh }) => {
     catch (e) { showToast("ดึงข้อมูลไม่สำเร็จ", "error"); onClose(); } finally { setLoading(false); }
   };
 
-  // ✅ ฟังก์ชันอัปเดตสถานะจาก Modal
   const handleStatusUpdate = async (newStatus) => {
     if (!detail) return;
     setIsUpdatingStatus(true);
@@ -279,8 +282,8 @@ const TodoDetailModal = ({ isOpen, onClose, todoId, onRefresh }) => {
       });
       showToast("อัปเดตสถานะเรียบร้อย", "success");
       
-      if (onRefresh) onRefresh(); // รีเฟรชหน้าบอร์ด
-      onClose(); // ✅ เพิ่มคำสั่งนี้เพื่อปิด Modal ทันทีที่อัปเดตสำเร็จ
+      if (onRefresh) onRefresh(); 
+      onClose(); 
 
     } catch (e) {
       showToast("เกิดข้อผิดพลาดในการอัปเดตสถานะ", "error");
@@ -316,15 +319,14 @@ const TodoDetailModal = ({ isOpen, onClose, todoId, onRefresh }) => {
           <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/50">
             <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><ClipboardList size={20} /> รายละเอียดใบงาน</h2>
             <div className="flex gap-2">
-              {detail && <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200"><Pencil size={14}/> แก้ไข</button>}
-              <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full"><X size={20} /></button>
+              {detail && <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1.5 flex items-center gap-1.5 text-sm font-bold bg-white text-zinc-700 rounded-lg hover:bg-zinc-100 border border-zinc-200 shadow-sm transition-colors"><Pencil size={14}/> แก้ไข</button>}
+              <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors"><X size={20} /></button>
             </div>
           </div>
           <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
             {loading ? <div className="h-40 flex items-center justify-center text-zinc-400"><Loader2 className="animate-spin" /></div> : detail ? (
               <div className="space-y-6">
                 
-                {/* ✅ ส่วนแสดงสถานะ + ปุ่มอัปเดตสถานะ */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-zinc-200 bg-zinc-50/50">
                   <div className="flex flex-wrap gap-2">
                     <span className={cn("px-3 py-1.5 rounded-lg text-sm font-bold border flex items-center gap-1.5", getStatusColor(detail.status))}>
@@ -437,7 +439,7 @@ const ConfirmDeleteModal = ({ isOpen, onClose, onConfirm, count, isProcessing })
         <h3 className="text-xl font-bold text-zinc-900 mb-2">ยืนยันการลบถาวร?</h3>
         <p className="text-sm text-zinc-500 mb-6 leading-relaxed">คุณกำลังจะลบข้อมูลที่เลือกจำนวน <strong className="text-zinc-900">{count}</strong> รายการ <br/><span className="text-red-500 font-medium">การกระทำนี้เป็นการลบถาวรและไม่สามารถกู้คืนได้</span></p>
         <div className="flex gap-3">
-          <button onClick={onClose} disabled={isProcessing} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition-colors disabled:opacity-50">ยกเลิก</button>
+          <button onClick={onClose} disabled={isProcessing} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition-colors disabled:opacity-50">ยกเลิก</button>
           <button onClick={onConfirm} disabled={isProcessing} className="flex-1 h-11 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md shadow-red-200">{isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} {isProcessing ? "กำลังลบ..." : "ลบถาวร"}</button>
         </div>
       </div>
@@ -521,7 +523,7 @@ const TrashModal = ({ isOpen, onClose, onRefresh }) => {
               <h2 className="text-lg font-bold text-red-600 flex items-center gap-2"><Trash2 size={20} /> ถังขยะ (Recycle Bin)</h2>
               <p className="text-xs text-zinc-500 mt-1 flex items-center gap-1.5"><AlertTriangle size={14} className="text-amber-500"/> รายการจะถูกเก็บไว้ 30 วันก่อนถูกลบถาวรอัตโนมัติ</p>
             </div>
-            <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full"><X size={20} strokeWidth={1.5} /></button>
+            <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors"><X size={20} strokeWidth={1.5} /></button>
           </div>
           <div className="px-6 py-3 border-b border-zinc-100 bg-white flex justify-between items-center">
             <label onClick={handleToggleAll} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-zinc-700 select-none">
@@ -531,8 +533,8 @@ const TrashModal = ({ isOpen, onClose, onRefresh }) => {
               เลือกทั้งหมด ({selectedIds.length}/{trashItems.length})
             </label>
             <div className="flex gap-2">
-              <button onClick={handleRestore} disabled={!selectedIds.length || isProcessing} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1.5 transition-colors"><RefreshCw size={14} /> กู้คืน</button>
-              <button onClick={handlePermanentDeleteClick} disabled={!selectedIds.length || isProcessing} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 flex items-center gap-1.5 transition-colors"><Trash2 size={14} /> ลบถาวร</button>
+              <button onClick={handleRestore} disabled={!selectedIds.length || isProcessing} className="px-3 py-1.5 text-sm font-bold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1.5 transition-colors"><RefreshCw size={14} /> กู้คืน</button>
+              <button onClick={handlePermanentDeleteClick} disabled={!selectedIds.length || isProcessing} className="px-3 py-1.5 text-sm font-bold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 flex items-center gap-1.5 transition-colors"><Trash2 size={14} /> ลบถาวร</button>
             </div>
           </div>
           <div className="p-6 overflow-y-auto flex-1 bg-zinc-50 custom-scrollbar">
@@ -610,14 +612,13 @@ export default function MyTodos() {
     }
   };
 
-  // ✅ ฟังก์ชันสำหรับลากวาง (Drag & Drop)
   const handleDragStart = (e, id) => {
     e.dataTransfer.setData('todoId', id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e) => {
-    e.preventDefault(); // อนุญาตให้วาง
+    e.preventDefault(); 
   };
 
   const handleDrop = async (e, newStatus) => {
@@ -628,7 +629,6 @@ export default function MyTodos() {
     const todoToUpdate = todos.find(t => t.id.toString() === todoIdStr);
     if (!todoToUpdate || todoToUpdate.status === newStatus) return;
 
-    // อัปเดต UI ทันที (Optimistic Update)
     const previousTodos = [...todos];
     setTodos(prev => prev.map(t => t.id.toString() === todoIdStr ? { ...t, status: newStatus } : t));
 
@@ -639,7 +639,7 @@ export default function MyTodos() {
       });
       showToast('อัปเดตสถานะสำเร็จ', 'success');
     } catch (err) {
-      setTodos(previousTodos); // ถ้ายิง API พลาด ให้คืนค่าสถานะเดิม
+      setTodos(previousTodos); 
       showToast('ไม่สามารถอัปเดตสถานะได้', 'error');
     }
   };
@@ -673,42 +673,54 @@ export default function MyTodos() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-6 md:space-y-8 relative animate-in fade-in duration-500">
       
       <TodoDetailModal isOpen={!!selectedTodoId} onClose={() => setSelectedTodoId(null)} todoId={selectedTodoId} onRefresh={fetchTodos} />
       <CreateTodoModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') fetchTodos(); }} />
       <TrashModal isOpen={isTrashModalOpen} onClose={() => setIsTrashModalOpen(false)} onRefresh={fetchTodos} />
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-6">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
-            <ClipboardList className="text-zinc-900" size={24}/> ใบงานของฉัน
+            ใบงานของฉัน
           </h1>
           <p className="text-zinc-500 text-sm font-light mt-1">ติดตามและจัดการสถานะใบงานซ่อมบำรุงของคุณ</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-64 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
-            <input type="text" placeholder="ค้นหารหัสงาน หรือหมวดหมู่..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 shadow-sm" />
-          </div>
-          <CustomFilterSelect value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
-          
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button 
-              onClick={() => setIsTrashModalOpen(true)}
-              className="h-11 px-3 bg-white text-zinc-600 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:text-red-600 transition-all flex flex-1 sm:flex-none items-center justify-center shadow-sm active:scale-95"
-            >
-              <Trash2 size={18} />
-            </button>
-            <button onClick={() => setIsCreateModalOpen(true)} className="flex-1 sm:flex-none h-11 px-4 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95">
-              <Plus size={16} /> <span className="hidden sm:inline">สร้างใบงาน</span>
-            </button>
-          </div>
+        <div className="flex flex-row items-center gap-3 w-full md:w-auto">
+          <button 
+            onClick={() => setIsTrashModalOpen(true)}
+            className="h-10 px-4 bg-white border border-zinc-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+          >
+            <Trash2 size={16} /> <span className="hidden sm:inline">ถังขยะ</span>
+          </button>
+          <button 
+            onClick={() => setIsCreateModalOpen(true)} 
+            className="h-10 px-4 bg-zinc-900 border border-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
+          >
+            <Plus size={16} /> <span className="hidden sm:inline">สร้างใบงาน</span>
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 flex md:grid md:grid-cols-3 gap-4 md:gap-6 items-start overflow-x-auto md:overflow-hidden pb-4 snap-x snap-mandatory hide-scrollbar min-h-0">
+      {/* FILTER & SEARCH SECTION */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 animate-in slide-in-from-bottom-2 fade-in">
+        <div className="relative flex-1 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-zinc-800 transition-colors" size={18} />
+          <input 
+            type="text" 
+            placeholder="ค้นหารหัสงาน หรือหมวดหมู่..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            className="w-full h-11 pl-10 pr-4 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all shadow-sm" 
+          />
+        </div>
+        <CustomFilterSelect value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
+      </div>
+
+      {/* BOARD AREA */}
+      <div className="flex-1 flex md:grid md:grid-cols-3 gap-4 md:gap-6 items-start overflow-x-auto md:overflow-visible pb-4 snap-x snap-mandatory hide-scrollbar min-h-[60vh] animate-in slide-in-from-bottom-4 fade-in">
         {['TODO', 'DOING', 'DONE'].map((status) => {
           const config = getColConfig(status);
           const items = columns[status];
@@ -716,7 +728,6 @@ export default function MyTodos() {
           return (
             <div 
               key={status} 
-              // ✅ กำหนดความกว้างในมือถือให้แคบกว่าจอเล็กน้อย (85vw) เพื่อให้เห็นขอบของคอลัมน์ถัดไป
               className={cn("w-[85vw] sm:w-[340px] md:w-auto shrink-0 snap-center rounded-2xl border flex flex-col h-full", config.bg, config.border)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, status)}
