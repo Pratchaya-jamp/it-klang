@@ -3,9 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   ArrowDownToLine, ArrowUpFromLine, Search, Package, User,
   Hash, Clock, X, Loader2, CheckCircle2, FileText,
-  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, 
-  Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon, 
-  ShoppingCart, ClipboardCheck, History, FileMinus, Ban, ArrowLeft, FileX
+  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon, ShoppingCart, ClipboardCheck, History, FileMinus, Ban, ArrowLeft, FileX
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -673,6 +671,7 @@ const WriteOffSummaryModal = ({ isOpen, onClose }) => {
   );
 };
 
+
 // --- 6. TRANSACTION HISTORY MODAL (ดูประวัติทั้งหมด) ---
 const TransactionHistoryModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('PR');
@@ -1175,7 +1174,6 @@ export default function Transactions() {
       <TransactionModal isOpen={!!transactionType} type={transactionType} onClose={() => setTransactionType(null)} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
       <ApproveWithdrawModal isOpen={!!approveItem} approveItem={approveItem} onClose={() => setApproveItem(null)} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
       
-      {/* ✅ เรียกใช้งาน Modal ใหม */}
       <CancelRequestModal isOpen={!!cancelItem} onClose={() => setCancelItem(null)} item={cancelItem} activeTab={activeTab} onSuccess={(msg, type) => { showToast(msg, type); if (type === 'success') loadData(activeTab); }} />
       <WriteOffSummaryModal isOpen={isWriteOffModalOpen} onClose={() => setIsWriteOffModalOpen(false)} />
       <TransactionHistoryModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} /> 
@@ -1232,16 +1230,17 @@ export default function Transactions() {
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse min-w-[900px] table-fixed">
+          {/* ✅ เอา table-fixed ออก และให้ข้อมูลวันที่ใช้ whitespace-nowrap ห้ามตัดบรรทัด */}
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[15%]">เลขที่รายการ</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[25%]">รายละเอียดอุปกรณ์</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[10%]">รหัสงาน</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center w-[10%]">จำนวน</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[15%]">ผู้ทำรายการ</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 w-[10%]">วันที่รายการ</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right w-[15%]">จัดการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 whitespace-nowrap">เลขที่รายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 min-w-[200px]">รายละเอียดอุปกรณ์</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 whitespace-nowrap">รหัสงาน</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center whitespace-nowrap">จำนวน</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 whitespace-nowrap">ผู้ทำรายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 whitespace-nowrap">วันที่รายการ</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right whitespace-nowrap">จัดการ</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-zinc-50">
@@ -1262,12 +1261,12 @@ export default function Transactions() {
                         <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-bold text-xs">
                           <Hash size={12} className="text-zinc-400" /> {item.itemCode}
                         </div>
-                        <span className="text-[11px] font-medium text-zinc-600 truncate max-w-[200px]">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
+                        <span className="text-[11px] font-medium text-zinc-600 truncate max-w-[250px]">{item.itemName || 'ไม่ทราบชื่ออุปกรณ์'}</span>
                       </div>
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[80px]">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[100px]">
                         <Briefcase size={10} className="text-zinc-500 shrink-0"/>
                         <span className="truncate">{item.jobNo || '-'}</span>
                       </span>
@@ -1278,25 +1277,25 @@ export default function Transactions() {
                         "inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-md font-extrabold text-xs border shadow-sm",
                         activeTab === 'PR' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"
                       )}>
-                        {item.pendingAmount}
+                        {item.pendingAmount || item.quantity}
                       </span>
                     </td>
 
                     <td className="px-6 py-4">
                        <div className="flex items-center gap-1.5">
                          <div className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0"><User size={10} /></div>
-                         <span className="text-[11px] font-medium text-zinc-700 truncate">{item.recordedBy || '-'}</span>
+                         <span className="text-[11px] font-medium text-zinc-700 truncate max-w-[120px]">{item.recordedBy || item.createdBy || '-'}</span>
                        </div>
                     </td>
 
+                    {/* ✅ แก้ไขจุดนี้: ดึงค่าทั้ง createdAt หรือ lastUpdated มาแสดงและป้องกันการตัดคำบรรทัด */}
                     <td className="px-6 py-4">
-                      <span className="text-[10px] font-mono text-zinc-500 bg-white border border-zinc-200 px-1.5 py-0.5 rounded truncate block w-fit">
-                         {item.lastUpdated}
+                      <span className="text-[10px] font-mono text-zinc-500 bg-white border border-zinc-200 px-2 py-1 rounded inline-block whitespace-nowrap">
+                         {item.createdAt || item.lastUpdated || '-'}
                       </span>
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      {/* ✅ เพิ่มปุ่มยกเลิก คู่กับปุ่มรับเข้า/อนุมัติ */}
                       <div className="flex items-center justify-end gap-2">
                         {activeTab === 'PR' ? (
                           <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95 whitespace-nowrap">
