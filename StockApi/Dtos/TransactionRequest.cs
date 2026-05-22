@@ -4,10 +4,25 @@ namespace StockApi.Dtos
 {
     public class PurchaseRequestDto
     {
-        [Required] public string ItemCode { get; set; } = string.Empty;
-        [Required] public string JobNo { get; set; } = string.Empty;
-        [Required][Range(1, int.MaxValue)] public int Quantity { get; set; }
-        [Required(ErrorMessage = "กรุณาระบุเหตุผลในการขอซื้อ")] public string Note { get; set; } = string.Empty;
+        // 🔥 เติมเครื่องหมาย ? เข้าไป เพื่อบอก .NET ว่าอนุญาตให้เป็น null/ค่าว่างได้
+        public string? ItemCode { get; set; }
+
+        [Required(ErrorMessage = "กรุณาระบุรหัสอ้างอิง Job (Job No)")]
+        public string JobNo { get; set; } = string.Empty;
+
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "จำนวนต้องมากกว่า 0")]
+        public int Quantity { get; set; }
+
+        public string? Note { get; set; } // Note ก็ควรเป็นแบบ Nullable ได้เช่นกัน
+
+        public bool IsNewItem { get; set; } = false;
+        public bool AutoGenerateCode { get; set; } = false;
+
+        // 🔥 กลุ่มนี้ต้องเติม ? ทั้งหมด เพราะถ้าเป็นของเก่า (isNewItem = false) ยูสเซอร์จะไม่ส่งข้อมูลพวกนี้มา
+        public string? ItemName { get; set; }
+        public string? Category { get; set; }
+        public string? Unit { get; set; }
     }
 
     public class ReceiveRequest

@@ -49,7 +49,6 @@ namespace StockApi.Services
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
-                JobNo = x.JobNo, // 🔥 เพิ่มบรรทัดนี้ให้หน้า Dashboard เห็นเลข Job
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToListAsync();
@@ -81,7 +80,6 @@ namespace StockApi.Services
                     Name = request.Name,
                     Category = request.Category,
                     Unit = request.Unit,
-                    JobNo = request.JobNo,
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -120,7 +118,6 @@ namespace StockApi.Services
                     Name = newItem.Name,
                     Category = newItem.Category,
                     Unit = newItem.Unit,
-                    JobNo = newItem.JobNo,
                     CreatedAt = newItem.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                     UpdatedAt = newItem.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
@@ -168,7 +165,6 @@ namespace StockApi.Services
                         Name = request.Name,
                         Category = request.Category,
                         Unit = request.Unit,
-                        JobNo = item.JobNo,
                         CreatedAt = item.CreatedAt,
                         UpdatedAt = now
                     };
@@ -222,20 +218,47 @@ namespace StockApi.Services
             var trackedItem = await _context.Items.Include(x => x.StockBalance).FirstOrDefaultAsync(x => x.ItemCode == itemCode);
             if (trackedItem == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
 
-            //string oldName = trackedItem.Name; // เก็บไว้ใช้ตอนส่ง Noti
+            //string oldName = trackedItem.Name; // ✅ คืนชีพตัวแปรนี้กลับมาใช้
             int oldQuantity = trackedItem.StockBalance?.TotalQuantity ?? 0;
             string oldValue = $"Name: {trackedItem.Name}, Cat: {trackedItem.Category}, Unit: {trackedItem.Unit}, Qty: {oldQuantity}";
 
-            // 📦 1. จัดการอัปเดตตาราง Items (ข้อมูลทั่วไป)
+            // 🕵️‍♂️ 1. ตรวจสอบว่ามีการแก้ช่องไหนบ้าง และเก็บข้อความเอาไว้
+            var changedFields = new List<string>();
+            string singleChangeMsg = "";
+
+            if (trackedItem.Name != request.Name)
+            {
+                changedFields.Add("ชื่อ");
+                singleChangeMsg = $"ชื่อเป็น '{request.Name}'";
+            }
+            if (trackedItem.Category != request.Category)
+            {
+                changedFields.Add("หมวดหมู่");
+                singleChangeMsg = $"หมวดหมู่เป็น '{request.Category}'";
+            }
+            if (trackedItem.Unit != request.Unit)
+            {
+                changedFields.Add("หน่วยนับ");
+                singleChangeMsg = $"หน่วยนับเป็น '{request.Unit}'";
+            }
+            if (oldQuantity != request.Quantity)
+            {
+                changedFields.Add("ยอดตั้งต้น");
+                singleChangeMsg = $"ยอดตั้งต้นเป็น '{request.Quantity}'";
+            }
+
+            // ถ้ากดยืนยันแต่ไม่ได้แก้อะไรเลย ให้จบการทำงานตรงนี้ได้เลย
+            if (changedFields.Count == 0) return;
+
+            // 📦 2. จัดการอัปเดตตาราง Items (ข้อมูลทั่วไป)
             trackedItem.Name = request.Name;
             trackedItem.Category = request.Category;
             trackedItem.Unit = request.Unit;
             trackedItem.UpdatedAt = now;
 
-            // 📊 2. จัดการอัปเดตตาราง StockBalances (ถ้ายูสเซอร์แก้ตัวเลข)
+            // 📊 3. จัดการอัปเดตตาราง StockBalances (ถ้ายูสเซอร์แก้ตัวเลข)
             if (trackedItem.StockBalance != null && request.Quantity != oldQuantity)
             {
-                // เช็คว่าเคยมีประวัติการเบิก/รับเข้า หรือทำ Action อื่นๆ ไปหรือยัง?
                 bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
                     x.RecordId == itemCode &&
                     x.Action != "CREATE" &&
@@ -245,10 +268,9 @@ namespace StockApi.Services
 
                 if (hasOtherActions)
                 {
-                    throw new BadRequestException($"ไม่สามารถแก้ไขยอดเริ่มต้นของ '{trackedItem.Name}' ได้โดยตรง เนื่องจากมีการเคลื่อนไหวสต๊อกไปแล้ว กรุณาใช้เมนู 'ปรับปรุงยอด (Stock Adjust)'");
+                    throw new BadRequestException($"ไม่สามารถแก้ไขยอดเริ่มต้นของ '{oldName}' ได้โดยตรง เนื่องจากมีการเคลื่อนไหวสต๊อกไปแล้ว กรุณาใช้เมนู 'ปรับปรุงยอด (Stock Adjust)'");
                 }
 
-                // ถ้าผ่านเงื่อนไข (แปลว่าเพิ่งสร้าง) ให้แก้ยอดในตาราง Stock ได้เลย
                 trackedItem.StockBalance.TotalQuantity = request.Quantity;
                 trackedItem.StockBalance.Balance = request.Quantity;
                 trackedItem.StockBalance.Received = request.Quantity;
@@ -258,59 +280,108 @@ namespace StockApi.Services
             string newValue = $"Name: {request.Name}, Cat: {request.Category}, Unit: {request.Unit}, Qty: {request.Quantity}";
             await _logRepo.AddLogAsync("UPDATE", "Items", trackedItem.ItemCode, oldValue, newValue, currentUser);
 
-            // 🔥 สั่ง SaveChanges ครั้งเดียว EF Core จะไปแยก Update 2 ตารางให้เองแบบอัตโนมัติ
+            // 🔥 สั่ง SaveChanges ครั้งเดียว
             await _context.SaveChangesAsync();
+
+            // 🔔 4. จัดการสร้างข้อความ Noti ให้คล้ายกับกรณีแรก
+            string notiMessage = "";
+            if (changedFields.Count == 1)
+            {
+                // ถ้าแก้ช่องเดียว (เช่น: คุณ System แก้ไขหมวดหมู่เป็น 'Network' ให้กับอุปกรณ์ 'สายแลน' (IT-001) เรียบร้อยแล้ว)
+                notiMessage = $"คุณ {currentUser} แก้ไข{singleChangeMsg} ให้กับอุปกรณ์ '{oldName}' ({trackedItem.ItemCode}) เรียบร้อยแล้ว";
+            }
+            else
+            {
+                // ถ้าแก้ 2 ช่องขึ้นไป (เช่น: คุณ System แก้ไขข้อมูล (ชื่อ, หมวดหมู่) ให้กับอุปกรณ์ 'สายแลน' (IT-001) เรียบร้อยแล้ว)
+                notiMessage = $"คุณ {currentUser} แก้ไขข้อมูล ({string.Join(", ", changedFields)}) ให้กับอุปกรณ์ '{oldName}' ({trackedItem.ItemCode}) เรียบร้อยแล้ว";
+            }
 
             await _notiService.SendNotificationAsync(
                 null, "แก้ไขข้อมูลอุปกรณ์",
-                $"คุณ {currentUser} อัปเดตข้อมูลอุปกรณ์ '{oldName}' รหัสปัจจุบันคือ ({trackedItem.ItemCode}) เรียบร้อยแล้ว",
+                notiMessage,
                 "ITEM_UPDATE");
         }
 
         // D: Delete
         public async Task DeleteItemAsync(string itemCode)
         {
-            var item = await _repo.GetItemByCodeAsync(itemCode);
-            if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
-
-            // 🔥 1. เช็คว่าเคยมี Action อื่นๆ ที่ไม่ใช่ CREATE กับ UPDATE หรือไม่ (เช่น STOCK_IN, STOCK_OUT, BORROW, RETURN)
-            bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
-                x.RecordId == itemCode &&
-                x.Action != "CREATE" &&
-                x.Action != "UPDATE" && 
-                x.Action != "UPDATE_CODE" // อนุญาตให้เปลี่ยนรหัสลบได้
-            );
-
-            // 🔥 2. เงื่อนไขการลบ
-            if (hasOtherActions)
+            // 🔥 เปิด Transaction เพราะเราต้องจัดการลบข้าม 3 ตารางให้เสร็จพร้อมกัน (Atomic)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                // ถ้า "เคย" มีการทำรายการอื่นๆ ไปแล้ว (ของถูกใช้งานจริง) 
-                // บังคับว่ายอดคงเหลือ (TotalQuantity) ต้องเป็น 0 เท่านั้นถึงจะยอมให้ลบ
-                if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
+                // โหลด Item พร้อม StockBalance ขึ้นมาเพื่อเตรียมลบ
+                var item = await _context.Items.Include(i => i.StockBalance).FirstOrDefaultAsync(i => i.ItemCode == itemCode);
+                if (item == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {itemCode}");
+
+                // 🕵️‍♂️ 1. เช็คจาก Log เดิมว่าเคยมี Action อื่นๆ (เช่น รับเข้า/เบิก) หรือไม่
+                bool hasOtherActions = await _context.SystemLogs.AnyAsync(x =>
+                    x.RecordId == itemCode &&
+                    x.Action != "CREATE" &&
+                    x.Action != "UPDATE" &&
+                    x.Action != "UPDATE_CODE"
+                );
+
+                // 🕵️‍♂️ 2. เช็คจากฝั่ง Transaction เสริมความชัวร์ ว่าเคยมีรายการอื่นที่ไม่ใช่ "ขอซื้อ (PR)" ไหม
+                bool hasRealTransactions = await _context.StockTransactions.AnyAsync(t =>
+                    t.ItemCode == itemCode && t.Type != "PR" && t.Type != "CANCEL_PR");
+
+                // 🔥 เงื่อนไขการลบ
+                if (hasOtherActions || hasRealTransactions)
                 {
-                    throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากเคยมีการทำรายการ (เบิก/รับเข้า) ไปแล้ว หากต้องการลบต้องปรับยอดคงเหลือให้เป็น 0 ก่อน");
+                    // ถ้า "เคย" มีการทำรายการอื่นๆ ไปแล้ว (ของถูกใช้งานจริงในระบบ) 
+                    // บังคับตาม Logic เดิมของคุณคือ ยอดคงเหลือ (TotalQuantity) ต้องเป็น 0 เท่านั้นถึงจะยอมให้ลบ
+                    if (item.StockBalance != null && item.StockBalance.TotalQuantity > 0)
+                    {
+                        throw new BadRequestException($"ไม่สามารถลบ '{item.Name}' ได้ เนื่องจากเคยมีการทำรายการ (เบิก/รับเข้า) ไปแล้ว หากต้องการลบต้องปรับยอดคงเหลือให้เป็น 0 ก่อน");
+                    }
                 }
+
+                // 🗑️ 3. กวาดล้างใบคำขอซื้อ (PR) หรือใบที่ถูกยกเลิก (CANCEL_PR) ที่ค้างอยู่ทิ้งให้หมด (Hard Delete)
+                var pendingPRs = await _context.StockTransactions
+                    .Where(t => t.ItemCode == itemCode && (t.Type == "PR" || t.Type == "CANCEL_PR"))
+                    .ToListAsync();
+
+                if (pendingPRs.Any())
+                {
+                    // ลบทิ้งจาก Database ถาวร โดยไม่เก็บ Log ใดๆ ทั้งสิ้นตามเงื่อนไข
+                    _context.StockTransactions.RemoveRange(pendingPRs);
+                }
+
+                string currentUser = GetCurrentUserName();
+
+                // บันทึก Log การลบ Master Item ตามปกติ
+                await _logRepo.AddLogAsync(
+                    "DELETE",
+                    "Items",
+                    itemCode,
+                    $"Name: {item.Name}",
+                    "DELETED",
+                    currentUser
+                );
+
+                // 🗑️ 4. ทำการลบข้อมูลที่เหลือผ่าน Context โดยตรง
+                if (item.StockBalance != null)
+                {
+                    _context.StockBalances.Remove(item.StockBalance);
+                }
+                _context.Items.Remove(item); // ลบ Item Master
+
+                // บันทึกและ Commit ทุกอย่างลง Database
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // แจ้งเตือน
+                await _notiService.SendNotificationAsync(
+                    null,
+                    "ลบอุปกรณ์",
+                    $"คุณ {currentUser} ลบอุปกรณ์ '{item.Name}' ({itemCode}) ออกจากระบบ",
+                    "ITEM_DELETE");
             }
-
-            string currentUser = GetCurrentUserName(); // ✅ ดึงชื่อมาใช้
-
-            // ✅ ใช้ currentUser แทน "Admin"
-            await _logRepo.AddLogAsync(
-                "DELETE",
-                "Items",
-                itemCode,
-                $"Name: {item.Name}",
-                "DELETED",
-                currentUser
-            );
-
-            await _repo.DeleteItemAsync(itemCode);
-
-            await _notiService.SendNotificationAsync(
-                null,
-                "ลบอุปกรณ์",
-                $"คุณ {currentUser} ลบอุปกรณ์ '{item.Name}' ({itemCode}) ออกจากระบบ",
-                "ITEM_DELETE");
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
     }
 }

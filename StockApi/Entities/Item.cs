@@ -24,8 +24,6 @@ namespace StockApi.Entities
         [Column("Unit")]
         public string Unit { get; set; } = string.Empty;
 
-        public string? JobNo { get; set; }
-
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
 

@@ -87,7 +87,7 @@ namespace StockApi.Services
             return $"TRX-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 5).ToUpper()}";
         }
 
-        // 📝 1. ขอซื้อ (PR) - ไม่กระทบสต๊อก
+        // 📝 1. ขอซื้อ (PR) - เพิ่มกลไกสร้าง Item ใหม่อัตโนมัติทันทีเมื่อเป็นอุปกรณ์ใหม่
         public async Task RequestPurchaseAsync(List<PurchaseRequestDto> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -98,28 +98,89 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
-                    var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                    if (stock == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
+                    string finalItemCode = request.ItemCode ?? "";
 
+                    // 🎯 เคสที่ 1: เป็นอุปกรณ์ใหม่ที่ยังไม่เคยมีในฐานข้อมูล
+                    if (request.IsNewItem)
+                    {
+                        // ตรวจสอบเงื่อนไขการกรอกข้อมูลพื้นฐาน
+                        if (string.IsNullOrWhiteSpace(request.ItemName)) throw new BadRequestException("กรุณาระบุชื่ออุปกรณ์ใหม่");
+
+                        // เช็คกลไกการตั้งรหัสผ่าน Toggle
+                        if (request.AutoGenerateCode)
+                        {
+                            // ระบบเจนรหัสชั่วคราวให้เองอัตโนมัติ
+                            finalItemCode = $"DRAFT-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}";
+                        }
+                        else
+                        {
+                            // ยูสเซอร์เลือกกรอกรหัสเอง
+                            if (string.IsNullOrWhiteSpace(finalItemCode)) throw new BadRequestException("กรุณาระบุรหัสอุปกรณ์ที่คุณต้องการตั้งเอง");
+                        }
+
+                        // ตรวจสอบความซ้ำซ้อนของไอดีในระบบหลัก
+                        var isDuplicate = await _context.Items.AnyAsync(i => i.ItemCode == finalItemCode);
+                        if (isDuplicate) throw new BadRequestException($"ไม่สามารถสร้างได้ เนื่องจากรหัสอุปกรณ์ '{finalItemCode}' มีอยู่เดิมในระบบแล้ว");
+
+                        // 1. วิ่งไป Insert สร้างข้อมูลที่ตารางหลัก Items เดี๋ยวนั้นเลย (ไม่มีฟิลด์ JobNo แล้วตามแผน)
+                        var newItem = new Item
+                        {
+                            ItemCode = finalItemCode,
+                            Name = request.ItemName,
+                            Category = !string.IsNullOrEmpty(request.Category) ? request.Category : "-",
+                            Unit = !string.IsNullOrEmpty(request.Unit) ? request.Unit : "ชิ้น",
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+                        _context.Items.Add(newItem);
+
+                        // 2. สร้างยอดตั้งต้นที่ตาราง StockBalances โดยเซ็ตยอดสต๊อกเริ่มต้นเป็น 0 ทั้งหมดตามที่ตกลงกันไว้
+                        var newStockBalance = new StockBalance
+                        {
+                            ItemCode = finalItemCode,
+                            TotalQuantity = 0, // สต๊อกรวมเป็น 0
+                            Balance = 0,       // ของในตู้เป็น 0
+                            TempWithdrawn = 0,
+                            Received = 0,
+                            LastReceivedDate = DateTime.Now,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+                        _context.StockBalances.Add(newStockBalance);
+
+                        // บันทึก Log ประวัติการลงทะเบียนของใหม่เบื้องหลัง
+                        await _logRepo.AddLogAsync("AUTO_CREATE_ITEM", "Items", finalItemCode, "New Register", $"สร้างอุปกรณ์ใหม่ผ่านระบบขอซื้อโดยคุณ {currentUser}", currentUser);
+                    }
+                    else
+                    {
+                        // เคสที่ 2: เป็นของเก่าที่มีในตู้ปกติ วิ่งเช็คตามเดิม
+                        var exists = await _context.StockBalances.AnyAsync(x => x.ItemCode == finalItemCode);
+                        if (!exists) throw new NotFoundException($"ไม่พบอุปกรณ์รหัส '{finalItemCode}' ในระบบ หากเป็นของใหม่กรุณาเปิดใช้ฟังก์ชันเพิ่มอุปกรณ์ใหม่");
+                    }
+
+                    // 3. ทำการบันทึกใบคำขอสั่งซื้อ (PR) ลงตาราง Transaction เชื่อมต่อโฟลว์ตามปกติ
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
                         TransactionNo = GenerateTransactionNo(),
-                        ItemCode = request.ItemCode,
+                        ItemCode = finalItemCode, // ผูกรหัสที่สรุปได้ (ไม่ว่าจะตั้งเองหรือระบบสุ่มให้)
                         Type = "PR",
                         Quantity = request.Quantity,
-                        BalanceAfter = stock.Balance,
+                        BalanceAfter = 0, // เนื่องจากของเปิดใหม่ ยอดหลังธุรกรรมจึงบันทึกเป็น 0 ไว้ก่อน
                         JobNo = request.JobNo,
-                        Note = $"[ขอซื้อ] {request.Note}",
+                        Note = request.IsNewItem
+                            ? $"[ขอซื้ออุปกรณ์ใหม่] {request.Note ?? ""}"
+                            : (request.Note ?? ""),
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });
 
-                    notiMessages.Add($"- 🛒 ขอซื้อ {stock.Item?.Name ?? request.ItemCode} จำนวน {request.Quantity} ชิ้น [Job: {request.JobNo}]");
+                    notiMessages.Add($"- 🛒 ขอซื้อ {request.ItemName ?? finalItemCode} จำนวน {request.Quantity} ชิ้น [Job: {request.JobNo}]");
                 }
+
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                if (notiMessages.Any()) await _notiService.SendNotificationAsync(null, "แจ้งขอสั่งซื้ออุปกรณ์", $"คุณ {currentUser} ทำเรื่องขอสั่งซื้อ:\n" + string.Join("\n", notiMessages), "STOCK_PR");
+                if (notiMessages.Any()) await _notiService.SendNotificationAsync(null, "แจ้งขอสั่งซื้ออุปกรณ์", $"คุณ {currentUser} ทำเรื่องขอสั่งซื้ออุปกรณ์ใหม่:\n" + string.Join("\n", notiMessages), "STOCK_PR");
             }
             catch { await transaction.RollbackAsync(); throw; }
         }
@@ -175,7 +236,7 @@ namespace StockApi.Services
             catch { await transaction.RollbackAsync(); throw; }
         }
 
-        // 📤 3. ขอเบิก (REQ_OUT) - แค่สร้างใบขอเบิก ยังไม่หัก Stock ใดๆ ทั้งสิ้น
+        // 📤 3. ขอเบิก (REQ_OUT) - ปรับเงื่อนไข item ต่ำกว่าหรือเท่ากับ 0 จะเบิกไม่ได้เด็ดขาด
         public async Task RequestWithdrawAsync(List<WithdrawRequest> requests)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -186,16 +247,21 @@ namespace StockApi.Services
 
                 foreach (var request in requests)
                 {
-                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์ ({request.ItemCode}) ยังไม่มีรหัสจริง เบิกไม่ได้");
+                    if (request.ItemCode.StartsWith("DRAFT-")) throw new BadRequestException($"อุปกรณ์ ({request.ItemCode}) เป็นรายการรอสั่งซื้อชั่วคราว ยังไม่มีของจริงในคลัง ไม่สามารถเบิกได้");
+
                     var stock = await _context.StockBalances.Include(s => s.Item).FirstOrDefaultAsync(x => x.ItemCode == request.ItemCode);
-                    if (stock == null) throw new Exception($"ไม่พบอุปกรณ์ Code: {request.ItemCode}");
+                    if (stock == null) throw new NotFoundException($"ไม่พบอุปกรณ์ Code: {request.ItemCode} ในระบบ");
 
-                    // เช็คแค่ว่า "ณ ตอนที่ทำเรื่อง" มีของพอไหม (แต่ไม่ได้ตัดยอดนะ)
+                    // 🎯 ปรับเงื่อนไขใหม่: ถ้าของในสต๊อกหมด (<= 0) หรือมีไม่พอกับจำนวนที่ขอเบิก ให้ดีด Error บล็อกทันที
+                    if (stock.Balance <= 0)
+                    {
+                        throw new BadRequestException($"ไม่สามารถเบิกได้! อุปกรณ์ '{stock.Item?.Name ?? stock.ItemCode}' หมดคลัง (สต๊อกเป็น 0) กรุณาทำเรื่อง 'ขอสั่งซื้อ (PR)' แทน");
+                    }
+
                     if (stock.Balance < request.Quantity)
-                        throw new BadRequestException($"อุปกรณ์ '{stock.Item?.Name ?? stock.ItemCode}' ไม่พอเบิก (ขอ {request.Quantity} มี {stock.Balance}) กรุณาทำเรื่อง 'ขอสั่งซื้อ (PR)' แทน");
-
-                    // 🔥 ไม่มีการหัก stock.Balance หรือบวก stock.TempWithdrawn ตรงนี้แล้ว! 
-                    // บันทึกแค่ใบ Transaction ไว้เป็นหลักฐานรออนุมัติ
+                    {
+                        throw new BadRequestException($"ไม่สามารถเบิกได้! อุปกรณ์ '{stock.Item?.Name ?? stock.ItemCode}' มีไม่พอจ่าย (ต้องการ {request.Quantity} แต่เหลือในคลังแค่ {stock.Balance})");
+                    }
 
                     await _txRepo.AddTransactionAsync(new StockTransaction
                     {
@@ -203,9 +269,9 @@ namespace StockApi.Services
                         ItemCode = request.ItemCode,
                         Type = "REQ_OUT",
                         Quantity = request.Quantity,
-                        BalanceAfter = stock.Balance, // ยอดคงเหลือยังเท่าเดิม
+                        BalanceAfter = stock.Balance,
                         JobNo = request.JobNo,
-                        Note = request.Note,
+                        Note = request.Note ?? "",
                         CreatedBy = currentUser,
                         CreatedAt = DateTime.Now
                     });

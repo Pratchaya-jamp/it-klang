@@ -117,7 +117,7 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
                       <td className="px-4 sm:px-6 py-3 text-zinc-500">{item.category}</td>
                       <td className="px-4 sm:px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
                       <td className="px-4 sm:px-6 py-3 text-center">
-                        <button disabled={isDraft} onClick={() => { onSelect(item); onClose(); }} className={cn("px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm whitespace-nowrap", isDraft ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95")}>
+                        <button type="button" disabled={isDraft} onClick={() => { onSelect(item); onClose(); }} className={cn("px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm whitespace-nowrap", isDraft ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95")}>
                           {isDraft ? 'ไม่อนุญาต' : 'เลือก'}
                         </button>
                       </td>
@@ -150,7 +150,7 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
 // --- 2. CREATE REQUEST MODAL ---
 const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   const [activeType, setActiveType] = useState(type); // 'PR' | 'WITHDRAW'
-  const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+  const [items, setItems] = useState([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '', isNewItem: false, autoGenerateCode: true, category: '' }]);
   const [inventoryData, setInventoryData] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -167,7 +167,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      setItems([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+      setItems([{ itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '', isNewItem: false, autoGenerateCode: true, category: '' }]);
       
       request('/api/stocks/overview').then(res => {
         setInventoryData(Array.isArray(res) ? res : (res?.data || []));
@@ -198,16 +198,42 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
 
   const handleFieldChange = (index, field, val) => {
     const newItems = [...items];
+    
+    if (field === 'isNewItem') {
+      if (val === true) {
+        newItems[index].itemCode = '';
+        newItems[index].currentStock = 0;
+      } else {
+        newItems[index].itemName = '';
+        newItems[index].category = '';
+        newItems[index].unit = '';
+        newItems[index].autoGenerateCode = true;
+      }
+    }
+    
+    if (field === 'autoGenerateCode' && val === true) {
+      newItems[index].itemCode = '';
+    }
+
     newItems[index][field] = val;
     setItems(newItems);
   };
 
-  const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '' }]);
+  const handleAddItem = () => setItems([...items, { itemCode: '', itemName: '', jobNo: '', quantity: 1, currentStock: 0, unit: '', note: '', isNewItem: false, autoGenerateCode: true, category: '' }]);
   const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
   
-  const isValid = items.every(item => item.itemCode && Number(item.quantity) > 0 && item.jobNo.trim() !== "");
+  const isValid = items.every(item => {
+    const isQtyJobValid = Number(item.quantity) > 0 && item.jobNo.trim() !== "";
+    if (activeType === 'PR' && item.isNewItem) {
+      const isBasicValid = isQtyJobValid && item.itemName.trim() !== "" && (item.category || "").trim() !== "" && (item.unit || "").trim() !== "";
+      if (item.autoGenerateCode) return isBasicValid;
+      return isBasicValid && item.itemCode.trim() !== "";
+    }
+    return isQtyJobValid && item.itemCode.trim() !== "";
+  });
   
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!isValid) return;
     setIsSubmitting(true);
     try {
@@ -215,12 +241,29 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
         ? '/api/transactions/purchase/request' 
         : '/api/transactions/withdraw/request';
         
-      const payload = items.map(item => ({ 
-        itemCode: item.itemCode, 
-        jobNo: item.jobNo.trim(), 
-        quantity: Number(item.quantity), 
-        note: item.note || "" 
-      }));
+      const payload = items.map(item => {
+        if (activeType === 'PR' && item.isNewItem) {
+          return {
+            itemCode: item.autoGenerateCode ? "" : item.itemCode.trim(), 
+            jobNo: item.jobNo.trim(),
+            quantity: Number(item.quantity),
+            note: item.note || "",
+            isNewItem: true,
+            autoGenerateCode: item.autoGenerateCode,
+            itemName: item.itemName.trim(),
+            category: item.category.trim(),
+            unit: item.unit.trim()
+          };
+        } else {
+          return { 
+            itemCode: item.itemCode.trim(), 
+            jobNo: item.jobNo.trim(), 
+            quantity: Number(item.quantity), 
+            note: item.note || "",
+            isNewItem: false
+          };
+        }
+      });
       
       await request(endpoint, { method: 'POST', body: JSON.stringify(payload) });
       onSuccess(`สร้างรายการ${activeType === 'PR' ? 'ขอซื้อ' : 'ขอเบิก'}สำเร็จ`, "success");
@@ -256,55 +299,117 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
+            <button type="button" onClick={onClose} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-white rounded-full transition-colors"><X size={20} /></button>
           </div>
           
-          <div className="p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-zinc-50/30 flex-1">
-            <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>วันที่: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString('th-TH')}</span></span></div>
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <div key={index} className="flex flex-col gap-3 p-4 bg-white rounded-xl border border-zinc-200 shadow-sm group transition-all hover:border-zinc-300">
-                  <div className="flex items-start gap-3 w-full">
-                    <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">รหัสอุปกรณ์</label>
-                      <div className="relative flex gap-2">
-                        <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-10 px-3 border rounded-lg text-sm flex items-center cursor-pointer transition-all hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed bg-zinc-50" : "text-zinc-900 border-zinc-300 font-medium bg-white")}>
-                            {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "คลิกเพื่อค้นหาอุปกรณ์..."}
-                        </div>
-                        <button onClick={() => handleOpenPicker(index)} className="h-10 w-10 shrink-0 flex items-center justify-center bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 text-zinc-600 rounded-lg transition-colors"><Search size={16} /></button>
+          <form onSubmit={handleSubmit} className="overflow-hidden flex flex-col flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-zinc-50/30 flex-1">
+              <div className="flex items-center gap-2 text-sm text-zinc-500 mb-2"><Calendar size={14} /><span>วันที่: <span className="text-zinc-900 font-medium">{new Date().toLocaleDateString('th-TH')}</span></span></div>
+              <div className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={index} className="flex flex-col gap-3 p-4 sm:p-5 bg-white rounded-xl border border-zinc-200 shadow-sm transition-all">
+                    
+                    {/* Header Item Card: Item ID & Toggles */}
+                    <div className="flex justify-between items-center w-full border-b border-zinc-100 pb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-100 px-2 py-1 rounded-md border border-zinc-200/50">รายการที่ {index + 1}</span>
+                        {activeType === 'PR' && (
+                          <div className="flex bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
+                            <button 
+                              type="button"
+                              onClick={() => handleFieldChange(index, 'isNewItem', false)}
+                              className={cn("px-3 py-1 text-[11px] font-bold rounded-md transition-all whitespace-nowrap", !item.isNewItem ? "bg-white text-emerald-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}
+                            >
+                              มีในระบบ
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => handleFieldChange(index, 'isNewItem', true)}
+                              className={cn("px-3 py-1 text-[11px] font-bold rounded-md transition-all whitespace-nowrap", item.isNewItem ? "bg-white text-emerald-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700")}
+                            >
+                              + สร้างใหม่
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1 flex items-center gap-1.5">คงเหลือปัจจุบัน: <span className="font-bold text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
+                      <button type="button" onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="p-1.5 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={16} /></button>
                     </div>
-                    <div className="w-10 pt-5">
-                      <button onClick={() => handleRemoveItem(index)} disabled={items.length === 1} className="h-10 w-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"><Trash2 size={18} /></button>
+
+                    {/* Equipment Select / Create Form */}
+                    {!item.isNewItem ? (
+                      <div className="flex items-start gap-3 w-full">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">รหัสอุปกรณ์ <span className="text-red-400">*</span></label>
+                          <div className="relative flex gap-2">
+                            <div onClick={() => handleOpenPicker(index)} className={cn("flex-1 h-11 px-3 border rounded-xl text-sm flex items-center cursor-pointer transition-all hover:border-zinc-400 hover:shadow-sm truncate", !item.itemCode ? "text-zinc-400 border-zinc-200 border-dashed bg-zinc-50" : "text-zinc-900 border-zinc-300 font-medium bg-white")}>
+                                {item.itemCode ? `${item.itemCode} - ${item.itemName}` : "คลิกเพื่อค้นหาอุปกรณ์..."}
+                            </div>
+                            <button type="button" onClick={() => handleOpenPicker(index)} className="h-11 w-11 shrink-0 flex items-center justify-center bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors"><Search size={18} /></button>
+                          </div>
+                          {item.itemCode && (<p className="text-[10px] text-zinc-400 mt-1 pl-1 flex items-center gap-1.5">คงเหลือปัจจุบัน: <span className="font-bold text-zinc-700">{item.currentStock} {item.unit}</span></p>)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full animate-in fade-in zoom-in-95 duration-200">
+                        {/* Auto Generate Toggle + Code Input */}
+                        <div className="space-y-1.5 sm:col-span-2 flex flex-col">
+                          <div className="flex items-center justify-between mb-1">
+                             <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">รหัสอุปกรณ์ (Item Code) { !item.autoGenerateCode && <span className="text-red-400">*</span> }</label>
+                             <label className="flex items-center gap-2 cursor-pointer">
+                               <input type="checkbox" checked={item.autoGenerateCode} onChange={(e) => handleFieldChange(index, 'autoGenerateCode', e.target.checked)} className="w-3.5 h-3.5 accent-emerald-600 rounded" />
+                               <span className="text-[10px] font-bold text-zinc-500">สร้างรหัสอัตโนมัติ</span>
+                             </label>
+                          </div>
+                          {item.autoGenerateCode ? (
+                             <div className="w-full h-11 px-3 bg-zinc-50 border border-zinc-200 border-dashed rounded-xl text-sm flex items-center text-zinc-400 font-medium italic">ระบบจะสร้างรหัสให้อัตโนมัติ</div>
+                          ) : (
+                             <input type="text" required placeholder="ระบุรหัสอุปกรณ์" value={item.itemCode} onChange={(e) => handleFieldChange(index, 'itemCode', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ชื่ออุปกรณ์ <span className="text-red-400">*</span></label>
+                          <input type="text" required placeholder="ระบุชื่ออุปกรณ์" value={item.itemName} onChange={(e) => handleFieldChange(index, 'itemName', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">หมวดหมู่ <span className="text-red-400">*</span></label>
+                          <input type="text" required placeholder="เช่น อุปกรณ์คอมพิวเตอร์" value={item.category || ''} onChange={(e) => handleFieldChange(index, 'category', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">หน่วยนับ <span className="text-red-400">*</span></label>
+                          <input type="text" required placeholder="เช่น ชิ้น, เครื่อง" value={item.unit} onChange={(e) => handleFieldChange(index, 'unit', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Common Fields: JobNo, Quantity, Note */}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full pt-1">
+                      <div className="w-full sm:w-1/3 space-y-1.5">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">รหัสงาน <span className="text-red-400">*</span></label>
+                        <input type="text" required placeholder="เช่น JOB-001" value={item.jobNo} onChange={(e) => handleFieldChange(index, 'jobNo', e.target.value)} className={cn("w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 transition-all", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
+                      </div>
+                      <div className="w-full sm:w-1/4 space-y-1.5">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">จำนวน <span className="text-red-400">*</span></label>
+                        <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className={cn("w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm text-center outline-none focus:ring-2 transition-all font-bold", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400 text-emerald-700" : "focus:ring-amber-500/20 focus:border-amber-400 text-amber-700")} />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">หมายเหตุ <span className="text-zinc-300 normal-case font-normal">(ไม่บังคับ)</span></label>
+                        <input type="text" placeholder="ระบุเหตุผลเพิ่มเติม..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className={cn("w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 transition-all placeholder:text-zinc-300", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 w-full mt-1">
-                    <div className="w-full sm:w-1/3 space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">รหัสงาน <span className="text-red-400">*</span></label>
-                      <input type="text" required placeholder="เช่น JOB-001" value={item.jobNo} onChange={(e) => handleFieldChange(index, 'jobNo', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 transition-all", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
-                    </div>
-                    <div className="w-full sm:w-1/4 space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between">จำนวน <span className="text-red-400">*</span></label>
-                      <input type="number" min="1" required value={item.quantity} onChange={(e) => handleFieldChange(index, 'quantity', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm text-center outline-none focus:ring-2 transition-all", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">หมายเหตุ <span className="text-zinc-300 normal-case font-normal">(ไม่บังคับ)</span></label>
-                      <input type="text" placeholder="ระบุเหตุผลเพิ่มเติม..." value={item.note} onChange={(e) => handleFieldChange(index, 'note', e.target.value)} className={cn("w-full h-10 px-3 bg-white border border-zinc-200 rounded-lg text-sm outline-none focus:ring-2 transition-all placeholder:text-zinc-300", activeType === 'PR' ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-amber-500/20 focus:border-amber-400")} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <button type="button" onClick={handleAddItem} className="w-full py-3.5 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-white transition-all flex items-center justify-center gap-2 text-sm font-bold bg-zinc-50"><Plus size={16} /> เพิ่มรายการอุปกรณ์</button>
             </div>
-            <button onClick={handleAddItem} className="w-full py-3 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 hover:bg-white transition-all flex items-center justify-center gap-2 text-sm font-bold bg-zinc-50"><Plus size={16} /> เพิ่มรายการอุปกรณ์</button>
-          </div>
-          <div className="p-4 sm:p-6 border-t border-zinc-100 bg-white flex gap-3 shrink-0">
-            <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition-all">ยกเลิก</button>
-            <button onClick={handleSubmit} disabled={!isValid || isSubmitting} className={cn("flex-1 h-11 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2", activeType === 'PR' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (activeType === 'PR' ? <ShoppingCart size={16} /> : <ArrowUpRight size={16} />)}
-              ส่งคำขอ
-            </button>
-          </div>
+            <div className="p-4 sm:p-6 border-t border-zinc-100 bg-white flex gap-3 shrink-0">
+              <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition-all">ยกเลิก</button>
+              <button type="submit" disabled={!isValid || isSubmitting} className={cn("flex-[2] sm:flex-1 h-11 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2", activeType === 'PR' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-amber-600 hover:bg-amber-700 shadow-amber-100", (!isValid || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none")}>
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (activeType === 'PR' ? <ShoppingCart size={16} /> : <ArrowUpRight size={16} />)}
+                ส่งคำขอ
+              </button>
+            </div>
+          </form>
         </div>
       </div>
       <ItemSelectorModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleSelectItem} data={inventoryData} />
@@ -1128,11 +1233,11 @@ export default function Transactions() {
 
   const [receivingPendingItem, setReceivingPendingItem] = useState(null); 
   const [approveItem, setApproveItem] = useState(null); 
-  const [cancelItem, setCancelItem] = useState(null); // ✅ สำหรับเปิด Modal ยกเลิกคำขอ
+  const [cancelItem, setCancelItem] = useState(null); 
   const [transactionType, setTransactionType] = useState(null); 
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false); 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false); 
-  const [isCancelLogModalOpen, setIsCancelLogModalOpen] = useState(false); // ✅ สำหรับเปิด Modal ประวัติยกเลิก
+  const [isCancelLogModalOpen, setIsCancelLogModalOpen] = useState(false); 
 
   const loadData = async (tab) => {
     setLoading(true);
@@ -1230,7 +1335,6 @@ export default function Transactions() {
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
-          {/* ✅ เอา table-fixed ออก และให้ข้อมูลวันที่ใช้ whitespace-nowrap ห้ามตัดบรรทัด */}
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
@@ -1251,7 +1355,7 @@ export default function Transactions() {
                   <tr key={index} className="group hover:bg-zinc-50/50 transition-colors">
                     
                     <td className="px-6 py-4">
-                      <span className="text-[10px] font-mono font-bold text-zinc-700 bg-zinc-100 px-2 py-1 rounded border border-zinc-200 truncate block">
+                      <span className="text-[10px] font-mono font-bold text-zinc-700 bg-zinc-100 px-2 py-1 rounded border border-zinc-200 truncate block whitespace-nowrap">
                         {item.transactionNo}
                       </span>
                     </td>
@@ -1266,7 +1370,7 @@ export default function Transactions() {
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[100px]">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-100 border border-zinc-200 text-[11px] font-bold text-zinc-700 truncate max-w-[100px] whitespace-nowrap">
                         <Briefcase size={10} className="text-zinc-500 shrink-0"/>
                         <span className="truncate">{item.jobNo || '-'}</span>
                       </span>
@@ -1282,13 +1386,12 @@ export default function Transactions() {
                     </td>
 
                     <td className="px-6 py-4">
-                       <div className="flex items-center gap-1.5">
+                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                          <div className="w-5 h-5 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0"><User size={10} /></div>
                          <span className="text-[11px] font-medium text-zinc-700 truncate max-w-[120px]">{item.recordedBy || item.createdBy || '-'}</span>
                        </div>
                     </td>
 
-                    {/* ✅ แก้ไขจุดนี้: ดึงค่าทั้ง createdAt หรือ lastUpdated มาแสดงและป้องกันการตัดคำบรรทัด */}
                     <td className="px-6 py-4">
                       <span className="text-[10px] font-mono text-zinc-500 bg-white border border-zinc-200 px-2 py-1 rounded inline-block whitespace-nowrap">
                          {item.createdAt || item.lastUpdated || '-'}
@@ -1296,17 +1399,17 @@ export default function Transactions() {
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                         {activeTab === 'PR' ? (
-                          <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95 whitespace-nowrap">
+                          <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95">
                             <ArrowDownToLine size={14} strokeWidth={2.5}/> รับของ
                           </button>
                         ) : (
-                          <button onClick={() => setApproveItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-amber-200 hover:border-amber-600 active:scale-95 whitespace-nowrap">
+                          <button onClick={() => setApproveItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-amber-200 hover:border-amber-600 active:scale-95">
                             <CheckCircle2 size={14} strokeWidth={2.5}/> อนุมัติ
                           </button>
                         )}
-                        <button onClick={() => setCancelItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-red-200 hover:border-red-500 active:scale-95 whitespace-nowrap">
+                        <button onClick={() => setCancelItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-red-200 hover:border-red-500 active:scale-95">
                           <Ban size={14} strokeWidth={2.5} /> ยกเลิก
                         </button>
                       </div>

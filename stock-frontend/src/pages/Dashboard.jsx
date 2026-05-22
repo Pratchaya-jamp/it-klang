@@ -125,16 +125,16 @@ const CreatableSelect = ({ label, value, onChange, options, placeholder = "เ�
   );
 };
 
-// 2. Item Modal (ฉบับปรับปรุงระบบตรวจสอบการเปลี่ยนแปลงค่า)
+// 2. Item Modal
 const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories = [] }) => {
   const isEditMode = !!initialData;
   
   // State สำหรับเก็บค่าปัจจุบันในฟอร์ม
   const [formData, setFormData] = useState({ 
-    itemCode: '', name: '', category: '', jobNo: '', unit: '', quantity: '' 
+    itemCode: '', name: '', category: '', unit: '', quantity: '' 
   });
 
-  // ✅ State สำหรับเก็บค่า "อ้างอิง" จาก Server (เอาไว้เช็คว่า User แก้ไขอะไรไปบ้าง)
+  // State สำหรับเก็บค่า "อ้างอิง" จาก Server 
   const [baselineData, setBaselineData] = useState(null);
   
   const [isAutoCode, setIsAutoCode] = useState(false); 
@@ -163,12 +163,11 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        // 1. ตั้งค่าเริ่มต้นจากแถวที่กดมาก่อน (เพื่อให้ฟอร์มไม่ว่างระหว่างรอ API)
+        // 1. ตั้งค่าเริ่มต้นจากแถวที่กดมาก่อน 
         const initialForm = {
           itemCode: initialData.itemCode || '',
           name: initialData.name || '',
           category: initialData.category || '',
-          jobNo: initialData.jobNo || '',
           unit: initialData.unit || '',
           quantity: initialData.quantity || 0
         };
@@ -176,7 +175,7 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
         setIsAutoCode(false);
         setIsLoading(true);
 
-        // 2. ดึงข้อมูลจริงจาก Server มาทับเพื่อความแม่นยำ (Audit Logs & Stock Overview)
+        // 2. ดึงข้อมูลจริงจาก Server มาทับเพื่อความแม่นยำ
         Promise.all([
           fetchItemLogs(initialData.itemCode),
           fetch('/api/stocks/overview').then(res => res.ok ? res.json() : [])
@@ -193,7 +192,7 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
           
           const finalQuantity = serverStock ? serverStock.totalQuantity : initialData.quantity;
 
-          // ✅ บันทึกค่า Baseline ที่ดึงมาจาก Server จริงๆ
+          // บันทึกค่า Baseline ที่ดึงมาจาก Server จริงๆ
           const serverBaseline = { 
             ...initialForm, 
             quantity: finalQuantity 
@@ -206,7 +205,7 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
 
       } else {
         // โหมดสร้างใหม่
-        const newForm = { itemCode: '', name: '', category: '', jobNo: '', unit: '', quantity: '' };
+        const newForm = { itemCode: '', name: '', category: '', unit: '', quantity: '' };
         setFormData(newForm);
         setBaselineData(newForm);
         setIsAutoCode(false);
@@ -219,16 +218,15 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
   const isDraftCode = isEditMode && initialData?.itemCode?.toUpperCase().startsWith('DRAFT-');
   const canEditCode = isEditMode ? isDraftCode : !isAutoCode;
 
-  // ✅ ตรวจสอบว่า "ข้อมูลมีการเปลี่ยนแปลงจากค่าที่ดึงมาจาก Server หรือไม่"
+  // ตรวจสอบว่า "ข้อมูลมีการเปลี่ยนแปลงจากค่าที่ดึงมาจาก Server หรือไม่"
   const isChanged = useMemo(() => {
     if (!baselineData) return false;
     
-    // เทียบทุก Field (แปลงเป็น String เพื่อความชัวร์ในการเทียบค่าตัวเลขและ null)
+    // เทียบทุก Field
     return (
       formData.itemCode?.trim() !== baselineData.itemCode?.trim() ||
       formData.name?.trim() !== baselineData.name?.trim() ||
       formData.category !== baselineData.category ||
-      (formData.jobNo || '') !== (baselineData.jobNo || '') ||
       formData.unit?.trim() !== baselineData.unit?.trim() ||
       Number(formData.quantity) !== Number(baselineData.quantity)
     );
@@ -250,8 +248,7 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
       const payload = { 
         ...formData, 
         itemCode: finalItemCode,
-        quantity: Number(formData.quantity),
-        jobNo: formData.jobNo?.trim() === '' ? null : formData.jobNo?.trim()
+        quantity: Number(formData.quantity)
       };
 
       if (isEditMode) {
@@ -310,17 +307,11 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
               />
             </div>
 
-            {/* Job No */}
+            {/* Name */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 mt-[5px] block">รหัสงาน</label>
-              <input type="text" placeholder="JOB-XXXX" value={formData.jobNo} onChange={e => setFormData({...formData, jobNo: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 outline-none transition-all" />
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 mt-[5px] block">ชื่ออุปกรณ์</label>
+              <input type="text" required placeholder="ระบุชื่ออุปกรณ์" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 outline-none transition-all" />
             </div>
-          </div>
-
-          {/* Name */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">ชื่ออุปกรณ์</label>
-            <input type="text" required placeholder="ระบุชื่ออุปกรณ์" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full h-11 px-3 bg-zinc-50 border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-200 outline-none transition-all" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -331,7 +322,7 @@ const ItemModal = ({ isOpen, onClose, onSuccess, initialData = null, categories 
             </div>
           </div>
           
-          {/* Quantity (Baseline Comparison Logic) */}
+          {/* Quantity */}
           <div className="space-y-1">
             <div className="flex items-center justify-between ml-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
@@ -625,8 +616,6 @@ export default function Dashboard() {
                   <th className="px-6 py-4 cursor-pointer hover:bg-zinc-50 transition-colors group/sort select-none" onClick={toggleSort}><div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 group-hover/sort:text-zinc-900">รหัส<div className="flex flex-col">{sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}</div></div></th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">ชื่อ</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400">หมวดหมู่</th>
-                  {/* ✅ เพิ่มคอลัมน์รหัสงาน (Job No) ไว้หน้าหน่วย */}
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center">รหัสงาน</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-center">หน่วย</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">วันที่</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-zinc-400 text-right">จัดการ</th>
@@ -634,15 +623,13 @@ export default function Dashboard() {
               </thead>
               <tbody className="text-sm">
                 {loading ? (
-                  [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="7" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
+                  [...Array(5)].map((_, i) => <tr key={i} className="animate-pulse"><td colSpan="6" className="px-6 py-4"><div className="h-2 bg-zinc-100 rounded w-full"></div></td></tr>)
                 ) : processedData.paginated.length > 0 ? (
                   processedData.paginated.map((item) => (
                     <tr key={item.itemCode} className="group hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0">
                       <td className="px-6 py-4 font-mono text-zinc-500 text-xs group-hover:text-zinc-900 font-medium">{item.itemCode}</td>
                       <td className="px-6 py-4"><span className="font-medium text-zinc-900 block">{item.name}</span></td>
                       <td className="px-6 py-4"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 text-zinc-600 tracking-wide border border-zinc-200/50">{item.category}</span></td>
-                      {/* ✅ แสดงข้อมูล Job No */}
-                      <td className="px-6 py-4 text-center text-zinc-500 font-medium text-xs">{item.jobNo || '-'}</td>
                       <td className="px-6 py-4 text-center text-zinc-500">{item.unit}</td>
                       <td className="px-6 py-4 text-right text-zinc-400 text-xs font-light">{item.createdAt}</td>
                       <td className="px-6 py-4 text-right">
@@ -654,7 +641,7 @@ export default function Dashboard() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="7" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Search size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">ไม่พบอุปกรณ์</p></div></td></tr>
+                  <tr><td colSpan="6" className="px-6 py-24 text-center"><div className="flex flex-col items-center justify-center text-zinc-400"><Search size={32} strokeWidth={1} className="mb-2 opacity-50"/><p className="text-sm">ไม่พบอุปกรณ์</p></div></td></tr>
                 )}
               </tbody>
             </table>
