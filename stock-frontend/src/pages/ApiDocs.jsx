@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   Terminal, ShieldCheck, Package, ArrowRightLeft, LifeBuoy, 
-  Copy, Check, Code2, Server 
+  Copy, Check, Code2, Server, Bell, ListTodo, History
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -9,7 +9,7 @@ import { twMerge } from 'tailwind-merge';
 // Utility Function
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// --- ข้อมูล API ENDPOINTS ---
+// --- ข้อมูล API ENDPOINTS ทั้งหมด ---
 const apiSections = [
   {
     title: "Authentication & Users",
@@ -19,12 +19,20 @@ const apiSections = [
     bg: "bg-purple-50",
     endpoints: [
       { method: "POST", path: "/api/auth/login", desc: "เข้าสู่ระบบเพื่อรับ JWT Token" },
-      { method: "GET", path: "/api/auth/me", desc: "ดึงข้อมูลผู้ใช้งานปัจจุบัน" },
-      { method: "GET", path: "/api/auth/admin/users", desc: "ดึงข้อมูลผู้ใช้งานทั้งหมด (สำหรับ Admin)" },
-      { method: "PUT", path: "/api/auth/admin/users/{staffId}", desc: "อัปเดตข้อมูลและสิทธิ์ผู้ใช้งาน" },
-      { method: "POST", path: "/api/auth/admin/request-otp", desc: "ร้องขอ OTP เพื่อรีเซ็ตรหัสผ่านให้ผู้ใช้ (Admin)" },
-      { method: "POST", path: "/api/auth/admin/reset-password", desc: "ยืนยัน OTP และให้ระบบสร้างรหัสผ่านใหม่ (Auto-gen)" },
-      { method: "GET", path: "/api/audit/login-logs", desc: "ดึงประวัติการเข้าสู่ระบบ (กรองด้วย Staff ID ได้)" }
+      { method: "POST", path: "/api/auth/register", desc: "ลงทะเบียนผู้ใช้งานใหม่" },
+      { method: "POST", path: "/api/auth/logout", desc: "ออกจากระบบ (ลบ Session/Token)" },
+      { method: "GET", path: "/api/auth/me", desc: "ดึงข้อมูลโปรไฟล์ของผู้ใช้งานปัจจุบัน" },
+      { method: "PUT", path: "/api/auth/profile", desc: "อัปเดตข้อมูลโปรไฟล์ส่วนตัว" },
+      { method: "POST", path: "/api/auth/change-password", desc: "เปลี่ยนรหัสผ่านของผู้ใช้งานปัจจุบัน" },
+      { method: "POST", path: "/api/auth/forgot-password", desc: "แจ้งลืมรหัสผ่านเพื่อรับลิงก์ทางอีเมล" },
+      { method: "GET", path: "/api/auth/validate-reset-token", desc: "ตรวจสอบความถูกต้องของ Token สำหรับรีเซ็ตรหัสผ่าน" },
+      { method: "POST", path: "/api/auth/reset-password-token", desc: "ตั้งรหัสผ่านใหม่ด้วย Token" },
+      { method: "GET", path: "/api/auth/admin/users", desc: "(Admin) ดึงข้อมูลผู้ใช้งานทั้งหมดในระบบ" },
+      { method: "PUT", path: "/api/auth/admin/users/{staffId}", desc: "(Admin) อัปเดตข้อมูลและสิทธิ์ผู้ใช้งาน" },
+      { method: "POST", path: "/api/auth/admin/request-otp", desc: "(Admin) ร้องขอ OTP เพื่อสิทธิ์แก้ไขขั้นสูง" },
+      { method: "POST", path: "/api/auth/admin/reset-password", desc: "(Admin) ยืนยัน OTP และรีเซ็ตรหัสผ่านให้ผู้ใช้อื่น" },
+      { method: "GET", path: "/api/audit/login-logs", desc: "ดึงประวัติการเข้าสู่ระบบทั้งหมด" },
+      { method: "GET", path: "/api/audit/login-logs/{staffId}", desc: "ดึงประวัติการเข้าสู่ระบบเฉพาะบุคคล" }
     ]
   },
   {
@@ -35,24 +43,33 @@ const apiSections = [
     bg: "bg-blue-50",
     endpoints: [
       { method: "GET", path: "/api/items/dashboard", desc: "ดึงรายการอุปกรณ์ทั้งหมด (รองรับ Query Params เพื่อ Search/Filter)" },
-      { method: "POST", path: "/api/items", desc: "เพิ่มอุปกรณ์ใหม่ (รองรับ Auto-gen รหัส)" },
-      { method: "PUT", path: "/api/items/{code}", desc: "แก้ไขข้อมูลอุปกรณ์" },
+      { method: "POST", path: "/api/items", desc: "เพิ่มอุปกรณ์ใหม่เข้าสู่คลัง" },
+      { method: "PUT", path: "/api/items/{code}", desc: "แก้ไขรายละเอียดข้อมูลอุปกรณ์" },
       { method: "DELETE", path: "/api/items/{code}", desc: "ลบอุปกรณ์ออกจากระบบ" },
-      { method: "GET", path: "/api/stocks/overview", desc: "ดึงข้อมูลรายการอุปกรณ์ทั้งหมดสำหรับการเลือกทำรายการ" }
+      { method: "GET", path: "/api/stocks/overview", desc: "ดึงข้อมูลสต็อกคงเหลือและยอดการเคลื่อนไหวทั้งหมด" }
     ]
   },
   {
     title: "Transactions",
-    description: "ระบบเบิก, รับเข้า และตัดจำหน่าย (Write-off)",
+    description: "ระบบคำขอสั่งซื้อ (PR), ขอเบิก (Withdraw) และตัดจำหน่าย (Write-off)",
     icon: ArrowRightLeft,
     color: "text-emerald-600",
     bg: "bg-emerald-50",
     endpoints: [
-      { method: "GET", path: "/api/transactions/pending", desc: "ดึงรายการค้างจ่าย (Pending) ทั้งหมด" },
-      { method: "POST", path: "/api/transactions/withdraw", desc: "ทำรายการเบิกจ่ายอุปกรณ์ออกไปใช้งาน" },
-      { method: "POST", path: "/api/transactions/receive", desc: "ทำรายการรับอุปกรณ์ค้างจ่ายกลับเข้าสต็อก" },
-      { method: "POST", path: "/api/transactions/write-off", desc: "ทำรายการตัดจำหน่ายอุปกรณ์ทิ้ง (บังคับกรอก Note)" },
-      { method: "GET", path: "/api/transactions/write-off/summary", desc: "ดึงประวัติและยอดรวมของการตัดจำหน่ายทั้งหมด" }
+      { method: "GET", path: "/api/transactions/purchase/request", desc: "ดึงรายการคำขอสั่งซื้ออุปกรณ์ (PR)" },
+      { method: "POST", path: "/api/transactions/purchase/request", desc: "สร้างรายการคำขอสั่งซื้ออุปกรณ์ (PR)" },
+      { method: "GET", path: "/api/transactions/withdraw/request", desc: "ดึงรายการคำขอเบิกอุปกรณ์" },
+      { method: "POST", path: "/api/transactions/withdraw/request", desc: "สร้างรายการคำขอเบิกอุปกรณ์ออกจากคลัง" },
+      { method: "POST", path: "/api/transactions/withdraw/approve", desc: "อนุมัติการเบิกจ่ายอุปกรณ์" },
+      { method: "POST", path: "/api/transactions/receive", desc: "ทำรายการรับอุปกรณ์เข้าสต็อก (ทั้งรับใหม่และรับคืน)" },
+      { method: "POST", path: "/api/transactions/write-off", desc: "ทำรายการตัดจำหน่ายอุปกรณ์ (Write-off)" },
+      { method: "GET", path: "/api/transactions/write-off/summary", desc: "ดึงประวัติและสรุปยอดตัดจำหน่ายทั้งหมด" },
+      { method: "GET", path: "/api/transactions/purchase/history", desc: "ดึงประวัติการสั่งซื้อทั้งหมด" },
+      { method: "GET", path: "/api/transactions/withdraw/history", desc: "ดึงประวัติการเบิกอุปกรณ์ทั้งหมด" },
+      { method: "GET", path: "/api/transactions/purchase/cancel", desc: "ดึงประวัติการยกเลิกคำขอสั่งซื้อ" },
+      { method: "POST", path: "/api/transactions/purchase/cancel", desc: "ยกเลิกคำขอสั่งซื้อ (PR)" },
+      { method: "GET", path: "/api/transactions/withdraw/cancel", desc: "ดึงประวัติการยกเลิกคำขอเบิก" },
+      { method: "POST", path: "/api/transactions/withdraw/cancel", desc: "ยกเลิกคำขอเบิกอุปกรณ์" }
     ]
   },
   {
@@ -63,8 +80,8 @@ const apiSections = [
     bg: "bg-orange-50",
     endpoints: [
       { method: "GET", path: "/api/borrow/history", desc: "ดึงประวัติการยืม-คืนอุปกรณ์ทั้งหมด" },
-      { method: "POST", path: "/api/borrow/request", desc: "สร้างคำขอยืมอุปกรณ์ใหม่ (ระบุ Due Date)" },
-      { method: "POST", path: "/api/borrow/return/{id}", desc: "ทำรายการคืนอุปกรณ์" }
+      { method: "POST", path: "/api/borrow/request", desc: "สร้างคำขอยืมอุปกรณ์ใหม่ (ระบุระยะเวลา)" },
+      { method: "POST", path: "/api/borrow/return/{transactionId}", desc: "ทำรายการคืนอุปกรณ์ที่ยืม" }
     ]
   },
   {
@@ -74,11 +91,54 @@ const apiSections = [
     color: "text-amber-600",
     bg: "bg-amber-50",
     endpoints: [
-      { method: "GET", path: "/api/support/my-tickets", desc: "ดึงรายการ Ticket ของผู้ใช้งานปัจจุบัน" },
-      { method: "GET", path: "/api/support/tickets", desc: "ดึงรายการ Ticket ทั้งหมดในระบบ (Admin)" },
-      { method: "POST", path: "/api/support/ticket", desc: "สร้างรายการแจ้งปัญหาใหม่" },
-      { method: "PUT", path: "/api/support/ticket/{ticketNo}/reply", desc: "ตอบกลับการแจ้งปัญหา (Admin)" },
-      { method: "POST", path: "/api/support/ticket/{ticketNo}/rate", desc: "ผู้ใช้งานให้คะแนนประเมินการแก้ปัญหา (1-5 ดาว)" }
+      { method: "GET", path: "/api/support/my-tickets", desc: "ดึงรายการใบแจ้งปัญหาของตนเอง" },
+      { method: "GET", path: "/api/support/tickets", desc: "ดึงรายการใบแจ้งปัญหาทั้งหมด (Support/Admin)" },
+      { method: "POST", path: "/api/support/ticket", desc: "สร้างใบแจ้งปัญหาใหม่" },
+      { method: "PUT", path: "/api/support/ticket/{ticketNo}/reply", desc: "ตอบกลับหรืออัปเดตสถานะใบแจ้งปัญหา" },
+      { method: "POST", path: "/api/support/ticket/{ticketNo}/rate", desc: "ประเมินความพึงพอใจการแก้ปัญหา" }
+    ]
+  },
+  {
+    title: "Tasks & Todos",
+    description: "ระบบจัดการใบงานและรายการสิ่งที่ต้องทำ",
+    icon: ListTodo,
+    color: "text-indigo-600",
+    bg: "bg-indigo-50",
+    endpoints: [
+      { method: "GET", path: "/api/todos", desc: "ดึงรายการใบงานทั้งหมดของผู้ใช้งาน" },
+      { method: "POST", path: "/api/todos", desc: "สร้างใบงานใหม่" },
+      { method: "GET", path: "/api/todos/{id}", desc: "ดึงรายละเอียดของใบงาน" },
+      { method: "PUT", path: "/api/todos/{id}", desc: "อัปเดตข้อมูลใบงานทั้งหมด" },
+      { method: "PATCH", path: "/api/todos/{id}/status", desc: "อัปเดตเฉพาะสถานะของใบงาน" },
+      { method: "GET", path: "/api/todos/trash", desc: "ดึงรายการใบงานในถังขยะ" },
+      { method: "DELETE", path: "/api/todos/temp-delete", desc: "ลบใบงานไปที่ถังขยะ (Soft Delete)" },
+      { method: "POST", path: "/api/todos/trash/restore", desc: "กู้คืนใบงานจากถังขยะ" },
+      { method: "DELETE", path: "/api/todos/trash/permanent", desc: "ลบใบงานทิ้งถาวร (Hard Delete)" },
+      { method: "GET", path: "/api/todos/image/{fileName}", desc: "ดึงรูปภาพแนบในใบงาน" }
+    ]
+  },
+  {
+    title: "Notifications",
+    description: "ระบบการแจ้งเตือนภายในแอปพลิเคชัน",
+    icon: Bell,
+    color: "text-rose-600",
+    bg: "bg-rose-50",
+    endpoints: [
+      { method: "GET", path: "/api/notifications/unread", desc: "ดึงรายการแจ้งเตือนที่ยังไม่ได้อ่าน" },
+      { method: "GET", path: "/api/notifications/history", desc: "ดึงประวัติการแจ้งเตือนทั้งหมด" },
+      { method: "PUT", path: "/api/notifications/read/{id}", desc: "เปลี่ยนสถานะการแจ้งเตือนเป็น 'อ่านแล้ว'" },
+      { method: "PUT", path: "/api/notifications/read-all", desc: "เปลี่ยนการแจ้งเตือนทั้งหมดเป็น 'อ่านแล้ว'" }
+    ]
+  },
+  {
+    title: "Audit Logs",
+    description: "ระบบเก็บประวัติการทำธุรกรรมเชิงลึกของข้อมูล",
+    icon: History,
+    color: "text-cyan-600",
+    bg: "bg-cyan-50",
+    endpoints: [
+      { method: "GET", path: "/api/auditlogs", desc: "ดึงประวัติการเปลี่ยนแปลงข้อมูล (Audit Logs) ทั้งหมดในระบบ" },
+      { method: "GET", path: "/api/auditlogs/{itemCode}", desc: "ดึงประวัติการเปลี่ยนแปลงข้อมูลเฉพาะรหัสอุปกรณ์" }
     ]
   }
 ];
@@ -89,6 +149,7 @@ const getMethodStyle = (method) => {
     case 'GET': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     case 'POST': return 'bg-blue-100 text-blue-700 border-blue-200';
     case 'PUT': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'PATCH': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
     case 'DELETE': return 'bg-red-100 text-red-700 border-red-200';
     default: return 'bg-zinc-100 text-zinc-700 border-zinc-200';
   }
@@ -152,7 +213,7 @@ export default function ApiDocs() {
                   <div key={eIdx} className="p-4 sm:px-6 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-zinc-50/50 transition-colors group">
                     
                     {/* Method & Path */}
-                    <div className="flex items-center gap-3 lg:w-5/12 shrink-0">
+                    <div className="flex items-center gap-3 lg:w-[40%] shrink-0">
                       <span className={cn(
                         "w-16 text-center text-[10px] font-extrabold uppercase tracking-widest py-1.5 rounded-md border",
                         getMethodStyle(endpoint.method)
@@ -177,7 +238,7 @@ export default function ApiDocs() {
                     {/* Description */}
                     <div className="flex-1 flex items-start gap-2 text-sm text-zinc-600 pl-16 lg:pl-0">
                       <Code2 size={14} className="text-zinc-300 mt-0.5 shrink-0 hidden lg:block" />
-                      <p className="leading-relaxed">{endpoint.desc}</p>
+                      <p className="leading-relaxed text-[13px]">{endpoint.desc}</p>
                     </div>
 
                   </div>
