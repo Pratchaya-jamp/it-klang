@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  ArrowDownToLine, ArrowUpFromLine, Search, Package, User,
-  Hash, Clock, X, Loader2, CheckCircle2, FileText,
-  ArrowDownLeft, ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, RefreshCcw, Briefcase, Plus, AlertTriangle, AlertOctagon, ShoppingCart, ClipboardCheck, History, FileMinus, Ban, ArrowLeft, FileX
+  ArrowDownToLine, Search, Package, User, Hash, Clock, X, Loader2, CheckCircle2, 
+  ArrowUpRight, Calendar, Trash2, Filter, ChevronDown, Check, Briefcase, Plus, 
+  AlertTriangle, ShoppingCart, ClipboardCheck, History, FileMinus, Ban, ArrowLeft, FileX
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -54,8 +54,55 @@ const CustomFilterDropdown = ({ value, onChange, options, placeholder }) => {
   );
 };
 
+// --- COMPONENT: CREATABLE SELECT (สำหรับเลือกหรือพิมพ์ Category ใหม่) ---
+const CreatableSelect = ({ label, value, onChange, options, placeholder = "เลือกหรือพิมพ์...", labelClassName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filteredOptions = options.filter(opt => opt.toLowerCase().includes((value || "").toLowerCase()));
+  const isCustomValue = value && !options.some(opt => opt.toLowerCase() === value.toLowerCase());
+
+  return (
+    <div className="space-y-1.5" ref={wrapperRef}>
+      <label className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1.5", labelClassName || "text-zinc-400")}>
+        {label} <span className="text-red-400">*</span>
+      </label>
+      <div className="relative">
+        <input 
+          type="text" required placeholder={placeholder} value={value} 
+          onChange={(e) => { onChange(e.target.value); setIsOpen(true); }} 
+          onFocus={() => setIsOpen(true)} 
+          className="w-full h-11 px-3 pr-10 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" 
+        />
+        <button type="button" onClick={() => setIsOpen(!isOpen)} className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-zinc-400 hover:text-zinc-600 outline-none" tabIndex={-1}>
+          <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
+        </button>
+        {isOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-100 rounded-lg shadow-xl max-h-48 overflow-auto animate-in fade-in zoom-in-95 duration-100 py-1">
+            {filteredOptions.length > 0 ? filteredOptions.map((opt) => (
+              <div key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={cn("px-3 py-2.5 text-sm cursor-pointer hover:bg-zinc-50 flex items-center justify-between transition-colors", value === opt ? "bg-zinc-50 font-bold text-zinc-900" : "text-zinc-600")}>
+                {opt} {value === opt && <Check size={14} className="text-zinc-900"/>}
+              </div>
+            )) : null}
+            {isCustomValue && <div onClick={() => setIsOpen(false)} className="px-3 py-2.5 text-xs text-zinc-500 border-t border-zinc-50 italic cursor-pointer hover:bg-zinc-50">ใช้หมวดหมู่ใหม่: "<span className="text-zinc-900 font-bold">{value}</span>"</div>}
+            {!value && filteredOptions.length === 0 && <div className="px-3 py-2.5 text-xs text-zinc-400 italic">พิมพ์เพื่อเพิ่มใหม่...</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- 1. ITEM SELECTOR MODAL ---
-const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
+const ItemSelectorModal = ({ isOpen, onClose, onSelect, data, activeType }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isMounted, setIsMounted] = useState(false);
@@ -110,15 +157,35 @@ const ItemSelectorModal = ({ isOpen, onClose, onSelect, data }) => {
               {filteredData.length > 0 ? (
                 filteredData.map((item) => {
                   const isDraft = item.itemCode?.toUpperCase().startsWith('DRAFT-');
+                  const isOutOfStockForWithdraw = activeType === 'WITHDRAW' && (Number(item.balance) <= 0);
+                  const isDisabled = isDraft || isOutOfStockForWithdraw;
+                  
+                  let buttonText = 'เลือก';
+                  if (isDraft) buttonText = 'ไม่อนุญาต';
+                  else if (isOutOfStockForWithdraw) buttonText = 'ของหมด';
+
                   return (
                     <tr key={item.itemCode} className="hover:bg-zinc-50 group transition-colors bg-white">
                       <td className="px-4 sm:px-6 py-3 font-mono text-zinc-500 font-medium">{item.itemCode}</td>
                       <td className="px-4 sm:px-6 py-3 text-zinc-900 min-w-[120px]">{item.name}</td>
                       <td className="px-4 sm:px-6 py-3 text-zinc-500">{item.category}</td>
-                      <td className="px-4 sm:px-6 py-3 text-right font-bold text-zinc-700">{item.balance} <span className="text-[10px] font-normal text-zinc-400">{item.unit}</span></td>
+                      <td className="px-4 sm:px-6 py-3 text-right font-bold text-zinc-700">
+                        <span className={cn(isOutOfStockForWithdraw && "text-red-500")}>{item.balance}</span> 
+                        <span className="text-[10px] font-normal text-zinc-400 ml-1">{item.unit}</span>
+                      </td>
                       <td className="px-4 sm:px-6 py-3 text-center">
-                        <button type="button" disabled={isDraft} onClick={() => { onSelect(item); onClose(); }} className={cn("px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm whitespace-nowrap", isDraft ? "bg-zinc-100 text-zinc-400 cursor-not-allowed" : "bg-zinc-900 text-white hover:bg-zinc-700 active:scale-95")}>
-                          {isDraft ? 'ไม่อนุญาต' : 'เลือก'}
+                        <button 
+                          type="button" 
+                          disabled={isDisabled} 
+                          onClick={() => { onSelect(item); onClose(); }} 
+                          className={cn(
+                            "px-4 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm whitespace-nowrap border", 
+                            isDisabled 
+                              ? "bg-zinc-50 text-zinc-400 border-zinc-200 cursor-not-allowed shadow-none" 
+                              : "bg-zinc-900 text-white border-zinc-900 hover:bg-zinc-700 active:scale-95"
+                          )}
+                        >
+                          {buttonText}
                         </button>
                       </td>
                     </tr>
@@ -275,6 +342,11 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
     }
   };
 
+  // ✅ ดึงหมวดหมู่ที่มีในระบบ เพื่อใช้ใน CreatableSelect
+  const dbCategories = useMemo(() => {
+    return [...new Set(inventoryData.map(item => item.category).filter(Boolean))].sort();
+  }, [inventoryData]);
+
   if (!isMounted) return null;
 
   return createPortal(
@@ -371,10 +443,17 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
                           <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ชื่ออุปกรณ์ <span className="text-red-400">*</span></label>
                           <input type="text" required placeholder="ระบุชื่ออุปกรณ์" value={item.itemName} onChange={(e) => handleFieldChange(index, 'itemName', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">หมวดหมู่ <span className="text-red-400">*</span></label>
-                          <input type="text" required placeholder="เช่น อุปกรณ์คอมพิวเตอร์" value={item.category || ''} onChange={(e) => handleFieldChange(index, 'category', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
-                        </div>
+                        
+                        {/* ✅ ใช้ CreatableSelect สำหรับหมวดหมู่ */}
+                        <CreatableSelect 
+                          label="หมวดหมู่"
+                          labelClassName="text-emerald-600"
+                          value={item.category || ''} 
+                          onChange={(val) => handleFieldChange(index, 'category', val)} 
+                          options={dbCategories}
+                          placeholder="เลือกหรือพิมพ์หมวดหมู่..." 
+                        />
+                        
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">หน่วยนับ <span className="text-red-400">*</span></label>
                           <input type="text" required placeholder="เช่น ชิ้น, เครื่อง" value={item.unit} onChange={(e) => handleFieldChange(index, 'unit', e.target.value)} className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all" />
@@ -412,7 +491,7 @@ const TransactionModal = ({ isOpen, type, onClose, onSuccess }) => {
           </form>
         </div>
       </div>
-      <ItemSelectorModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleSelectItem} data={inventoryData} />
+      <ItemSelectorModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={handleSelectItem} data={inventoryData} activeType={activeType} />
     </>,
     document.body
   );
@@ -1233,11 +1312,11 @@ export default function Transactions() {
 
   const [receivingPendingItem, setReceivingPendingItem] = useState(null); 
   const [approveItem, setApproveItem] = useState(null); 
-  const [cancelItem, setCancelItem] = useState(null); 
+  const [cancelItem, setCancelItem] = useState(null); // ✅ สำหรับเปิด Modal ยกเลิกคำขอ
   const [transactionType, setTransactionType] = useState(null); 
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false); 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false); 
-  const [isCancelLogModalOpen, setIsCancelLogModalOpen] = useState(false); 
+  const [isCancelLogModalOpen, setIsCancelLogModalOpen] = useState(false); // ✅ สำหรับเปิด Modal ประวัติยกเลิก
 
   const loadData = async (tab) => {
     setLoading(true);
@@ -1335,6 +1414,7 @@ export default function Transactions() {
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
+          {/* ✅ ไม่ใช้ table-fixed เพื่อให้ cell ขยายได้และไม่ทับกัน */}
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-white">
@@ -1399,6 +1479,7 @@ export default function Transactions() {
                     </td>
 
                     <td className="px-6 py-4 text-right">
+                      {/* ✅ ใช้ whitespace-nowrap ห้ามปุ่มตัดบรรทัด */}
                       <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                         {activeTab === 'PR' ? (
                           <button onClick={() => setReceivingPendingItem(item)} className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-sm border border-emerald-200 hover:border-emerald-600 active:scale-95">
