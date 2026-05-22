@@ -49,6 +49,7 @@ namespace StockApi.Services
                 Name = x.Name,
                 Category = x.Category,
                 Unit = x.Unit,
+                //JobNo = x.JobNo, // 🔥 เพิ่มบรรทัดนี้ให้หน้า Dashboard เห็นเลข Job
                 CreatedAt = x.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                 UpdatedAt = x.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
             }).ToListAsync();
@@ -80,6 +81,7 @@ namespace StockApi.Services
                     Name = request.Name,
                     Category = request.Category,
                     Unit = request.Unit,
+                    //JobNo = request.JobNo,
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -118,6 +120,7 @@ namespace StockApi.Services
                     Name = newItem.Name,
                     Category = newItem.Category,
                     Unit = newItem.Unit,
+                    //JobNo = newItem.JobNo,
                     CreatedAt = newItem.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss"),
                     UpdatedAt = newItem.UpdatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
@@ -154,11 +157,7 @@ namespace StockApi.Services
                 using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    // 1. สั่งลบตารางลูกและตารางแม่ของรหัส Draft ทิ้ง (ลบตรงๆ ที่ระดับ Database เร็วและไม่ติด Tracking)
-                    await _context.StockBalances.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
-                    await _context.Items.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
-
-                    // 2. สร้าง Item ใหม่ ด้วยรหัสใหม่เอี่ยม
+                    // 💡 1. สร้าง Item ใหม่ ด้วยรหัสใหม่เอี่ยม (สร้างบ้านใหม่)
                     var newItem = new Item
                     {
                         ItemCode = request.ItemCode,
@@ -171,7 +170,7 @@ namespace StockApi.Services
                     _context.Items.Add(newItem);
                     await _context.SaveChangesAsync();
 
-                    // 3. สร้าง StockBalance ใหม่ ผูกกับรหัสใหม่ (ตัวเลขดึงมาจากของเดิมทั้งหมด)
+                    // 💡 2. สร้าง StockBalance ใหม่ ผูกกับรหัสใหม่
                     if (item.StockBalance != null)
                     {
                         var newStock = new StockBalance
@@ -189,15 +188,24 @@ namespace StockApi.Services
                         await _context.SaveChangesAsync();
                     }
 
-                    // 4. อัปเดตประวัติ Log เก่าๆ ที่เคยเป็นชื่อ DRAFT- ให้เปลี่ยนเป็นรหัสใหม่ด้วย 
+                    // 🔥 3. (จุดสำคัญ) โอนย้ายใบขอซื้อ (PR) และ Transactions ทั้งหมดไปหารหัสใหม่!
+                    await _context.StockTransactions
+                        .Where(x => x.ItemCode == itemCode)
+                        .ExecuteUpdateAsync(s => s.SetProperty(x => x.ItemCode, request.ItemCode));
+
+                    // 💡 4. โอนย้ายประวัติ Log เก่าๆ ไปหารหัสใหม่
                     await _context.SystemLogs
                         .Where(x => x.RecordId == itemCode)
                         .ExecuteUpdateAsync(s => s.SetProperty(x => x.RecordId, request.ItemCode));
 
+                    // 🗑️ 5. ลบของเก่าทิ้งได้อย่างปลอดภัย (เพราะไม่มีใบขอซื้อเกาะอยู่แล้ว)
+                    await _context.StockBalances.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
+                    await _context.Items.Where(x => x.ItemCode == itemCode).ExecuteDeleteAsync();
+
                     await transaction.CommitAsync();
 
                     await _logRepo.AddLogAsync("UPDATE_CODE", "Items", request.ItemCode, itemCode, request.ItemCode, currentUser);
-                    
+
                     await _notiService.SendNotificationAsync(
                         null, "ยืนยันรหัสอุปกรณ์",
                         $"คุณ {currentUser} บันทึกรหัสจริง '{request.ItemCode}' ให้กับอุปกรณ์ '{request.Name}' เรียบร้อยแล้ว",
