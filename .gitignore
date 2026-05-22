@@ -2,3 +2,8 @@
 docker-compose.yml
 db.dockerfile
 db_backup.sh
+db_backup.bat
+start_project.bat
+stop_project.bat
+intern_project.sql
+DBBACKUP/
