@@ -27,6 +27,8 @@ namespace StockApi.Services
         Task CancelWithdrawRequestAsync(CancelRequestDto request); // 🔥 เพิ่มสำหรับยกเลิกใบขอเบิก
         Task<List<PurchaseHistoryDto>> GetCanceledPurchaseRequestsAsync(); // 🔥 เพิ่ม GET ประวัติยกเลิกซื้อ
         Task<List<WithdrawHistoryDto>> GetCanceledWithdrawRequestsAsync(); // 🔥 เพิ่ม GET ประวัติยกเลิกเบิก
+        Task<List<CategoryBalanceChartDto>> GetBalanceByCategoryChartAsync();
+        Task<List<CategoryWithdrawalChartDto>> GetWithdrawalByCategoryChartAsync(int? days, DateTime? startDate, DateTime? endDate);
     }
 
     public class StockService : IStockService
@@ -700,6 +702,65 @@ namespace StockApi.Services
                     CreatedAt = t.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                 };
             }).ToList();
+        }
+
+        // 📊 กราฟที่ 1: ยอดคงเหลือของแต่ละ Category
+        public async Task<List<CategoryBalanceChartDto>> GetBalanceByCategoryChartAsync()
+        {
+            var result = await _context.StockBalances
+                .Include(s => s.Item)
+                .Where(s => s.Item != null) // กันเหนียวกรณี Item โดนลบแต่ Stock ค้าง
+                .GroupBy(s => s.Item!.Category) // จัดกลุ่มตามหมวดหมู่
+                .Select(g => new CategoryBalanceChartDto
+                {
+                    Category = string.IsNullOrEmpty(g.Key) || g.Key == "-" ? "Uncategorized" : g.Key,
+                    TotalBalance = g.Sum(x => x.Balance) // เอา Balance ในตู้มารวมกัน
+                })
+                .Where(x => x.TotalBalance > 0) // (Optional) ถ้าไม่อยากโชว์หมวดที่สต๊อกเป็น 0 ให้ใส่บรรทัดนี้
+                .OrderByDescending(x => x.TotalBalance) // เรียงจากของเยอะไปน้อย
+                .ToListAsync();
+
+            return result;
+        }
+
+        // ใน StockService
+        // 📈 กราฟยอดเบิกออกแบบ Custom Date & ฟิลเตอร์ขยะทิ้ง
+        public async Task<List<CategoryWithdrawalChartDto>> GetWithdrawalByCategoryChartAsync(int? days, DateTime? startDate, DateTime? endDate)
+        {
+            DateTime filterStartDate;
+            DateTime filterEndDate = DateTime.Now.Date.AddDays(1).AddTicks(-1); // ตั้งค่าสิ้นสุดที่เวลา 23:59:59 ของวันนี้เป็นค่าเริ่มต้น
+
+            // 🎯 Logic เลือกช่วงเวลา: ถ้าส่ง Custom Date มาให้ใช้วันที่กำหนด แต่ถ้าไม่ส่ง ให้กลับไปใช้ days แทน
+            if (startDate.HasValue && endDate.HasValue)
+            {
+                filterStartDate = startDate.Value.Date; // เริ่ม 00:00:00 ของวันเริ่ม
+                filterEndDate = endDate.Value.Date.AddDays(1).AddTicks(-1); // จบ 23:59:59 ของวันสิ้นสุด
+            }
+            else
+            {
+                int fallbackDays = days ?? 7; // ถ้าไม่ส่งอะไรมาเลย ค่าเริ่มต้นคือ 7 วัน
+                filterStartDate = DateTime.Now.Date.AddDays(-fallbackDays);
+            }
+
+            var result = await _context.StockTransactions
+                .Include(t => t.Item)
+                .Where(t => t.Type == "OUT"
+                         && t.CreatedAt >= filterStartDate
+                         && t.CreatedAt <= filterEndDate
+                         && t.Item != null
+                         // 🔥 ดักจับตระกูลเทสทั้งหมด (TEST และ TETS)
+                         && (t.JobNo == null || (!t.JobNo.ToUpper().Contains("TEST") && !t.JobNo.ToUpper().Contains("TETS"))))
+                .GroupBy(t => t.Item!.Category) // กรุ๊ปตาม Category
+                .Select(g => new CategoryWithdrawalChartDto
+                {
+                    Category = string.IsNullOrEmpty(g.Key) || g.Key == "-" ? "Uncategorized" : g.Key,
+                    TotalWithdrawn = g.Sum(x => x.Quantity) // สั่งบวกรวมยอดทันที
+                })
+                .Where(x => x.TotalWithdrawn > 0)
+                .OrderByDescending(x => x.TotalWithdrawn)
+                .ToListAsync();
+
+            return result;
         }
     }
 }

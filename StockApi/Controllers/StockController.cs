@@ -38,5 +38,41 @@ namespace StockApi.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        // 📊 GET: api/stocks/charts/balances
+        [HttpGet("charts/balances")]
+        public async Task<IActionResult> GetBalanceChart()
+        {
+            try
+            {
+                // 🔥 แก้ตรงนี้: เปลี่ยน _stockService เป็น _service
+                var data = await _service.GetBalanceByCategoryChartAsync();
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // 📈 GET: api/stocks/charts/withdrawals?days=7
+        // days สามารถระบุเป็น 7, 30 หรือ 365 ได้
+        [HttpGet("charts/withdrawals")]
+        public async Task<IActionResult> GetWithdrawalChart(
+            [FromQuery] int? days,
+            [FromQuery] DateTime? startDate,
+            [FromQuery] DateTime? endDate)
+        {
+            try
+            {
+                // โยนหน้าที่คำนวณและกรองวันที่ไปให้ Service จัดการทั้งหมด
+                var data = await _service.GetWithdrawalByCategoryChartAsync(days, startDate, endDate);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
