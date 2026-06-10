@@ -78,11 +78,20 @@
 ### 🔄 Transactions (เบิก/รับ/ตัดจำหน่าย)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/transactions/pending` | ดึงรายการค้างจ่าย (Pending) ทั้งหมด |
-| `POST` | `/api/transactions/withdraw` | ทำรายการเบิกจ่ายอุปกรณ์ออกไปใช้งาน |
-| `POST` | `/api/transactions/receive` | ทำรายการรับอุปกรณ์ค้างจ่ายกลับเข้าสต็อก |
-| `POST` | `/api/transactions/write-off` | ทำรายการตัดจำหน่ายอุปกรณ์ทิ้ง (บังคับกรอก Note) |
-| `GET` | `/api/transactions/write-off/summary`| ดึงประวัติและยอดรวมของการตัดจำหน่ายทั้งหมด |
+| `GET` | `/api/transactions/purchase/request` | ดึงรายการคำขอสั่งซื้ออุปกรณ์ (PR) |
+| `POST` | `/api/transactions/purchase/request` | ทสร้างรายการคำขอสั่งซื้ออุปกรณ์ (PR) |
+| `GET` | `/api/transactions/withdraw/request` | ดึงรายการคำขอเบิกอุปกรณ์ |
+| `POST` | `/api/transactions/withdraw/request` | ทสร้างรายการคำขอเบิกอุปกรณ์ออกจากคลัง |
+| `POST` | `/api/transactions/withdraw/approve`| อนุมัติการเบิกจ่ายอุปกรณ์ |
+| `POST` | `/api/transactions/receive`| ทำรายการรับอุปกรณ์เข้าสต็อก (ทั้งรับใหม่และรับคืน) |
+| `POST` | `/api/transactions/write-off`| ทำรายการตัดจำหน่ายอุปกรณ์ (Write-off) |
+| `GET` | `/api/transactions/write-off/summary`| ดึงประวัติและสรุปยอดตัดจำหน่ายทั้งหมด |
+| `GET` | `/api/transactions/purchase/history`| ดึงประวัติการสั่งซื้อทั้งหมด |
+| `GET` | `/api/transactions/withdraw/history`| ดึงประวัติการเบิกอุปกรณ์ทั้งหมด |
+| `GET` | `/api/transactions/purchase/cancel`| ดึงประวัติการยกเลิกคำขอสั่งซื้อ |
+| `POST` | `/api/transactions/purchase/cancel`| ยกเลิกคำขอสั่งซื้อ (PR) |
+| `GET` | `/api/transactions/withdraw/cancel`| ดึงประวัติการยกเลิกคำขอเบิก |
+| `POST` | `/api/transactions/withdraw/cancel`| ยกเลิกคำขอเบิกอุปกรณ์ |
 
 ### 🤝 Borrowing (ยืม-คืน)
 | Method | Endpoint | Description |
