@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
-  Search, FileClock, Filter, User, Calendar, 
-  ArrowRight, ArrowUpRight, ArrowDownLeft, RotateCcw, 
-  Database, History
+  Search, FileClock, Filter, User, ArrowRight, RotateCcw, History, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { request } from '../utils/fetchUtils';
 import { useToast } from '../context/ToastContext';
@@ -20,6 +18,10 @@ export default function AuditLog() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFiltered, setIsFiltered] = useState(false);
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Preset Default = 10
+
   const fetchLogs = async (code = '') => {
     setLoading(true);
     try {
@@ -29,6 +31,7 @@ export default function AuditLog() {
       const data = await request(endpoint);
       setLogs(data || []);
       setIsFiltered(!!code);
+      setCurrentPage(1); // รีเซ็ตหน้ากลับไปหน้าแรกเมื่อค้นหาใหม่
     } catch (error) {
       console.error(error);
       showToast("ดึงข้อมูลบันทึกระบบไม่สำเร็จ", "error");
@@ -57,8 +60,23 @@ export default function AuditLog() {
     return 'bg-zinc-100 text-zinc-600 border-zinc-200';
   };
 
+  // --- Logic สำหรับ Pagination ---
+  const processedLogs = useMemo(() => {
+    if (!logs) return { paginated: [], totalPages: 0 };
+    
+    // คำนวณ index เริ่มต้นและสิ้นสุดของหน้าปัจจุบัน
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    
+    // ตัดเอาเฉพาะข้อมูลในหน้านั้นๆ
+    const currentItems = logs.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(logs.length / itemsPerPage);
+
+    return { paginated: currentItems, totalPages };
+  }, [logs, currentPage, itemsPerPage]);
+
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-6">
+    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-8 space-y-6 animate-in fade-in duration-500">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-6">
@@ -84,11 +102,11 @@ export default function AuditLog() {
               className="w-full h-10 pl-9 pr-4 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all"
             />
           </div>
-          <button type="submit" className="h-10 px-4 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-800 transition-colors shadow-sm flex items-center gap-2">
+          <button type="submit" className="h-10 px-4 bg-zinc-900 text-white rounded-lg text-sm font-bold hover:bg-zinc-800 transition-colors shadow-sm flex items-center gap-2 active:scale-95">
             <Filter size={14} /> ค้นหา
           </button>
           {isFiltered && (
-            <button type="button" onClick={handleReset} className="h-10 w-10 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition-colors" title="รีเซ็ต">
+            <button type="button" onClick={handleReset} className="h-10 w-10 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition-colors shadow-sm active:scale-95" title="รีเซ็ต">
               <RotateCcw size={16} />
             </button>
           )}
@@ -99,90 +117,79 @@ export default function AuditLog() {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-zinc-50/80 border-b border-zinc-200 text-xs uppercase text-zinc-500 font-semibold sticky top-0 z-10">
+            <thead className="bg-zinc-50/80 border-b border-zinc-200 text-[11px] uppercase tracking-wider text-zinc-500 font-bold sticky top-0 z-10">
               <tr>
-                {/* 1. Date & Time (Fixed Width) */}
-                <th className="px-4 py-3 w-[160px] whitespace-nowrap">วันเวลา</th>
-                
-                {/* 2. Item Code (Fixed Width) */}
-                <th className="px-4 py-3 w-[140px] whitespace-nowrap">รหัสอุปกรณ์</th>
-
-                {/* 3. Action (Fixed Width) */}
-                <th className="px-4 py-3 w-[150px] whitespace-nowrap">การกระทำ</th>
-
-                {/* 4. Movement (Fixed Width) */}
-                <th className="px-4 py-3 w-[100px] text-center whitespace-nowrap">การเปลี่ยนแปลง</th>
-
-                {/* 5. Detail (Fluid - กินพื้นที่ที่เหลือ) */}
-                <th className="px-4 py-3 min-w-[300px]">รายละเอียด (เดิม → ใหม่)</th>
-
-                {/* 6. User (Fixed Width) */}
-                <th className="px-4 py-3 w-[140px] text-right whitespace-nowrap">ผู้ทำรายการ</th>
+                <th className="px-6 py-4 w-[160px] whitespace-nowrap">วันเวลา</th>
+                <th className="px-6 py-4 w-[140px] whitespace-nowrap">รหัสอุปกรณ์</th>
+                <th className="px-6 py-4 w-[150px] whitespace-nowrap">การกระทำ</th>
+                <th className="px-6 py-4 w-[100px] text-center whitespace-nowrap">การเปลี่ยนแปลง</th>
+                <th className="px-6 py-4 min-w-[300px]">รายละเอียด (เดิม → ใหม่)</th>
+                <th className="px-6 py-4 w-[140px] text-right whitespace-nowrap">ผู้ทำรายการ</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-zinc-100">
+            <tbody className="text-sm divide-y divide-zinc-50">
               {loading ? (
                  [...Array(5)].map((_, i) => (
-                  <tr key={i}><td colSpan="6" className="px-4 py-4"><div className="h-4 bg-zinc-100 rounded w-full animate-pulse"></div></td></tr>
+                  <tr key={i}><td colSpan="6" className="px-6 py-4"><div className="h-6 bg-zinc-100 rounded w-full animate-pulse"></div></td></tr>
                 ))
-              ) : logs.length > 0 ? (
-                logs.map((log) => (
-                  <tr key={log.id} className="group hover:bg-zinc-50 transition-colors">
+              ) : processedLogs.paginated.length > 0 ? (
+                processedLogs.paginated.map((log) => (
+                  <tr key={log.id} className="group hover:bg-zinc-50/80 transition-colors">
                     
                     {/* Timestamp */}
-                    <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap font-mono">
+                    <td className="px-6 py-3.5 text-zinc-500 text-[11px] whitespace-nowrap font-mono font-medium">
                       {log.createdAt}
                     </td>
 
                     {/* Item Code */}
-                    <td className="px-4 py-3">
-                      <span className="font-mono font-medium text-zinc-700 bg-zinc-50 px-1.5 py-0.5 rounded border border-zinc-200 text-xs">
+                    <td className="px-6 py-3.5">
+                      <span className="font-mono font-bold text-zinc-700 bg-zinc-100 px-2 py-1 rounded border border-zinc-200 text-xs shadow-sm">
                         {log.recordId}
                       </span>
                     </td>
 
                     {/* Action */}
-                    <td className="px-4 py-3">
-                      <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border tracking-wide whitespace-nowrap", getActionColor(log.action))}>
-                        {log.action.split(' ')[0]} {/* ตัดเอาแค่คำแรก เช่น STOCK_IN */}
+                    <td className="px-6 py-3.5">
+                      <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wide whitespace-nowrap shadow-sm", getActionColor(log.action))}>
+                        {log.action.split(' ')[0]}
                       </span>
                     </td>
 
                     {/* Movement (+/-) */}
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-6 py-3.5 text-center">
                        {log.receive !== "+0" && log.receive !== "0" ? (
-                         <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                         <span className="text-emerald-600 font-extrabold text-xs bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100 shadow-sm">
                            {log.receive}
                          </span>
                        ) : log.withdraw !== "+0" && log.withdraw !== "0" ? (
-                         <span className="text-amber-600 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                         <span className="text-amber-600 font-extrabold text-xs bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100 shadow-sm">
                            {log.withdraw.replace('+', '')}
                          </span>
                        ) : (
-                         <span className="text-zinc-300">-</span>
+                         <span className="text-zinc-300 font-bold">-</span>
                        )}
                     </td>
 
                     {/* Detail (Old -> New) */}
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-3.5">
                       <div className="flex items-center gap-2 text-xs flex-wrap">
-                        <span className="text-zinc-500 line-through decoration-zinc-300">
+                        <span className="text-zinc-400 line-through decoration-zinc-300 font-medium">
                           {log.oldValue.replace('Balance: ', '')}
                         </span>
-                        <ArrowRight size={12} className="text-zinc-400 shrink-0" />
-                        <span className="text-zinc-900 font-semibold bg-white px-1.5 py-0.5 rounded border border-zinc-200 shadow-sm">
+                        <ArrowRight size={12} className="text-zinc-300 shrink-0" />
+                        <span className="text-zinc-900 font-bold bg-white px-2 py-1 rounded-md border border-zinc-200 shadow-sm">
                           {log.newValue.replace('Balance: ', '')}
                         </span>
                       </div>
                     </td>
 
                     {/* User */}
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-6 py-3.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        <span className="text-zinc-700 font-medium text-xs">{log.createdBy}</span>
+                        <span className="text-zinc-700 font-bold text-[11px]">{log.createdBy}</span>
                         <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 border border-zinc-200 shrink-0">
                           <User size={12} />
                         </div>
@@ -195,8 +202,8 @@ export default function AuditLog() {
                 <tr>
                   <td colSpan="6" className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center justify-center text-zinc-400">
-                      <FileClock size={48} strokeWidth={1} className="mb-3 opacity-20"/>
-                      <p className="text-zinc-900 font-medium">ไม่พบประวัติการทำรายการ</p>
+                      <FileClock size={40} strokeWidth={1.5} className="mb-3 opacity-30"/>
+                      <p className="text-zinc-500 font-bold text-sm">ไม่พบประวัติการทำรายการ</p>
                     </div>
                   </td>
                 </tr>
@@ -204,6 +211,46 @@ export default function AuditLog() {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <span className="font-medium">จำนวนแถว:</span>
+            <select 
+              value={itemsPerPage} 
+              onChange={(e) => { 
+                setItemsPerPage(Number(e.target.value)); 
+                setCurrentPage(1); 
+              }} 
+              className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-sm font-bold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 cursor-pointer shadow-sm"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-zinc-500">หน้า <span className="font-bold text-zinc-900">{currentPage}</span> จาก <span className="font-bold text-zinc-900">{processedLogs.totalPages || 1}</span></span>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                disabled={currentPage === 1 || loading} 
+                className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 bg-white hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+              >
+                <ChevronLeft size={16} strokeWidth={2.5} />
+              </button>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(processedLogs.totalPages, p + 1))} 
+                disabled={currentPage >= processedLogs.totalPages || processedLogs.totalPages === 0 || loading} 
+                className="p-1.5 rounded-lg border border-zinc-200 text-zinc-500 bg-white hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+              >
+                <ChevronRight size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

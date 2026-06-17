@@ -53,10 +53,10 @@ namespace StockApi.Services
 
         public async Task RegisterAsync(RegisterRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new Exception("ระบบอนุญาตให้ใช้อีเมลขององค์กร (@cosmo.co.th) ในการสมัครเท่านั้น");
-            }
+            // if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            // {
+            //     throw new Exception("ระบบอนุญาตให้ใช้อีเมลขององค์กร (@cosmo.co.th) ในการสมัครเท่านั้น");
+            // }
 
             if (request.Role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase))
             {
@@ -274,10 +274,10 @@ namespace StockApi.Services
             if (user == null) throw new Exception("ไม่พบข้อมูลผู้ใช้งาน");
 
             // 🔥 1. ดักโดเมนอีเมล
-            if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
-            }
+            // if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            // {
+            //     throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
+            // }
 
             // 🔥 2. เช็คอีเมลซ้ำ (เช็คเฉพาะตอนที่เปลี่ยนอีเมลใหม่ ไม่ตรงกับของเดิม)
             if (user.Email != request.Email && await _context.Users.AnyAsync(u => u.Email == request.Email))
@@ -301,10 +301,10 @@ namespace StockApi.Services
             if (user == null) throw new Exception($"ไม่พบผู้ใช้งาน ID: {targetStaffId}");
 
             // 🔥 1. ดักโดเมนอีเมล
-            if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
-            }
+            // if (!request.Email.EndsWith("@cosmo.co.th", StringComparison.OrdinalIgnoreCase))
+            // {
+            //     throw new Exception("ระบบอนุญาตให้ใช้อีเมลองค์กร (@cosmo.co.th) เท่านั้น");
+            // }
 
             // 🔥 2. เช็คอีเมลซ้ำ (เช็คเฉพาะตอนที่แอดมินเปลี่ยนใหม่อีเมลใหม่)
             if (user.Email != request.Email && await _context.Users.AnyAsync(u => u.Email == request.Email))
